@@ -38,5 +38,10 @@ Thumbs.db
 .coverage
 htmlcov/
 
+# Frontend
+ui/node_modules/
+ui/.next/
+ui/tsconfig.tsbuildinfo
+
 # scale-agentex local platform (not part of this repo)
 scale-agentex/
