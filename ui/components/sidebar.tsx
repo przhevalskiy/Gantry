@@ -338,7 +338,7 @@ export function Sidebar() {
         {[
           { icon: <IconApi />, label: 'Docs', title: 'Docs', onClick: undefined },
           { icon: <IconDownload />, label: 'Exports', title: 'Export reports', onClick: undefined },
-          { icon: <IconCirclePile />, label: 'Agents', title: 'Agents', onClick: undefined },
+          { icon: <IconCirclePile />, label: 'Agents', title: 'Agents', onClick: () => router.push('/agents') },
           { icon: <IconSquarePen />, label: 'New Task', title: 'New Task', onClick: () => router.push('/') },
         ].map(({ icon, label, title, onClick }) => (
           <button
