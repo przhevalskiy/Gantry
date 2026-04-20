@@ -33,6 +33,7 @@ from agentex.types.text_content import TextContent
 
 with workflow.unsafe.imports_passed_through():
     from project.planner import _extract_task_prompt
+    from project.complexity import classify_tier, params_for_tier, TIER_LABELS
     from workflows.architect_agent import ArchitectAgent
     from workflows.builder_agent import BuilderAgent
     from workflows.inspector_agent import InspectorAgent
@@ -136,12 +137,31 @@ class SwarmOrchestrator(BaseWorkflow):
         task_queue = environment_variables.WORKFLOW_TASK_QUEUE or "web_scout_queue"
         repo_path = params.params.get("repo_path", ".") if params.params else "."
         branch_prefix = params.params.get("branch_prefix", "swarm") if params.params else "swarm"
-        lightweight_mode = bool(params.params.get("lightweight_mode", False)) if params.params else False
-        max_heal = int(params.params.get("max_heal_cycles", MAX_HEAL_CYCLES)) if params.params else MAX_HEAL_CYCLES
-        max_parallel_tracks = int(params.params.get("max_parallel_tracks", MAX_PARALLEL_TRACKS)) if params.params else MAX_PARALLEL_TRACKS
-        if lightweight_mode:
-            max_heal = 1
-            max_parallel_tracks = 1
+
+        # Auto-classify complexity tier unless caller passed an explicit one
+        explicit_tier = int(params.params.get("tier", -1)) if params.params else -1
+        if explicit_tier >= 0:
+            tier = explicit_tier
+        else:
+            tier = classify_tier(goal)
+        tp = params_for_tier(tier)
+
+        lightweight_mode = bool(params.params.get("lightweight_mode", tp["lightweight_mode"])) if params.params else tp["lightweight_mode"]
+        max_heal = int(params.params.get("max_heal_cycles", tp["max_heal_cycles"])) if params.params else tp["max_heal_cycles"]
+        max_parallel_tracks = int(params.params.get("max_parallel_tracks", tp["max_parallel_tracks"])) if params.params else tp["max_parallel_tracks"]
+
+        tier_label = TIER_LABELS.get(tier, f"Tier {tier}")
+        await adk.messages.create(
+            task_id=task_id,
+            content=TextContent(
+                author="agent",
+                content=(
+                    f"[Foreman] Complexity tier: {tier_label} (Tier {tier}) — "
+                    f"{'lightweight, ' if lightweight_mode else ''}"
+                    f"{max_parallel_tracks} track(s), {max_heal} heal cycle(s)"
+                ),
+            ),
+        )
 
         last_result = ""
         iteration = 0
@@ -253,6 +273,9 @@ class SwarmOrchestrator(BaseWorkflow):
                 "tech_stack": [],
                 "repo_root": repo_path,
             }
+        # Always overwrite repo_root with the user-supplied path — the architect LLM
+        # may omit or invent it, which causes builders to write to the wrong directory.
+        architect_plan["repo_root"] = repo_path
 
         tracks = _extract_tracks(architect_plan, max_parallel_tracks=max_parallel_tracks)
         stack = ", ".join(architect_plan.get("tech_stack", [])[:4]) or "unknown stack"
@@ -269,6 +292,17 @@ class SwarmOrchestrator(BaseWorkflow):
                 ),
             ),
         )
+
+        # Snapshot pre-existing tests so Inspector can detect regressions
+        try:
+            pre_existing_tests: list[str] = await workflow.execute_activity(
+                "swarm_find_test_files",
+                args=[repo_path],
+                start_to_close_timeout=timedelta(seconds=30),
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            )
+        except Exception:
+            pre_existing_tests = []
 
         # ── Step 2: Parallel Builders + Inspector self-healing loop ───────────
         heal_instructions: list[str] = []
@@ -337,7 +371,7 @@ class SwarmOrchestrator(BaseWorkflow):
 
             inspector_json: str = await workflow.execute_child_workflow(
                 InspectorAgent.run,
-                args=[goal, repo_path, task_id],
+                args=[goal, repo_path, task_id, pre_existing_tests or None],
                 id=f"{task_id}-r{iteration}-inspector-{cycle}",
                 task_queue=task_queue,
                 execution_timeout=INSPECTOR_TIMEOUT,

@@ -18,7 +18,7 @@ The foreman should match crew size to task complexity. Spinning up 5 agents to b
 | Security | Skipped |
 | DevOps | Commit + PR |
 
-**Estimated cost:** $0.10–$0.40  
+**Estimated cost:** $0.05–$0.15  
 **Estimated time:** 1–3 min
 
 ---
@@ -37,7 +37,7 @@ The foreman should match crew size to task complexity. Spinning up 5 agents to b
 | Security | Secrets scan only |
 | DevOps | Branch + PR |
 
-**Estimated cost:** $0.50–$1.50  
+**Estimated cost:** $0.20–$0.40  
 **Estimated time:** 3–8 min
 
 ---
@@ -56,7 +56,7 @@ The foreman should match crew size to task complexity. Spinning up 5 agents to b
 | Security | Secrets + dep audit + SAST |
 | DevOps | Branch + commit + PR with description |
 
-**Estimated cost:** $2–$6  
+**Estimated cost:** $0.60–$1.50  
 **Estimated time:** 8–20 min
 
 ---
@@ -75,7 +75,7 @@ The foreman should match crew size to task complexity. Spinning up 5 agents to b
 | Security | Full scan — secrets, CVEs, SAST, OWASP checks |
 | DevOps | Branch strategy, staged commits, PR with full changelog |
 
-**Estimated cost:** $8–$20  
+**Estimated cost:** $2–$6  
 **Estimated time:** 20–45 min
 
 ---
@@ -95,7 +95,7 @@ The foreman should match crew size to task complexity. Spinning up 5 agents to b
 | Security | Full audit each session, tracks findings over time |
 | DevOps | Per-phase PRs, links to prior PRs in description |
 
-**Estimated cost:** $20–$80+ (across sessions)  
+**Estimated cost:** $8–$30+ (across sessions)  
 **Estimated time:** Multiple sessions over hours or days
 
 ---
@@ -131,7 +131,9 @@ Tier maps to:
 ## Implementation Priority
 
 - [x] Tier 2 — current default behavior
-- [ ] Tier 0/1 — single-track fast path, skip Security, lightweight Inspector
-- [ ] Complexity classifier in Architect prompt preamble
-- [ ] Tier 3 — add explicit 4-track cap enforcement
+- [x] Context compression — read result consumption, periodic summarization, 800-char tool cap
+- [x] Prompt caching — system + task prompt cached across turns
+- [x] `lightweight_mode` param — 1 track, 1 heal cycle, Security skipped (Tier 0/1)
+- [ ] Auto complexity classifier wired to Architect prompt
+- [ ] Tier 3 — explicit 4-track cap + Inspector regression awareness
 - [ ] Tier 4 — episodic memory + multi-session foreman persistence
