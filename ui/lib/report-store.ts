@@ -5,7 +5,7 @@ export type SavedReport = {
   createdAt: string; // ISO
 };
 
-const KEY = 'oumuamua_reports';
+const KEY = 'keystone_reports';
 const MAX = 50;
 
 function load(): SavedReport[] {

@@ -4,26 +4,21 @@ import { useMutation } from '@tanstack/react-query';
 import { agentRPCNonStreaming } from 'agentex/lib';
 import { useAgentex } from '@/components/providers';
 
-type CreateTaskInput = {
-  query: string;
-  extraParams?: Record<string, unknown>;
-};
-
-export function useCreateTask() {
+export function useSendFollowUp(taskId: string) {
   const { agentexClient } = useAgentex();
 
   return useMutation({
-    mutationFn: async ({ query, extraParams = {} }: CreateTaskInput) => {
+    mutationFn: async (prompt: string) => {
       const response = await agentRPCNonStreaming(
         agentexClient,
         { agentName: 'swarm-factory' },
-        'task/create',
+        'event/send',
         {
-          params: {
-            query,
-            prompt: query,
-            content: query,
-            ...extraParams,
+          task_id: taskId,
+          content: {
+            type: 'text' as const,
+            content: prompt,
+            author: 'user',
           },
         }
       );

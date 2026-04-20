@@ -5,7 +5,7 @@ import { Providers } from '@/components/providers';
 import { Sidebar } from '@/components/sidebar';
 
 export const metadata: Metadata = {
-  title: 'Oumuamua — Deep Research',
+  title: 'Keystone — Deep Research',
   description: 'AI-powered web research. Multi-source synthesis with live browser.',
 };
 

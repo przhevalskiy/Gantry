@@ -50,7 +50,7 @@ export function SharedReportView({ taskId }: { taskId: string }) {
           fontSize: '0.875rem',
           fontWeight: 600,
         }}>
-          ← Run your own research
+          ← Start a build
         </Link>
       </div>
     );
@@ -82,7 +82,7 @@ export function SharedReportView({ taskId }: { taskId: string }) {
           letterSpacing: '-0.01em',
           flexShrink: 0,
         }}>
-          ← Oumuamua
+          ← Keystone
         </Link>
 
         <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -141,7 +141,7 @@ export function SharedReportView({ taskId }: { taskId: string }) {
           justifyContent: 'space-between',
         }}>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-            Researched by Oumuamua · {date}
+            Built by Keystone · {date}
           </p>
           <Link href="/" style={{
             fontSize: '0.8125rem',
@@ -149,7 +149,7 @@ export function SharedReportView({ taskId }: { taskId: string }) {
             textDecoration: 'none',
             fontWeight: 600,
           }}>
-            Run your own research →
+            Start your own build →
           </Link>
         </div>
       </div>

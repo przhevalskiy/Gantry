@@ -82,9 +82,9 @@ function IconApi() {
   );
 }
 
-// ── History entry ──────────────────────────────────────────────────────────────
+// ── Tasks entry ──────────────────────────────────────────────────────────────
 
-function HistoryEntry({
+function TasksEntry({
   report,
   onDelete,
   collapsed,
@@ -98,7 +98,7 @@ function HistoryEntry({
   const menuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
-  const isActive = pathname === `/r/${report.taskId}` || pathname === `/research/${report.taskId}`;
+  const isActive = pathname === `/r/${report.taskId}` || pathname === `/task/${report.taskId}`;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -114,7 +114,7 @@ function HistoryEntry({
   const menuItems = [
     {
       label: 'Activate',
-      onClick: () => { router.push(`/research/${report.taskId}`); setMenuOpen(false); },
+      onClick: () => { router.push(`/task/${report.taskId}`); setMenuOpen(false); },
     },
     {
       label: 'Copy link',
@@ -256,7 +256,7 @@ export function Sidebar() {
   const router = useRouter();
 
   useEffect(() => {
-    const stored = localStorage.getItem('oumuamua_sidebar_collapsed');
+    const stored = localStorage.getItem('keystone_sidebar_collapsed');
     if (stored === 'true') setCollapsed(true);
   }, []);
 
@@ -266,7 +266,7 @@ export function Sidebar() {
 
   function toggleCollapsed() {
     setCollapsed(c => {
-      localStorage.setItem('oumuamua_sidebar_collapsed', String(!c));
+      localStorage.setItem('keystone_sidebar_collapsed', String(!c));
       return !c;
     });
   }
@@ -307,7 +307,7 @@ export function Sidebar() {
             fontWeight: 600,
             letterSpacing: '-0.02em',
           }}>
-            Oumuamua
+            Keystone
           </Link>
         )}
 
@@ -377,7 +377,7 @@ export function Sidebar() {
         ))}
       </div>
 
-      {/* History label */}
+      {/* Tasks label */}
       {!collapsed && (
         <div style={{ padding: '0', flexShrink: 0 }}>
           <span style={{
@@ -389,12 +389,12 @@ export function Sidebar() {
             letterSpacing: '0.08em',
             color: 'var(--text-secondary)',
           }}>
-            History
+            Tasks
           </span>
         </div>
       )}
 
-      {/* History list */}
+      {/* Tasks list */}
       <div style={{
         flex: 1,
         overflowY: 'auto',
@@ -410,12 +410,12 @@ export function Sidebar() {
             padding: '0.375rem 0.75rem',
             opacity: 0.5,
           }}>
-            No research yet
+            No builds yet
           </p>
         )}
 
         {reports.slice(0, 20).map(report => (
-          <HistoryEntry
+          <TasksEntry
             key={report.taskId}
             report={report}
             onDelete={() => handleDelete(report.taskId)}

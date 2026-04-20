@@ -4,44 +4,29 @@ import { persist } from 'zustand/middleware';
 export type AgentModel = 'claude-sonnet-4-6' | 'claude-haiku-4-5' | 'default';
 
 export type AgentConfig = {
-  // Research pipeline
-  maxAnalysts: number;          // 2–8
-  maxVerifiers: number;         // 1–5
-  analystDepth: 'shallow' | 'deep';
-
-  // Execution pipeline
-  requireApprovalForIrreversible: boolean;
-  maxExecutionSteps: number;    // 1–20
-  httpTimeoutSeconds: number;   // 10–120
-
-  // Model overrides per role
-  modelStrategist: AgentModel;
-  modelCritic: AgentModel;
-  modelTaskPlanner: AgentModel;
-  modelAnalyst: AgentModel;
-  modelScout: AgentModel;
-  modelVerifier: AgentModel;
-
-  // Display
+  swarmRepoPat: string;
+  swarmBranchPrefix: string;
+  swarmMaxHealCycles: number;
+  swarmMaxParallelTracks: number;
+  modelArchitect: AgentModel;
+  modelBuilder: AgentModel;
+  modelInspector: AgentModel;
+  modelSecurity: AgentModel;
+  modelDevOps: AgentModel;
   showAgentTagsInFeed: boolean;
-  showRawClaimsBeforeSynthesis: boolean;
 };
 
 export const DEFAULT_CONFIG: AgentConfig = {
-  maxAnalysts: 5,
-  maxVerifiers: 3,
-  analystDepth: 'deep',
-  requireApprovalForIrreversible: false,
-  maxExecutionSteps: 10,
-  httpTimeoutSeconds: 30,
-  modelStrategist: 'default',
-  modelCritic: 'default',
-  modelTaskPlanner: 'default',
-  modelAnalyst: 'default',
-  modelScout: 'default',
-  modelVerifier: 'default',
+  swarmRepoPat: '.',
+  swarmBranchPrefix: 'swarm',
+  swarmMaxHealCycles: 3,
+  swarmMaxParallelTracks: 4,
+  modelArchitect: 'default',
+  modelBuilder: 'default',
+  modelInspector: 'default',
+  modelSecurity: 'default',
+  modelDevOps: 'default',
   showAgentTagsInFeed: false,
-  showRawClaimsBeforeSynthesis: false,
 };
 
 type AgentConfigStore = {
@@ -64,6 +49,6 @@ export const useAgentConfigStore = create<AgentConfigStore>()(
         );
       },
     }),
-    { name: 'oumuamua_agent_config' }
+    { name: 'keystone_agent_config' }
   )
 );
