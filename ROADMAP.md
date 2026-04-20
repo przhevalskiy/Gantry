@@ -1,4 +1,4 @@
-# Oumuamua — Product Roadmap
+# Keystone — Product Roadmap
 
 ## Architecture Constraint (Read This First)
 
@@ -231,7 +231,7 @@ Run the same verification query as Phase 1:
 
 ---
 
-## Phase 2 — Custom Web App (oumuamua-ui)
+## Phase 2 — Custom Web App (keystone-ui)
 
 **Goal:** A standalone Next.js app that replaces the Scale dev UI for demos and external use.  
 **Architecture rule:** This app ONLY talks to `:5003` via the `agentex` npm SDK. It does not talk to Temporal directly. It does not talk to the agent process directly.
@@ -240,20 +240,20 @@ Run the same verification query as Phase 1:
 
 ### Step 2.1 — Scaffold the app
 
-From the Oumuamua root:
+From Keystone root:
 
 ```bash
-npx create-next-app@latest oumuamua-ui \
+npx create-next-app@latest keystone-ui \
   --typescript \
   --tailwind \
   --app \
   --no-src-dir \
   --import-alias "@/*"
-cd oumuamua-ui
+cd keystone-ui
 npm install agentex @tanstack/react-query
 ```
 
-**Guardrail:** `cd oumuamua-ui && npm run dev` starts without errors on port 3000. The default Next.js page loads.
+**Guardrail:** `cd keystone-ui && npm run dev` starts without errors on port 3000. The default Next.js page loads.
 
 **Pause here. Confirm the app starts cleanly.**
 
@@ -261,7 +261,7 @@ npm install agentex @tanstack/react-query
 
 ### Step 2.2 — Environment configuration
 
-Create `oumuamua-ui/.env.local`:
+Create `keystone-ui/.env.local`:
 
 ```
 NEXT_PUBLIC_AGENTEX_API_BASE_URL=http://localhost:5003
@@ -269,13 +269,13 @@ NEXT_PUBLIC_AGENTEX_API_BASE_URL=http://localhost:5003
 
 **Do not hardcode this URL anywhere in component code.** Always read from `process.env.NEXT_PUBLIC_AGENTEX_API_BASE_URL`.
 
-**Guardrail:** `console.log(process.env.NEXT_PUBLIC_AGENTEX_API_BASE_URL)` in any server component returns `http://localhost:5003`. If undefined, the `.env.local` file is not being read — confirm it is at `oumuamua-ui/.env.local`, not the repo root.
+**Guardrail:** `console.log(process.env.NEXT_PUBLIC_AGENTEX_API_BASE_URL)` in any server component returns `http://localhost:5003`. If undefined, the `.env.local` file is not being read — confirm it is at `keystone-ui/.env.local`, not the repo root.
 
 ---
 
 ### Step 2.3 — Agentex client singleton
 
-Create `oumuamua-ui/lib/agentex-client.ts`:
+Create `keystone-ui/lib/agentex-client.ts`:
 
 ```typescript
 import { AgentexSDK } from 'agentex'
@@ -295,7 +295,7 @@ This is the only place the SDK is instantiated. Every hook and component imports
 
 ### Step 2.4 — React Query provider
 
-Update `oumuamua-ui/app/layout.tsx` to wrap children in a React Query provider:
+Update `keystone-ui/app/layout.tsx` to wrap children in a React Query provider:
 
 ```typescript
 'use client'
@@ -322,7 +322,7 @@ export default function RootLayout({ children }) {
 
 ### Step 2.5 — Task subscription hook
 
-Create `oumuamua-ui/hooks/use-task-subscription.ts`:
+Create `keystone-ui/hooks/use-task-subscription.ts`:
 
 ```typescript
 import { useEffect, useState } from 'react'
@@ -352,7 +352,7 @@ export function useTaskSubscription(taskId: string | null) {
 
 ### Step 2.6 — Three pages only
 
-**Page 1: Home (`oumuamua-ui/app/page.tsx`)**
+**Page 1: Home (`keystone-ui/app/page.tsx`)**
 
 Input box + submit button. On submit:
 1. Call `agentexClient.tasks.create({ agentName: 'web-scout', params: { prompt: query } })`
@@ -361,14 +361,14 @@ Input box + submit button. On submit:
 
 No streaming on this page. Just create and redirect.
 
-**Page 2: Research view (`oumuamua-ui/app/research/[taskId]/page.tsx`)**
+**Page 2: Research view (`keystone-ui/app/research/[taskId]/page.tsx`)**
 
 - Use `useTaskSubscription(taskId)` for real-time updates
 - Show messages as they arrive — each `"Using tool: navigate..."` message is a source being read
 - When a message from `author: "agent"` contains `## Summary`, render it as the final answer
 - Show a spinner/loading state while `task.status !== 'completed'`
 
-**Page 3: Shared result (`oumuamua-ui/app/r/[taskId]/page.tsx`)**
+**Page 3: Shared result (`keystone-ui/app/r/[taskId]/page.tsx`)**
 
 - Same as research view but read-only
 - No input box
@@ -414,10 +414,10 @@ This is the visual differentiator. Users see the agent working in real time. No 
 
 ### Step 3.1 — Extension scaffold
 
-Create `oumuamua-extension/` at the repo root:
+Create `keystone-extension/` at repo root:
 
 ```
-oumuamua-extension/
+keystone-extension/
   manifest.json       ← Chrome extension config (Manifest V3)
   content.js          ← reads page context, injects sidebar
   background.js       ← calls Agentex API, manages task lifecycle
@@ -426,7 +426,7 @@ oumuamua-extension/
   icons/              ← 16, 48, 128px icons
 ```
 
-**Guardrail:** Load the unpacked extension in Chrome (`chrome://extensions` → Load unpacked → select `oumuamua-extension/`). The extension icon appears in the toolbar. No console errors.
+**Guardrail:** Load the unpacked extension in Chrome (`chrome://extensions` → Load unpacked → select `keystone-extension/`). The extension icon appears in the toolbar. No console errors.
 
 **Pause here. Confirm the extension loads without errors.**
 
@@ -434,12 +434,12 @@ oumuamua-extension/
 
 ### Step 3.2 — Manifest V3 config
 
-`oumuamua-extension/manifest.json`:
+`keystone-extension/manifest.json`:
 
 ```json
 {
   "manifest_version": 3,
-  "name": "Oumuamua",
+  "name": "Keystone",
   "version": "0.1.0",
   "description": "Deep research on any page",
   "permissions": ["activeTab", "scripting", "storage"],
@@ -619,7 +619,7 @@ These apply to every phase. If any of these are violated, stop and reassess befo
 - [ ] No deprecation warnings in worker logs (`acp_type="async"`)
 
 ### Phase 2
-- [ ] `oumuamua-ui` starts on port 3000 without errors
+- [ ] `keystone-ui` starts on port 3000 without errors
 - [ ] `web-scout` appears in agents list via SDK
 - [ ] Task creation works from the home page
 - [ ] Real-time message feed updates without polling

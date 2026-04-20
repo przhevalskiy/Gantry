@@ -132,7 +132,7 @@ Links to home.
 - Show raw claims before synthesis: toggle
 
 ### Storage
-Settings written to `localStorage` as `oumuamua_agent_config`.
+Settings written to `localStorage` as `keystone_agent_config`.
 On task creation, config is passed as params alongside the task prompt.
 Backend reads config overrides from task params where supported.
 

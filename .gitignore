@@ -18,7 +18,7 @@ build/
 .python-version
 
 # Screenshots
-oumuamua_screenshots/
+keystone_screenshots/
 
 # IDE
 .idea/

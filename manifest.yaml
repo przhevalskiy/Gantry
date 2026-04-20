@@ -4,9 +4,9 @@ build:
   context:
     root: ../
     include_paths:
-      - web_scout
-    dockerfile: web_scout/Dockerfile
-    dockerignore: web_scout/.dockerignore
+      - Keystone
+    dockerfile: Keystone/Dockerfile
+    dockerignore: Keystone/.dockerignore
 
 local_development:
   agent:
@@ -18,13 +18,14 @@ local_development:
 
 agent:
   acp_type: agentic
-  name: web-scout
-  description: "Agentic browser agent — prompt in, web actions out"
+  name: swarm-factory
+  description: "Durable Software Engineering Factory — Architect → Builder → Inspector → Security → DevOps"
   temporal:
     enabled: true
     workflows:
-      - name: web-scout
+      - name: swarm-factory
         queue_name: web_scout_queue
+        description: "Durable Software Engineering Factory — Architect → Builder → Inspector → Security → DevOps"
 
 deployment:
   image:
@@ -34,8 +35,8 @@ deployment:
     - name: my-registry-secret
   global:
     agent:
-      name: "web-scout"
-      description: "Agentic browser agent — prompt in, web actions out"
+      name: "swarm-factory"
+      description: "Durable Software Engineering Factory — Architect → Builder → Inspector → Security → DevOps"
     replicaCount: 1
     resources:
       requests:

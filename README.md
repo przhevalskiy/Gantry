@@ -1,4 +1,4 @@
-# Oumuamua
+# Keystone
 
 **Multi-dimensional agent ecosystem that researches, reasons, and acts.**
 
@@ -8,7 +8,7 @@ Role-differentiated agents, dynamically spawned, working in parallel to complete
 
 ## What it does
 
-Oumuamua takes a natural language task and routes it through a pipeline of specialized agents:
+Keystone takes a natural language task and routes it through a pipeline of specialized agents:
 
 **Research mode** — answers questions by reading the web in parallel
 ```
@@ -41,7 +41,7 @@ The same infrastructure handles both. The Strategist determines which mode (or b
 
 ### Why this is different from a single-agent loop
 
-Most browser agents (Manus, etc.) use one generalist agent doing everything sequentially. Oumuamua uses **role differentiation and parallelism**:
+Most browser agents (Manus, etc.) use one generalist agent doing everything sequentially. Keystone uses **role differentiation and parallelism**:
 
 - Scout runs 6–8 searches simultaneously
 - N Analysts read different URLs in parallel
@@ -82,7 +82,7 @@ Every agent is a Temporal workflow. Every action is a Temporal activity. Crashes
 ## Project structure
 
 ```
-oumuamua/
+keystone/
 ├── activities/                  # Temporal activities
 │   ├── strategist_activity.py   # dynamic research + mode planning
 │   ├── scout_planner_activity.py

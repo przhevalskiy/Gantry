@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dev.sh — Oumuamua development launcher
+# dev.sh — Keystone development launcher
 #
 # Assumes the Agentex platform (Docker) is already running via:
 #   cd scale-agentex/agentex && docker compose up -d
@@ -8,7 +8,7 @@
 #   1. Kills stale processes on local ports (8000, 8233, 3000)
 #   2. Starts Temporal dev server if not running (:7233)
 #   3. Starts the web-scout agent (ACP :8000 + Temporal worker)
-#   4. Starts oumuamua-ui (:3000)
+#   4. Starts keystone-ui (:3000)
 #
 # Usage:
 #   ./dev.sh               Start (live browser + search)
@@ -23,7 +23,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
 AGENTEX_DIR="$ROOT/scale-agentex/agentex"
-UI_DIR="$ROOT/../oumuamua-ui"
+UI_DIR="$ROOT/ui"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -73,13 +73,13 @@ _stop_all() {
 
 _show_status() {
   echo ""
-  for svc_port in "Agentex API:5003" "Temporal:7233" "Temporal UI:8080" "Agent ACP:8000" "oumuamua-ui:3000" "Redis:6379"; do
+  for svc_port in "Agentex API:5003" "Temporal:7233" "Temporal UI:8080" "Agent ACP:8000" "keystone-ui:3000" "Redis:6379"; do
     label="${svc_port%%:*}"; port="${svc_port##*:}"
     printf "  %-20s" "$label (:$port)"
     nc -z localhost "$port" 2>/dev/null && echo -e "${GREEN}running${NC}" || echo -e "${RED}stopped${NC}"
   done
   echo ""
-  echo "  http://localhost:3000       oumuamua-ui"
+  echo "  http://localhost:3000       keystone-ui"
   echo "  http://localhost:5003/swagger  Agentex API"
   echo "  http://localhost:8080       Temporal UI"
   echo ""
@@ -120,9 +120,13 @@ done
 if [ "$PLATFORM" = true ]; then
   _start_platform
 elif ! nc -z localhost 5003 2>/dev/null; then
-  warn "Agentex backend not detected on :5003"
-  warn "Start it with: cd scale-agentex/agentex && docker compose up -d"
-  warn "Or re-run with: ./dev.sh --platform"
+  header "Starting Agentex platform (Docker)"
+  if [ ! -d "$AGENTEX_DIR" ]; then
+    err "Agentex directory not found at $AGENTEX_DIR"; exit 1
+  fi
+  (cd "$AGENTEX_DIR" && docker compose up -d)
+  wait_for_port 5003 "Agentex API" 60
+  ok "Platform ready"
 fi
 
 # ── Step 1: Kill stale local processes ───────────────────────────────────────
@@ -164,23 +168,23 @@ fi
 AGENTEX_ARGS="--manifest manifest.yaml"
 [ "$CLEANUP" = true ] && AGENTEX_ARGS="$AGENTEX_ARGS --cleanup-on-start"
 
-agentex agents run $AGENTEX_ARGS >/tmp/oumuamua-agent.log 2>&1 &
+agentex agents run $AGENTEX_ARGS >/tmp/keystone-agent.log 2>&1 &
 AGENT_PID=$!
-echo "    PID $AGENT_PID — logs: tail -f /tmp/oumuamua-agent.log"
+echo "    PID $AGENT_PID — logs: tail -f /tmp/keystone-agent.log"
 wait_for_port 8000 "Agent ACP" 30
 ok "Agent running"
 
-# ── Step 4: oumuamua-ui ───────────────────────────────────────────────────────
-header "Starting oumuamua-ui"
+# ── Step 4: keystone-ui ───────────────────────────────────────────────────────
+header "Starting keystone-ui"
 
 if [ ! -d "$UI_DIR" ]; then
-  warn "oumuamua-ui not found at $UI_DIR — skipping"
+  warn "keystone-ui not found at $UI_DIR — skipping"
 else
   [ ! -d "$UI_DIR/node_modules" ] && (cd "$UI_DIR" && npm install --silent)
-  (cd "$UI_DIR" && npm run dev) >/tmp/oumuamua-ui.log 2>&1 &
+  (cd "$UI_DIR" && npm run dev) >/tmp/keystone-ui.log 2>&1 &
   UI_PID=$!
-  echo "    PID $UI_PID — logs: tail -f /tmp/oumuamua-ui.log"
-  wait_for_port 3000 "oumuamua-ui" 30
+  echo "    PID $UI_PID — logs: tail -f /tmp/keystone-ui.log"
+  wait_for_port 3000 "keystone-ui" 30
   ok "UI running"
 fi
 
@@ -189,11 +193,11 @@ echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  Ready${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo "  http://localhost:3000           oumuamua-ui"
+echo "  http://localhost:3000           keystone-ui"
 echo "  http://localhost:5003/swagger   Agentex API"
 echo "  http://localhost:8080           Temporal UI"
-echo "  tail -f /tmp/oumuamua-agent.log"
-echo "  tail -f /tmp/oumuamua-ui.log"
+echo "  tail -f /tmp/keystone-agent.log"
+echo "  tail -f /tmp/keystone-ui.log"
 echo "  ./dev.sh --stop   to tear down"
 echo ""
 

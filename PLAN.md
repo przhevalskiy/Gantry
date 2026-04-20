@@ -1,4 +1,4 @@
-# Oumuamua — Build Plan
+# Keystone — Build Plan
 
 > Multi-dimensional agent ecosystem that researches, reasons, and acts.
 > Role-differentiated agents, dynamically spawned, working as an ecosystem to complete any task —
@@ -200,7 +200,7 @@ The UI should make the agent ecosystem visible — not a black box.
 
 - `[ ]` Fix `adk.messages.create` in child workflows (Bug 1.1)
 - `[ ]` Timeout ladder: Scout 3 min, Analyst 8 min, Executor 5 min, Critic 2 min, Synthesizer 5 min
-- `[ ]` Screenshot TTL cleanup — `/tmp/oumuamua_screenshots` grows unbounded
+- `[ ]` Screenshot TTL cleanup — `/tmp/keystone_screenshots` grows unbounded
 - `[ ]` Worker concurrency tuning as execution agents scale (currently 60)
 - `[ ]` Irreversible action gate — configurable approval requirement before destructive steps
 
