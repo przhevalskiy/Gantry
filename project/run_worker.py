@@ -33,6 +33,7 @@ from activities.swarm_activities import (
     swarm_git_commit,
     swarm_git_push,
     swarm_create_pull_request,
+    swarm_find_test_files,
 )
 from activities.architect_planner_activity import plan_architect_step
 from activities.builder_planner_activity import plan_builder_step
@@ -61,6 +62,7 @@ async def main():
         swarm_git_commit,
         swarm_git_push,
         swarm_create_pull_request,
+        swarm_find_test_files,
         plan_architect_step,
         plan_builder_step,
         plan_inspector_step,

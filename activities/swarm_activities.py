@@ -277,3 +277,26 @@ async def swarm_create_pull_request(
     url_match = re.search(r"https://github\.com/\S+", result["stdout"])
     pr_url = url_match.group(0) if url_match else result["stdout"].strip()
     return json.dumps({"pr_url": pr_url})
+
+
+@activity.defn(name="swarm_find_test_files")
+async def swarm_find_test_files(repo_path: str) -> list[str]:
+    """Walk the repo and return relative paths of existing test files."""
+    SKIP = {".git", "node_modules", "__pycache__", ".venv", ".next", "dist", "build", "coverage"}
+    TEST_PATTERNS = re.compile(
+        r"(^test_|_test\.|\.test\.|\.spec\.|/tests?/|/__tests__/)",
+        re.IGNORECASE,
+    )
+    found: list[str] = []
+    root = Path(repo_path)
+    if not root.exists():
+        return []
+    for path in root.rglob("*"):
+        if any(part in SKIP for part in path.parts):
+            continue
+        if path.is_file() and TEST_PATTERNS.search(str(path)):
+            try:
+                found.append(str(path.relative_to(root)))
+            except ValueError:
+                pass
+    return sorted(found)
