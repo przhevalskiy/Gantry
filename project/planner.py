@@ -1,24 +1,30 @@
-"""
-LLM planning layer — Claude tool-use loop.
-Zero Playwright code. Zero Temporal code. Zero Agentex SDK imports. (I1)
-"""
+"""LLM planning layer — Claude tool-use loop for swarm agents."""
 from __future__ import annotations
 
+import asyncio
 import structlog
 from dataclasses import dataclass
 from typing import Any
 
 import anthropic
 
-from project.config import ANTHROPIC_API_KEY, CLAUDE_MODEL, MAX_AGENT_TURNS
-from project.tools import TOOLS
+from project.config import ANTHROPIC_API_KEY, CLAUDE_MODEL
+from project.rate_limit_config import (
+    get_rate_config, get_rate_tracker, log_rate_limit_warning, 
+    log_rate_limit_hit, log_rate_limit_recovery
+)
 
 logger = structlog.get_logger(__name__)
+
+_DEFAULT_SYSTEM = (
+    "You are a specialist agent in a durable software engineering swarm. "
+    "Use the tools available to complete your assigned task. "
+    "Call exactly ONE tool per response."
+)
 
 
 @dataclass
 class PlannerStep:
-    """A single tool call the planner wants to execute."""
     tool_name: str
     tool_use_id: str
     tool_input: dict[str, Any]
@@ -26,36 +32,24 @@ class PlannerStep:
 
 @dataclass
 class FinalAnswer:
-    """The planner has finished and produced a synthesized answer."""
     answer: str
 
 
-@dataclass
-class PlannerError:
-    """The planner hit MAX_AGENT_TURNS without resolving."""
-    message: str
+class PlannerError(Exception):
+    """Raised when the planner cannot complete a step (rate limit exhausted, API error, etc.)."""
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
 
 
 PlannerResult = PlannerStep | FinalAnswer | PlannerError
 
-
-def _build_system_prompt() -> str:
-    return (
-        "You are a thorough web research agent. Given a task, you use the available tools to "
-        "browse the web, search for information, and synthesize a comprehensive final answer. "
-        "RESEARCH RULES:\n"
-        "1. Always search before navigating. Use search_web first to find relevant sources.\n"
-        "2. Visit at least 3 distinct sources before calling finish().\n"
-        "3. Search from multiple angles — try different query phrasings to find more sources.\n"
-        "4. When sources contradict each other, note the contradiction and seek a third source.\n"
-        "5. Never call finish() before visiting at least 3 pages.\n"
-        "6. Never pass raw HTML to your reasoning — only work with extracted text.\n"
-        "IMPORTANT: Call exactly ONE tool per response. Never call multiple tools simultaneously."
-    )
+# Global semaphore — cap concurrent Claude calls across all activities in this worker
+_LLM_SEMAPHORE = asyncio.Semaphore(4)
 
 
 def _extract_task_prompt(params: dict | None) -> str:
-    """Extract the user's query string from task params."""
+    """Extract the user's goal string from task params."""
     if not params:
         return "No task prompt provided."
     return (
@@ -66,138 +60,124 @@ def _extract_task_prompt(params: dict | None) -> str:
     )
 
 
+async def _make_claude_request(client, kwargs: dict[str, Any]) -> Any:
+    """Make Claude API request with concurrency cap, token tracking, and exponential backoff."""
+    config = get_rate_config()
+    tracker = get_rate_tracker()
+
+    if tracker.is_near_limit(config):
+        log_rate_limit_warning()
+
+    retry_count = 0
+    delay = config.initial_retry_delay
+
+    async with _LLM_SEMAPHORE:
+        while retry_count <= config.max_retries:
+            try:
+                response = await client.messages.create(**kwargs)
+
+                if hasattr(response, 'usage'):
+                    tracker.add_tokens(
+                        response.usage.input_tokens,
+                        response.usage.output_tokens,
+                    )
+                if retry_count > 0:
+                    log_rate_limit_recovery()
+                return response
+
+            except anthropic.RateLimitError as e:
+                retry_count += 1
+                if retry_count > config.max_retries:
+                    logger.error("rate_limit_max_retries_exceeded", retries=retry_count, error=str(e))
+                    raise PlannerError(f"Rate limit exhausted after {retry_count} retries: {e}")
+                log_rate_limit_hit(retry_count, delay, str(e))
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, config.max_retry_delay)
+
+            except anthropic.APIError as e:
+                logger.error("claude_api_error", error=str(e), type=type(e).__name__)
+                raise PlannerError(f"Claude API error: {e}")
+
+            except Exception as e:
+                logger.error("unexpected_planner_error", error=str(e), type=type(e).__name__)
+                raise PlannerError(f"Unexpected error: {e}")
+
+    raise PlannerError(f"Failed after {config.max_retries} retries")
+
+
 async def next_step(
     task_prompt: str,
     context: list[dict],
     tools: list[dict] | None = None,
+    system_prompt: str | None = None,
 ) -> tuple[PlannerResult, list[dict]]:
     """
     Make one Claude API call and return the next step plus the updated context.
-
-    Args:
-        task_prompt: The user's original task prompt.
-        context: The current message history (immutable — a new list is returned).
-
-    Returns:
-        (result, new_context) where result is PlannerStep, FinalAnswer, or PlannerError.
-
-    Invariant I3: context is never mutated in place.
-    Invariant I8: No retry logic here — if the Claude call raises, let it propagate.
+    Context is never mutated in place — a new list is always returned.
     """
-    # Build messages list — first call has only the user message
     if not context:
-        research_guidance = (
-            f"{task_prompt}\n\n"
-            "Research instructions:\n"
-            "- Begin with search_web to find multiple relevant sources\n"
-            "- Visit at least 3 distinct sources before synthesizing\n"
-            "- Try different search queries to get multiple perspectives\n"
-            "- Cite specific URLs in your final answer"
-        )
-        messages: list[dict] = [{"role": "user", "content": research_guidance}]
+        messages: list[dict] = [{"role": "user", "content": task_prompt}]
     else:
         messages = context
 
     client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+    system = system_prompt or _DEFAULT_SYSTEM
 
     log = logger.bind(turn=len([m for m in messages if m["role"] == "assistant"]) + 1)
     log.info("planner_call", model=CLAUDE_MODEL, message_count=len(messages))
 
-    active_tools = tools if tools is not None else TOOLS
-    response = await client.messages.create(
+    kwargs: dict[str, Any] = dict(
         model=CLAUDE_MODEL,
         max_tokens=8192,
-        system=_build_system_prompt(),
-        tools=active_tools,
+        system=system,
         messages=messages,
     )
+    if tools:
+        kwargs["tools"] = tools
+
+    response = await _make_claude_request(client, kwargs)
 
     log.info(
         "planner_response",
         stop_reason=response.stop_reason,
-        content_blocks=len(response.content),
         input_tokens=response.usage.input_tokens,
         output_tokens=response.usage.output_tokens,
     )
 
-    # Append assistant message to context (I3: new list, no mutation)
-    # Build content blocks explicitly — model_dump() includes SDK-internal fields
-    # (citations, caller) that Anthropic rejects when sent back in messages.
-    def _serialize_block(b) -> dict:
+    def _serialize(b) -> dict:
         if b.type == "text":
             return {"type": "text", "text": b.text}
         if b.type == "tool_use":
             return {"type": "tool_use", "id": b.id, "name": b.name, "input": b.input}
         return b.model_dump(exclude_none=True)
 
-    assistant_message = {
-        "role": "assistant",
-        "content": [_serialize_block(b) for b in response.content],
-    }
-    new_context = messages + [assistant_message]
+    assistant_msg = {"role": "assistant", "content": [_serialize(b) for b in response.content]}
+    new_context = messages + [assistant_msg]
 
     if response.stop_reason == "end_turn":
-        # Extract text from response
         text_parts = [b.text for b in response.content if hasattr(b, "text")]
-        answer = " ".join(text_parts) if text_parts else "Task complete."
-        return FinalAnswer(answer=answer), new_context
+        return FinalAnswer(answer=" ".join(text_parts) or "Task complete."), new_context
 
     if response.stop_reason == "tool_use":
-        tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
+        tool_blocks = [b for b in response.content if b.type == "tool_use"]
+        first = tool_blocks[0] if tool_blocks else None
 
-        # If Claude batched multiple tool calls despite instructions, add stub tool_results
-        # for all but the first so the context stays valid for the next API call.
-        first_block = tool_use_blocks[0] if tool_use_blocks else None
-        extra_blocks = tool_use_blocks[1:]
-
-        if extra_blocks:
-            log.warning("parallel_tool_calls_detected", count=len(tool_use_blocks))
-            stub_results = [
-                {"type": "tool_result", "tool_use_id": b.id, "content": "Skipped: only one tool call per turn is supported."}
-                for b in extra_blocks
+        # Stub out any extra parallel tool calls so context stays valid
+        if len(tool_blocks) > 1:
+            stubs = [
+                {"type": "tool_result", "tool_use_id": b.id,
+                 "content": "Skipped: only one tool call per turn is supported."}
+                for b in tool_blocks[1:]
             ]
-            # Append a user message with stub results so context is valid
-            new_context = new_context + [{"role": "user", "content": stub_results}]
+            new_context = new_context + [{"role": "user", "content": stubs}]
 
-        if first_block:
-            if first_block.name == "finish":
-                answer = first_block.input.get("answer", "Task complete.")
-                log.info("planner_finish", answer_length=len(answer))
-                return FinalAnswer(answer=answer), new_context
+        if first:
+            if first.name == "finish":
+                return FinalAnswer(answer=first.input.get("answer", "Task complete.")), new_context
             return PlannerStep(
-                tool_name=first_block.name,
-                tool_use_id=first_block.id,
-                tool_input=first_block.input,
+                tool_name=first.name,
+                tool_use_id=first.id,
+                tool_input=first.input,
             ), new_context
 
-    # Unexpected stop reason
     return FinalAnswer(answer="Task complete (unexpected stop reason)."), new_context
-
-
-async def plan(
-    task_prompt: str,
-    initial_context: list[dict] | None = None,
-) -> tuple[list[PlannerStep | FinalAnswer], list[dict]]:
-    """
-    Run the full planner loop, yielding each step for the caller to execute.
-    Hard-stops after MAX_AGENT_TURNS.
-
-    This function is used only in tests and standalone contexts.
-    In production, the workflow drives the loop step-by-step via next_step().
-    """
-    context: list[dict] = list(initial_context) if initial_context else []
-    steps: list[PlannerStep | FinalAnswer] = []
-
-    for turn in range(MAX_AGENT_TURNS):
-        result, context = await next_step(task_prompt, context)
-        steps.append(result)
-
-        if isinstance(result, FinalAnswer):
-            return steps, context
-
-        logger.info("planner_step", turn=turn, tool=result.tool_name)
-
-    # Exceeded MAX_AGENT_TURNS — return what we have
-    logger.warning("planner_max_turns_exceeded", max_turns=MAX_AGENT_TURNS)
-    steps.append(FinalAnswer(answer="Reached maximum turns without a final answer."))
-    return steps, context
