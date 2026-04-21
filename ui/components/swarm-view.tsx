@@ -2,12 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useTask } from '@/hooks/use-task';
+import { saveReport } from '@/lib/report-store';
 import { useTaskMessages } from '@/hooks/use-task-messages';
 import { useSendFollowUp } from '@/hooks/use-send-followup';
 import { MessageFeed } from '@/components/message-feed';
 import { ChibiAvatar, type SwarmRole } from '@/components/chibi-avatar';
 import { FileExplorer } from '@/components/file-explorer';
-import { useAgentConfigStore } from '@/lib/agent-config-store';
 import { useFileAttachments, buildAttachmentBlock } from '@/hooks/use-file-attachments';
 import type { Task } from 'agentex/resources';
 import type { TaskMessage } from 'agentex/resources';
@@ -238,8 +238,8 @@ function PreviewPane({
 export function SwarmView({ taskId }: { taskId: string }) {
   const { data: task, isLoading: taskLoading } = useTask(taskId);
   const { data: messages, isLoading: msgsLoading } = useTaskMessages(taskId);
-  const configRepoPath = useAgentConfigStore(s => s.config.swarmRepoPat);
   const [followUp, setFollowUp] = useState('');
+  const [autoApprove, setAutoApprove] = useState(false);
   const [centerTab, setCenterTab] = useState<'explorer' | 'preview'>('explorer');
   const [previewUrl, setPreviewUrl] = useState('');
   const [manualUrl, setManualUrl] = useState('');
@@ -252,7 +252,7 @@ export function SwarmView({ taskId }: { taskId: string }) {
   const isDone = status === 'COMPLETED' || status === 'FAILED';
   const isFailed = status === 'FAILED';
   const goal = getTaskGoal(task);
-  const repoPath = getRepoPath(task) || configRepoPath || '';
+  const repoPath = getRepoPath(task) || '';
   const writtenPaths = extractWrittenPaths(messages ?? []);
   const { stages, finalReport, prUrl } = parsePipeline(messages, isDone, isFailed);
   const effectivelyDone = isDone || !!finalReport;
@@ -269,6 +269,12 @@ export function SwarmView({ taskId }: { taskId: string }) {
   })();
 
   const activePreviewUrl = manualUrl.trim() || detectedUrl || '';
+
+  // Persist final summary to report-store when swarm completes
+  useEffect(() => {
+    if (!finalReport) return;
+    saveReport({ taskId, query: goal, answer: finalReport, createdAt: new Date().toISOString(), summary: finalReport.slice(0, 400) });
+  }, [finalReport, taskId, goal]);
 
   const submitFollowUp = () => {
     const text = followUp.trim();
@@ -312,6 +318,29 @@ export function SwarmView({ taskId }: { taskId: string }) {
             {goal || taskId}
           </p>
         </div>
+        {!effectivelyDone && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', flexShrink: 0 }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Auto-approve</span>
+            <div
+              onClick={() => setAutoApprove(p => !p)}
+              style={{
+                width: 32, height: 18, borderRadius: 999,
+                background: autoApprove ? '#f97316' : 'var(--surface-raised)',
+                border: '1px solid var(--border)',
+                position: 'relative', cursor: 'pointer',
+                transition: 'background 0.15s',
+              }}
+            >
+              <div style={{
+                position: 'absolute', top: 2,
+                left: autoApprove ? 14 : 2,
+                width: 12, height: 12, borderRadius: '50%',
+                background: autoApprove ? 'white' : 'var(--text-secondary)',
+                transition: 'left 0.15s',
+              }} />
+            </div>
+          </label>
+        )}
         <StatusBadge status={status} />
       </header>
 
@@ -350,7 +379,7 @@ export function SwarmView({ taskId }: { taskId: string }) {
                 <Spinner />
               </div>
             ) : (
-              <MessageFeed messages={messages ?? []} isRunning={!effectivelyDone} />
+              <MessageFeed messages={messages ?? []} isRunning={!effectivelyDone} taskId={taskId} autoApprove={autoApprove} />
             )}
           </div>
 
