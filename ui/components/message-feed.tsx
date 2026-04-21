@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import type { TaskMessage } from 'agentex/resources';
 import { ChibiAvatar, ROLE_TO_SPRITE, type SwarmRole } from './chibi-avatar';
 
@@ -404,6 +404,156 @@ function StrategyCard({ text }: { text: string }) {
   );
 }
 
+// ── HITL approval parsing ─────────────────────────────────────────────────────
+
+const APPROVAL_REQUEST_PREFIX = '__approval_request__';
+const APPROVAL_RESOLVED_PREFIX = '__approval_resolved__';
+
+type ApprovalPayload = {
+  checkpoint: string;
+  action: string;
+  workflow_id: string;
+};
+
+type ResolvedPayload = {
+  checkpoint: string;
+  approved: boolean;
+  workflow_id: string;
+};
+
+function parseApprovalRequest(text: string): ApprovalPayload | null {
+  if (!text.startsWith(APPROVAL_REQUEST_PREFIX)) return null;
+  try {
+    return JSON.parse(text.slice(APPROVAL_REQUEST_PREFIX.length)) as ApprovalPayload;
+  } catch { return null; }
+}
+
+function parseApprovalResolved(text: string): ResolvedPayload | null {
+  if (!text.startsWith(APPROVAL_RESOLVED_PREFIX)) return null;
+  try {
+    return JSON.parse(text.slice(APPROVAL_RESOLVED_PREFIX.length)) as ResolvedPayload;
+  } catch { return null; }
+}
+
+const CHECKPOINT_LABELS: Record<string, string> = {
+  architect_plan: 'Build Plan Review',
+  max_heals:      'Heal Limit Reached',
+  devops:         'Deployment Approval',
+};
+
+function ApprovalCard({
+  payload,
+  taskId,
+  autoApprove,
+}: {
+  payload: ApprovalPayload;
+  taskId: string;
+  autoApprove: boolean;
+}) {
+  const [decided, setDecided] = useState<'approved' | 'rejected' | null>(null);
+  const [loading, setLoading] = useState(false);
+  const ACCENT = '#f97316';
+
+  const sendSignal = useCallback(async (approved: boolean) => {
+    if (decided || loading) return;
+    setLoading(true);
+    try {
+      await fetch(`/api/tasks/${taskId}/signal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workflow_id: payload.workflow_id, approved }),
+      });
+      setDecided(approved ? 'approved' : 'rejected');
+    } catch {
+      // leave in pending state so user can retry
+    } finally {
+      setLoading(false);
+    }
+  }, [decided, loading, taskId, payload.workflow_id]);
+
+  // Auto-approve when flag is set
+  useEffect(() => {
+    if (autoApprove && !decided && !loading) {
+      sendSignal(true);
+    }
+  }, [autoApprove, decided, loading, sendSignal]);
+
+  const label = CHECKPOINT_LABELS[payload.checkpoint] ?? 'Approval Required';
+  const borderColor = decided === 'approved' ? '#22c55e' : decided === 'rejected' ? '#ef4444' : ACCENT;
+
+  return (
+    <div style={{
+      margin: '0.75rem 0',
+      border: `1px solid ${borderColor}`,
+      borderRadius: '12px',
+      overflow: 'hidden',
+      background: 'var(--surface)',
+      opacity: decided ? 0.75 : 1,
+      transition: 'opacity 0.2s',
+    }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.5rem',
+        padding: '0.625rem 0.875rem',
+        background: `${borderColor}12`,
+        borderBottom: `1px solid ${borderColor}30`,
+      }}>
+        <span style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: borderColor }}>
+          {label}
+        </span>
+        {decided && (
+          <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: decided === 'approved' ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
+            {decided === 'approved' ? '✓ Approved' : '✗ Rejected'}
+          </span>
+        )}
+      </div>
+
+      {/* Action text */}
+      <div style={{ padding: '0.75rem 0.875rem' }}>
+        <p style={{ fontSize: '0.8375rem', color: 'var(--text-primary)', lineHeight: 1.5, margin: 0 }}>
+          {payload.action}
+        </p>
+      </div>
+
+      {/* Buttons */}
+      {!decided && (
+        <div style={{ display: 'flex', gap: '0.5rem', padding: '0 0.875rem 0.75rem' }}>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => sendSignal(true)}
+            style={{
+              flex: 1, padding: '0.45rem 0', borderRadius: '8px',
+              background: '#22c55e', border: 'none', color: 'white',
+              fontSize: '0.8125rem', fontWeight: 600, cursor: loading ? 'wait' : 'pointer',
+              fontFamily: 'inherit', opacity: loading ? 0.6 : 1,
+              transition: 'opacity 0.12s',
+            }}
+          >
+            {loading ? '…' : 'Approve'}
+          </button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => sendSignal(false)}
+            style={{
+              flex: 1, padding: '0.45rem 0', borderRadius: '8px',
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              color: 'var(--text-secondary)',
+              fontSize: '0.8125rem', fontWeight: 400, cursor: loading ? 'wait' : 'pointer',
+              fontFamily: 'inherit', opacity: loading ? 0.6 : 1,
+              transition: 'opacity 0.12s',
+            }}
+          >
+            Reject
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TextBubble({ text }: { text: string }) {
   const trimmed = text.trim();
   if (!trimmed) return null;
@@ -419,7 +569,7 @@ function TextBubble({ text }: { text: string }) {
 
 // ── Message router ────────────────────────────────────────────────────────────
 
-function MessageRow({ message }: { message: TaskMessage }) {
+function MessageRow({ message, taskId, autoApprove }: { message: TaskMessage; taskId: string; autoApprove: boolean }) {
   const c = message.content as unknown as MsgContent;
   if (!c) return null;
   const msgType = c.type;
@@ -432,10 +582,15 @@ function MessageRow({ message }: { message: TaskMessage }) {
   if (msgType === 'text' || !msgType) {
     const text = typeof c.content === 'string' ? c.content : '';
     if (!text.trim()) return null;
+
+    // HITL approval messages
+    const approvalPayload = parseApprovalRequest(text);
+    if (approvalPayload) return <ApprovalCard payload={approvalPayload} taskId={taskId} autoApprove={autoApprove} />;
+    if (parseApprovalResolved(text)) return null; // resolved marker — card handles its own state
+
     if (text.startsWith('## Swarm Factory Report')) return null;
     if (STRATEGY_RE.test(text)) return <StrategyCard text={text} />;
     if (TAGGED_RE.test(text)) {
-      // Foreman launch message gets special card
       const parsed = parseTaggedMessage(text);
       if (parsed?.type === 'foreman' && LAUNCH_RE.test(parsed.body)) {
         return <LaunchCard text={parsed.body} />;
@@ -452,7 +607,17 @@ function MessageRow({ message }: { message: TaskMessage }) {
 
 // ── Feed ──────────────────────────────────────────────────────────────────────
 
-export function MessageFeed({ messages, isRunning }: { messages: TaskMessage[]; isRunning: boolean }) {
+export function MessageFeed({
+  messages,
+  isRunning,
+  taskId,
+  autoApprove = false,
+}: {
+  messages: TaskMessage[];
+  isRunning: boolean;
+  taskId: string;
+  autoApprove?: boolean;
+}) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -470,7 +635,7 @@ export function MessageFeed({ messages, isRunning }: { messages: TaskMessage[]; 
 
   return (
     <div>
-      {messages.map((msg) => <MessageRow key={msg.id} message={msg} />)}
+      {messages.map((msg) => <MessageRow key={msg.id} message={msg} taskId={taskId} autoApprove={autoApprove} />)}
       {isRunning && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingTop: '0.5rem' }}>
           <PulsingDot />

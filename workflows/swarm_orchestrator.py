@@ -23,6 +23,7 @@ from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+from temporalio.workflow import ParentClosePolicy
 
 from agentex.lib import adk
 from agentex.lib.types.acp import CreateTaskParams, SendEventParams
@@ -34,6 +35,7 @@ from agentex.types.text_content import TextContent
 with workflow.unsafe.imports_passed_through():
     from project.planner import _extract_task_prompt
     from project.complexity import classify_tier, params_for_tier, TIER_LABELS
+    from project.child_workflow import ApprovalWorkflow
     from workflows.architect_agent import ArchitectAgent
     from workflows.builder_agent import BuilderAgent
     from workflows.inspector_agent import InspectorAgent
@@ -179,6 +181,7 @@ class SwarmOrchestrator(BaseWorkflow):
                 max_parallel_tracks=max_parallel_tracks,
                 task_queue=task_queue,
                 iteration=iteration,
+                tier=tier,
                 log=log,
             )
 
@@ -223,6 +226,48 @@ class SwarmOrchestrator(BaseWorkflow):
 
         return last_result
 
+    async def _hitl_checkpoint(
+        self,
+        task_id: str,
+        task_queue: str,
+        checkpoint: str,
+        action: str,
+        iteration: int,
+    ) -> bool:
+        """Emit an approval_request message then block until the user signals approve/reject."""
+        approval_wf_id = f"{task_id}-r{iteration}-approval-{checkpoint}"
+        payload = json.dumps({
+            "checkpoint": checkpoint,
+            "action": action,
+            "workflow_id": approval_wf_id,
+        })
+        await adk.messages.create(
+            task_id=task_id,
+            content=TextContent(
+                author="agent",
+                content=f"__approval_request__{payload}",
+            ),
+        )
+
+        result: str = await workflow.execute_child_workflow(
+            ApprovalWorkflow.run,
+            args=[action],
+            id=approval_wf_id,
+            task_queue=task_queue,
+            execution_timeout=timedelta(hours=72),
+            parent_close_policy=ParentClosePolicy.TERMINATE,
+        )
+
+        approved = result == "Approved"
+        await adk.messages.create(
+            task_id=task_id,
+            content=TextContent(
+                author="agent",
+                content=f"__approval_resolved__{json.dumps({'checkpoint': checkpoint, 'approved': approved, 'workflow_id': approval_wf_id})}",
+            ),
+        )
+        return approved
+
     async def _run_pipeline(
         self,
         task_id: str,
@@ -235,6 +280,7 @@ class SwarmOrchestrator(BaseWorkflow):
         max_parallel_tracks: int,
         task_queue: str,
         iteration: int,
+        tier: int,
         log,
     ) -> str:
         branch = _branch_name(f"{task_id}-r{iteration}", branch_prefix)
@@ -292,6 +338,27 @@ class SwarmOrchestrator(BaseWorkflow):
                 ),
             ),
         )
+
+        # ── HITL checkpoint 1: architect plan review (Standard / Full Crew) ─────
+        if tier >= 2:
+            action = (
+                f"Architect plan ready: {len(tracks)} track(s), stack: {stack}, "
+                f"{sum(len(t.get('implementation_steps', [])) for t in tracks)} steps. "
+                f"Approve to launch builders?"
+            )
+            approved = await self._hitl_checkpoint(
+                task_id=task_id,
+                task_queue=task_queue,
+                checkpoint="architect_plan",
+                action=action,
+                iteration=iteration,
+            )
+            if not approved:
+                await adk.messages.create(
+                    task_id=task_id,
+                    content=TextContent(author="agent", content="[Foreman] Build rejected at architect review. Stopping."),
+                )
+                return "[Foreman] Task rejected by user at architect plan checkpoint."
 
         # Snapshot pre-existing tests so Inspector can detect regressions
         try:
@@ -406,11 +473,29 @@ class SwarmOrchestrator(BaseWorkflow):
 
             if cycle >= max_heal:
                 log.warning("heal_cycles_exhausted", max_heal=max_heal)
+                action = (
+                    f"Inspector still failing after {max_heal} heal cycle(s). "
+                    f"Last issue: {inspector_report.get('summary', 'checks failed')[:200]}. "
+                    f"Proceed anyway (code may be broken)?"
+                )
+                approved = await self._hitl_checkpoint(
+                    task_id=task_id,
+                    task_queue=task_queue,
+                    checkpoint="max_heals",
+                    action=action,
+                    iteration=iteration,
+                )
+                if not approved:
+                    await adk.messages.create(
+                        task_id=task_id,
+                        content=TextContent(author="agent", content="[Foreman] Stopping after heal exhaustion — rejected by user."),
+                    )
+                    return "[Foreman] Task rejected by user after max heal cycles."
                 await adk.messages.create(
                     task_id=task_id,
                     content=TextContent(
                         author="agent",
-                        content=f"[Foreman] Inspector still failing after {max_heal} heal cycles. Proceeding.",
+                        content=f"[Foreman] Proceeding past failed inspector — approved by user.",
                     ),
                 )
                 break
@@ -492,6 +577,35 @@ class SwarmOrchestrator(BaseWorkflow):
         )
 
         # ── Step 4: DevOps ────────────────────────────────────────────────────
+        # HITL checkpoint 3: deployment approval (Full Crew only)
+        if tier >= 3:
+            action = (
+                f"Build and QA complete. Approve creating branch '{branch}' "
+                f"and opening a pull request?"
+            )
+            approved = await self._hitl_checkpoint(
+                task_id=task_id,
+                task_queue=task_queue,
+                checkpoint="devops",
+                action=action,
+                iteration=iteration,
+            )
+            if not approved:
+                await adk.messages.create(
+                    task_id=task_id,
+                    content=TextContent(author="agent", content="[Foreman] Deployment rejected by user. Build artifacts remain on disk."),
+                )
+                return _build_final_report(
+                    goal=goal,
+                    tracks=tracks,
+                    build_result=build_result,
+                    inspector_report=inspector_report,
+                    security_report=security_report,
+                    devops_result=None,
+                    heal_cycles=heal_cycles,
+                    blocked_by="user rejected deployment",
+                )
+
         await adk.messages.create(
             task_id=task_id,
             content=TextContent(author="agent", content=f"[Foreman] Dispatching DevOps — branch: {branch}"),
