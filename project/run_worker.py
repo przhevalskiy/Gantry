@@ -18,6 +18,7 @@ from workflows.builder_agent import BuilderAgent
 from workflows.inspector_agent import InspectorAgent
 from workflows.security_agent import SecurityAgent
 from workflows.devops_agent import DevOpsAgent
+from project.child_workflow import ApprovalWorkflow
 
 from activities.swarm_activities import (
     swarm_list_directory,
@@ -34,6 +35,20 @@ from activities.swarm_activities import (
     swarm_git_push,
     swarm_create_pull_request,
     swarm_find_test_files,
+    swarm_search_filesystem,
+    swarm_str_replace_editor,
+    swarm_install_packages,
+    swarm_run_application_feedback,
+    swarm_check_secrets,
+    swarm_web_search,
+    swarm_fetch_url,
+    swarm_execute_sql,
+    swarm_git_diff,
+    swarm_run_migration,
+    swarm_list_ports,
+    swarm_deploy,
+    swarm_memory_write,
+    swarm_memory_read,
 )
 from activities.architect_planner_activity import plan_architect_step
 from activities.builder_planner_activity import plan_builder_step
@@ -63,6 +78,20 @@ async def main():
         swarm_git_push,
         swarm_create_pull_request,
         swarm_find_test_files,
+        swarm_search_filesystem,
+        swarm_str_replace_editor,
+        swarm_install_packages,
+        swarm_run_application_feedback,
+        swarm_check_secrets,
+        swarm_web_search,
+        swarm_fetch_url,
+        swarm_execute_sql,
+        swarm_git_diff,
+        swarm_run_migration,
+        swarm_list_ports,
+        swarm_deploy,
+        swarm_memory_write,
+        swarm_memory_read,
         plan_architect_step,
         plan_builder_step,
         plan_inspector_step,
@@ -88,6 +117,7 @@ async def main():
             InspectorAgent,
             SecurityAgent,
             DevOpsAgent,
+            ApprovalWorkflow,
         ],
     )
 

@@ -47,6 +47,85 @@ INSPECTOR_TOOLS: list[dict] = [
         },
     },
     {
+        "name": "web_search",
+        "description": (
+            "Search the web to diagnose an unfamiliar error message, look up a test framework's API, "
+            "or find known issues with a library version."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search query."},
+                "num_results": {"type": "integer", "description": "Number of results (default: 5)."},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "fetch_url",
+        "description": "Fetch a URL (e.g. a GitHub issue, changelog, or error page) and return its text.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "URL to fetch."},
+                "max_chars": {"type": "integer", "description": "Max characters to return (default: 8000)."},
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "execute_sql",
+        "description": "Query the project database to verify data integrity, check migration results, or confirm schema.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "SQL to execute."},
+                "database_url": {"type": "string", "description": "DB URL (default: reads DATABASE_URL env var)."},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "list_ports",
+        "description": "Check which ports are in use. Use before run_application to verify the port is free, or after to confirm the process started.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ports": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "description": "Specific ports to check (e.g. [3000, 8080]). Omit for all listening ports.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "memory_read",
+        "description": "Read context notes from the Architect or earlier agents. Call at start to check for known issues or missing secrets.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "repo_path": {"type": "string", "description": "Absolute repo root path."},
+                "keys": {"type": "array", "items": {"type": "string"}, "description": "Specific keys to fetch. Omit for all."},
+            },
+            "required": ["repo_path"],
+        },
+    },
+    {
+        "name": "memory_write",
+        "description": "Store a QA finding or diagnosis note for the Builder's next heal cycle.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "key": {"type": "string", "description": "Note key."},
+                "value": {"type": "string", "description": "Note content."},
+                "repo_path": {"type": "string", "description": "Absolute repo root path."},
+            },
+            "required": ["key", "value", "repo_path"],
+        },
+    },
+    {
         "name": "read_file",
         "description": "Read a file to understand a test failure or lint error in context.",
         "input_schema": {
@@ -55,6 +134,52 @@ INSPECTOR_TOOLS: list[dict] = [
                 "path": {"type": "string", "description": "Relative path to the file."},
             },
             "required": ["path"],
+        },
+    },
+    {
+        "name": "run_application",
+        "description": (
+            "Start the application with a shell command, wait for it to boot, probe a URL, "
+            "and return the HTTP status + response body. Use this to verify the app actually "
+            "starts and serves traffic — not just that tests pass."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "start_command": {
+                    "type": "string",
+                    "description": "Command to start the application (e.g. 'npm run dev', 'python app.py', 'uvicorn main:app').",
+                },
+                "url": {
+                    "type": "string",
+                    "description": "URL to probe after startup (default: http://localhost:3000).",
+                },
+                "wait_seconds": {
+                    "type": "integer",
+                    "description": "Seconds to wait for startup before probing (default: 5, max: 30).",
+                },
+                "cwd": {"type": "string", "description": "Working directory (default: repo root)."},
+            },
+            "required": ["start_command"],
+        },
+    },
+    {
+        "name": "check_secrets",
+        "description": (
+            "Check whether required environment variables are present. "
+            "Use when tests fail with auth errors, missing config, or connection refused — "
+            "missing secrets are a common root cause."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Environment variable names to check.",
+                },
+            },
+            "required": ["names"],
         },
     },
     {

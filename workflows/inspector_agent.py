@@ -74,11 +74,15 @@ class InspectorAgent:
             f"Repository root: {repo_path}\n"
             f"{regression_note}\n"
             "Instructions:\n"
-            "1. Run the test suite first (e.g. 'pytest --tb=short -q' or 'npm test -- --run').\n"
-            "2. Run the linter (e.g. 'ruff check .' or 'eslint src/').\n"
-            "3. Run type checking if applicable (e.g. 'mypy .' or 'tsc --noEmit').\n"
-            "4. Read failing files if you need context to write heal_instructions.\n"
-            "5. Call report_inspection with a full summary and concrete heal_instructions if anything failed."
+            f"1. Start with memory_read(repo_path='{repo_path}') to check for known issues from Architect/Builder.\n"
+            "2. Run the test suite (e.g. 'pytest --tb=short -q' or 'npm test -- --run').\n"
+            "3. Run the linter (e.g. 'ruff check .' or 'eslint src/').\n"
+            "4. Run type checking if applicable (e.g. 'mypy .' or 'tsc --noEmit').\n"
+            "5. Optionally use run_application to verify the app actually starts and serves traffic.\n"
+            "6. Use list_ports to check port availability before run_application.\n"
+            "7. Use check_secrets if tests fail with auth or connection errors.\n"
+            "8. Use web_search to look up unfamiliar error messages.\n"
+            "9. Read failing files for context, then call report_inspection with concrete heal_instructions."
         )
 
         context: list[dict] = []
@@ -160,5 +164,59 @@ class InspectorAgent:
                 "swarm_run_command",
                 args=[tool_input.get("command", ""), tool_input.get("cwd")],
                 **CMD_OPTIONS,
+            )
+        if tool_name == "run_application":
+            return await workflow.execute_activity(
+                "swarm_run_application_feedback",
+                args=[
+                    tool_input.get("start_command", ""),
+                    tool_input.get("url", "http://localhost:3000"),
+                    min(tool_input.get("wait_seconds", 5), 30),
+                    tool_input.get("cwd"),
+                ],
+                start_to_close_timeout=timedelta(seconds=90),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        if tool_name == "check_secrets":
+            return await workflow.execute_activity(
+                "swarm_check_secrets",
+                args=[tool_input.get("names", [])],
+                **IO_OPTIONS,
+            )
+        if tool_name == "web_search":
+            return await workflow.execute_activity(
+                "swarm_web_search",
+                args=[tool_input.get("query", ""), tool_input.get("num_results", 5)],
+                **IO_OPTIONS,
+            )
+        if tool_name == "fetch_url":
+            return await workflow.execute_activity(
+                "swarm_fetch_url",
+                args=[tool_input.get("url", ""), tool_input.get("max_chars", 8000)],
+                **IO_OPTIONS,
+            )
+        if tool_name == "execute_sql":
+            return await workflow.execute_activity(
+                "swarm_execute_sql",
+                args=[tool_input.get("query", ""), tool_input.get("database_url"), tool_input.get("cwd")],
+                **IO_OPTIONS,
+            )
+        if tool_name == "list_ports":
+            return await workflow.execute_activity(
+                "swarm_list_ports",
+                args=[tool_input.get("ports")],
+                **IO_OPTIONS,
+            )
+        if tool_name == "memory_read":
+            return await workflow.execute_activity(
+                "swarm_memory_read",
+                args=[tool_input.get("repo_path", "."), tool_input.get("keys")],
+                **IO_OPTIONS,
+            )
+        if tool_name == "memory_write":
+            return await workflow.execute_activity(
+                "swarm_memory_write",
+                args=[tool_input.get("key", ""), tool_input.get("value", ""), tool_input.get("repo_path", ".")],
+                **IO_OPTIONS,
             )
         return f"Error: tool '{tool_name}' not dispatched."

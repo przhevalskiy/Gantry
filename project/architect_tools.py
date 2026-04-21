@@ -29,6 +29,94 @@ ARCHITECT_TOOLS: list[dict] = [
         },
     },
     {
+        "name": "search_files",
+        "description": (
+            "Search for files by name pattern (glob) or by content (regex). "
+            "Use to locate relevant files before reading them, especially in large repos."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "type": "string",
+                    "description": "Glob pattern (e.g. '*.py', 'config.*') or regex for content search.",
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Absolute path of root directory to search.",
+                },
+                "type": {
+                    "type": "string",
+                    "enum": ["name", "content"],
+                    "description": "'name' matches filenames, 'content' searches file text. Default: 'name'.",
+                },
+            },
+            "required": ["pattern", "path"],
+        },
+    },
+    {
+        "name": "web_search",
+        "description": (
+            "Search the web for documentation, package versions, architecture patterns, or API references. "
+            "Use when you're uncertain about a library's API or want to verify an approach before planning."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search query."},
+                "num_results": {"type": "integer", "description": "Number of results (default: 5, max: 10)."},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "fetch_url",
+        "description": "Fetch a documentation URL, README, or changelog and return its text. Use to read API docs or package changelogs.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "URL to fetch."},
+                "max_chars": {"type": "integer", "description": "Max characters to return (default: 8000)."},
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "memory_write",
+        "description": (
+            "Store a context note for Builder and Inspector agents to read during this build. "
+            "Use to record key decisions, missing secrets, DB schema notes, or architecture constraints."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "key": {"type": "string", "description": "Note key (e.g. 'auth_pattern', 'missing_secrets', 'db_url')."},
+                "value": {"type": "string", "description": "Note content."},
+                "repo_path": {"type": "string", "description": "Absolute repo root path."},
+            },
+            "required": ["key", "value", "repo_path"],
+        },
+    },
+    {
+        "name": "check_secrets",
+        "description": (
+            "Check whether required environment variables (API keys, tokens, DB URLs) are present "
+            "in the worker environment. Call this early if the project requires secrets — "
+            "report missing ones in the plan notes so builders can surface the issue."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Environment variable names to check (e.g. ['DATABASE_URL', 'OPENAI_API_KEY']).",
+                },
+            },
+            "required": ["names"],
+        },
+    },
+    {
         "name": "report_plan",
         "description": (
             "Call this when you have fully mapped the repository and are ready to produce "

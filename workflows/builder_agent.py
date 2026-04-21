@@ -34,6 +34,10 @@ CMD_OPTIONS = {
     "start_to_close_timeout": timedelta(seconds=30),  # Builder commands are mkdir/touch only
     "retry_policy": RetryPolicy(maximum_attempts=1),
 }
+INSTALL_OPTIONS = {
+    "start_to_close_timeout": timedelta(seconds=360),
+    "retry_policy": RetryPolicy(maximum_attempts=1),
+}
 
 
 @workflow.defn(name="BuilderAgent")
@@ -102,8 +106,12 @@ class BuilderAgent:
             f"- ALL file paths MUST be absolute, starting with {repo_root}. "
             f"Example: {repo_root}/src/App.tsx — NEVER just src/App.tsx.\n"
             "- Use read_file to read files. NEVER use run_command to cat or read files.\n"
-            "- NEVER run npm install, yarn, pip install, vite build, tsc, or any package/build command.\n"
-            "- Use write_file for new files, patch_file for edits to existing files.\n"
+            "- For package installation use install_packages — do NOT use run_command for installs.\n"
+            "- Use str_replace_editor (preferred) or patch_file for targeted edits; write_file for new files.\n"
+            "- Use search_files to locate files by name or content before editing.\n"
+            "- Use web_search / fetch_url when uncertain about a library's API or an error message.\n"
+            "- Use git_diff before finish_build to verify all intended changes are present.\n"
+            f"- Use memory_read(repo_path='{repo_root}') at the start to check Architect notes.\n"
             "- Call finish_build when all steps are done."
         )
 
@@ -205,6 +213,35 @@ class BuilderAgent:
                 args=[tool_input.get("path", ""), tool_input.get("old_str", ""), tool_input.get("new_str", "")],
                 **IO_OPTIONS,
             )
+        if tool_name == "str_replace_editor":
+            return await workflow.execute_activity(
+                "swarm_str_replace_editor",
+                args=[
+                    tool_input.get("command", "view"),
+                    tool_input.get("path", ""),
+                    tool_input.get("old_str", ""),
+                    tool_input.get("new_str", ""),
+                    tool_input.get("view_range"),
+                ],
+                **IO_OPTIONS,
+            )
+        if tool_name == "search_files":
+            return await workflow.execute_activity(
+                "swarm_search_filesystem",
+                args=[tool_input.get("pattern", ""), tool_input.get("path", "."), tool_input.get("type", "name")],
+                **IO_OPTIONS,
+            )
+        if tool_name == "install_packages":
+            return await workflow.execute_activity(
+                "swarm_install_packages",
+                args=[
+                    tool_input.get("manager", "npm"),
+                    tool_input.get("packages"),
+                    tool_input.get("flags", ""),
+                    tool_input.get("cwd"),
+                ],
+                **INSTALL_OPTIONS,
+            )
         if tool_name == "delete_file":
             return await workflow.execute_activity(
                 "swarm_delete_file", args=[tool_input.get("path", "")], **IO_OPTIONS
@@ -214,5 +251,48 @@ class BuilderAgent:
                 "swarm_run_command",
                 args=[tool_input.get("command", ""), tool_input.get("cwd")],
                 **CMD_OPTIONS,
+            )
+        if tool_name == "web_search":
+            return await workflow.execute_activity(
+                "swarm_web_search",
+                args=[tool_input.get("query", ""), tool_input.get("num_results", 5)],
+                **IO_OPTIONS,
+            )
+        if tool_name == "fetch_url":
+            return await workflow.execute_activity(
+                "swarm_fetch_url",
+                args=[tool_input.get("url", ""), tool_input.get("max_chars", 8000)],
+                **IO_OPTIONS,
+            )
+        if tool_name == "execute_sql":
+            return await workflow.execute_activity(
+                "swarm_execute_sql",
+                args=[tool_input.get("query", ""), tool_input.get("database_url"), tool_input.get("cwd")],
+                **IO_OPTIONS,
+            )
+        if tool_name == "git_diff":
+            return await workflow.execute_activity(
+                "swarm_git_diff",
+                args=[tool_input.get("cwd"), tool_input.get("staged", False), tool_input.get("paths")],
+                **IO_OPTIONS,
+            )
+        if tool_name == "run_migration":
+            return await workflow.execute_activity(
+                "swarm_run_migration",
+                args=[tool_input.get("tool", "auto"), tool_input.get("cwd"), tool_input.get("command")],
+                start_to_close_timeout=timedelta(seconds=180),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        if tool_name == "memory_read":
+            return await workflow.execute_activity(
+                "swarm_memory_read",
+                args=[tool_input.get("repo_path", "."), tool_input.get("keys")],
+                **IO_OPTIONS,
+            )
+        if tool_name == "memory_write":
+            return await workflow.execute_activity(
+                "swarm_memory_write",
+                args=[tool_input.get("key", ""), tool_input.get("value", ""), tool_input.get("repo_path", ".")],
+                **IO_OPTIONS,
             )
         return f"Error: tool '{tool_name}' not dispatched."

@@ -70,7 +70,11 @@ class DevOpsAgent:
             "4. Commit with a descriptive conventional commit message.\n"
             "5. Push the branch with git_push.\n"
             "6. Optionally create a pull request with create_pull_request.\n"
-            "7. Call report_devops with the branch, commit SHA, PR URL, and summary."
+            "7. Optionally run run_migration if the build added new migrations.\n"
+            "8. Optionally deploy if a platform token is configured (use deploy with platform='auto').\n"
+            "9. Read memory_read to pull build context into the PR description if available.\n"
+            f"10. Call report_devops with the branch, commit SHA, PR URL, and summary.\n\n"
+            f"For memory_read use repo_path='{repo_path}'."
         )
 
         context: list[dict] = []
@@ -181,6 +185,26 @@ class DevOpsAgent:
                     tool_input.get("base_branch", "main"),
                     cwd,
                 ],
+                **IO_OPTIONS,
+            )
+        if tool_name == "run_migration":
+            return await workflow.execute_activity(
+                "swarm_run_migration",
+                args=[tool_input.get("tool", "auto"), cwd, tool_input.get("command")],
+                start_to_close_timeout=timedelta(seconds=180),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        if tool_name == "deploy":
+            return await workflow.execute_activity(
+                "swarm_deploy",
+                args=[tool_input.get("platform", "auto"), cwd],
+                start_to_close_timeout=timedelta(seconds=360),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        if tool_name == "memory_read":
+            return await workflow.execute_activity(
+                "swarm_memory_read",
+                args=[tool_input.get("repo_path", "."), tool_input.get("keys")],
                 **IO_OPTIONS,
             )
         return f"Error: tool '{tool_name}' not dispatched."

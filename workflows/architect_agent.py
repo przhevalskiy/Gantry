@@ -91,7 +91,13 @@ class ArchitectAgent:
             "   - Use 1 track for simple tasks, 2-4 for larger ones.\n"
             "   - Example tracks: 'backend', 'frontend', 'tests', 'infra', 'docs'.\n"
             "   - Tracks run SIMULTANEOUSLY — they must not depend on each other.\n"
-            f"6. Call report_plan with repo_root='{repo_path}' and the tracks array when ready."
+            f"6. Call report_plan with repo_root='{repo_path}' and the tracks array when ready.\n\n"
+            "Additional tools available:\n"
+            "- search_files: find files by glob or content regex instead of listing directories\n"
+            "- web_search / fetch_url: look up unfamiliar libraries, APIs, or patterns\n"
+            "- check_secrets: verify required env vars are present before planning\n"
+            f"- memory_write: store key findings (auth patterns, missing secrets, DB schema) for Builder agents to read. "
+            f"Always use repo_path='{repo_path}'."
         )
 
         context: list[dict] = []
@@ -205,6 +211,36 @@ class ArchitectAgent:
             return await workflow.execute_activity(
                 "swarm_read_file",
                 args=[tool_input.get("path", "")],
+                **IO_OPTIONS,
+            )
+        if tool_name == "search_files":
+            return await workflow.execute_activity(
+                "swarm_search_filesystem",
+                args=[tool_input.get("pattern", ""), tool_input.get("path", "."), tool_input.get("type", "name")],
+                **IO_OPTIONS,
+            )
+        if tool_name == "check_secrets":
+            return await workflow.execute_activity(
+                "swarm_check_secrets",
+                args=[tool_input.get("names", [])],
+                **IO_OPTIONS,
+            )
+        if tool_name == "web_search":
+            return await workflow.execute_activity(
+                "swarm_web_search",
+                args=[tool_input.get("query", ""), tool_input.get("num_results", 5)],
+                **IO_OPTIONS,
+            )
+        if tool_name == "fetch_url":
+            return await workflow.execute_activity(
+                "swarm_fetch_url",
+                args=[tool_input.get("url", ""), tool_input.get("max_chars", 8000)],
+                **IO_OPTIONS,
+            )
+        if tool_name == "memory_write":
+            return await workflow.execute_activity(
+                "swarm_memory_write",
+                args=[tool_input.get("key", ""), tool_input.get("value", ""), tool_input.get("repo_path", ".")],
                 **IO_OPTIONS,
             )
         return f"Error: tool '{tool_name}' not dispatched."

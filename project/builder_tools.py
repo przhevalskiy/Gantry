@@ -60,10 +60,204 @@ BUILDER_TOOLS: list[dict] = [
         },
     },
     {
+        "name": "web_search",
+        "description": (
+            "Search the web for documentation, error messages, package APIs, or implementation patterns. "
+            "Use when you're uncertain about a library's API or need to look up an error."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search query."},
+                "num_results": {"type": "integer", "description": "Number of results (default: 5, max: 10)."},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "fetch_url",
+        "description": "Fetch a documentation page or API reference URL and return its text content.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "URL to fetch."},
+                "max_chars": {"type": "integer", "description": "Max characters to return (default: 8000)."},
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "execute_sql",
+        "description": (
+            "Execute SQL against the project database to verify migrations, inspect schema, or seed data. "
+            "Reads DATABASE_URL from env if database_url is not provided."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "SQL to execute (e.g. 'SELECT * FROM users LIMIT 5')."},
+                "database_url": {"type": "string", "description": "DB URL override (default: reads DATABASE_URL env var)."},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "git_diff",
+        "description": (
+            "Show what has changed vs. HEAD. Call before finish_build to verify all intended changes are "
+            "present and no unintended files were modified."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "cwd": {"type": "string", "description": "Working directory (repo root)."},
+                "staged": {"type": "boolean", "description": "If true, show staged-only diff."},
+                "paths": {"type": "array", "items": {"type": "string"}, "description": "Limit diff to these paths."},
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "run_migration",
+        "description": "Run database migrations (alembic, prisma, knex, rails). Auto-detects tool from project files.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "tool": {
+                    "type": "string",
+                    "enum": ["auto", "alembic", "prisma", "knex", "rails", "flyway"],
+                    "description": "Migration tool ('auto' detects from project files).",
+                },
+                "cwd": {"type": "string", "description": "Working directory (repo root)."},
+                "command": {"type": "string", "description": "Command override (e.g. 'upgrade head', 'migrate dev')."},
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "memory_read",
+        "description": "Read context notes left by the Architect or earlier agents in this build.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "repo_path": {"type": "string", "description": "Absolute repo root path."},
+                "keys": {"type": "array", "items": {"type": "string"}, "description": "Specific keys to fetch. Omit for all."},
+            },
+            "required": ["repo_path"],
+        },
+    },
+    {
+        "name": "memory_write",
+        "description": "Store a context note for other agents or heal cycles to read.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "key": {"type": "string", "description": "Note key."},
+                "value": {"type": "string", "description": "Note content."},
+                "repo_path": {"type": "string", "description": "Absolute repo root path."},
+            },
+            "required": ["key", "value", "repo_path"],
+        },
+    },
+    {
+        "name": "search_files",
+        "description": (
+            "Search for files by name pattern (glob) or by content (regex). "
+            "Use before editing to locate the right file when you are unsure of its path."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "type": "string",
+                    "description": "Glob pattern for name search (e.g. '*.tsx') or regex for content search.",
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Root directory to search. Use the repo_root you were given.",
+                },
+                "type": {
+                    "type": "string",
+                    "enum": ["name", "content"],
+                    "description": "'name' matches filenames, 'content' searches file text. Default: 'name'.",
+                },
+            },
+            "required": ["pattern", "path"],
+        },
+    },
+    {
+        "name": "str_replace_editor",
+        "description": (
+            "View a file with line numbers, perform a precise string replacement, or create a new file. "
+            "Prefer this over patch_file — it shows file context when old_str is not found, "
+            "and warns when old_str is ambiguous."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "enum": ["view", "str_replace", "create"],
+                    "description": (
+                        "'view' shows the file with line numbers. "
+                        "'str_replace' replaces old_str with new_str. "
+                        "'create' writes a new file with new_str as content."
+                    ),
+                },
+                "path": {"type": "string", "description": "Absolute path to the file."},
+                "old_str": {
+                    "type": "string",
+                    "description": "[str_replace] Exact string to replace. Must be unique in the file.",
+                },
+                "new_str": {
+                    "type": "string",
+                    "description": "[str_replace/create] Replacement string or full file content.",
+                },
+                "view_range": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "description": "[view] Optional [start_line, end_line] to view a specific range.",
+                },
+            },
+            "required": ["command", "path"],
+        },
+    },
+    {
+        "name": "install_packages",
+        "description": (
+            "Install packages using a package manager. Use this for ANY dependency installation — "
+            "do not use run_command for installs."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "manager": {
+                    "type": "string",
+                    "enum": ["npm", "yarn", "pnpm", "pip", "pip3", "uv"],
+                    "description": "Package manager to use.",
+                },
+                "packages": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Package names to install. Omit to install from lockfile.",
+                },
+                "flags": {
+                    "type": "string",
+                    "description": "Extra flags (e.g. '--save-dev', '--dev', '--group dev').",
+                },
+                "cwd": {"type": "string", "description": "Working directory (default: repo root)."},
+            },
+            "required": ["manager"],
+        },
+    },
+    {
         "name": "run_command",
         "description": (
-            "Run a shell command in the repo directory (e.g. 'pip install -r requirements.txt', "
-            "'npm install'). Use for dependency installation only — not for tests."
+            "Run a shell command in the repo directory. "
+            "Use only for lightweight commands like mkdir or touch. "
+            "For package installation use install_packages instead."
         ),
         "input_schema": {
             "type": "object",
