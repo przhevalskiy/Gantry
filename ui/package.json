@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.96.2",
+    "@temporalio/client": "^1.16.0",
     "agentex": "^0.1.0-alpha.9",
     "framer-motion": "^12.38.0",
     "geist": "^1.7.0",
