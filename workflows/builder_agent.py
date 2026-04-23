@@ -64,10 +64,25 @@ class BuilderAgent:
 
         heal_section = ""
         if heal_instructions:
-            heal_section = (
-                "\n\nHEAL INSTRUCTIONS from Inspector (fix these before finishing):\n"
-                + "\n".join(f"  - {h}" for h in heal_instructions)
-            )
+            # heal_instructions may be a list of strings OR a list of structured dicts
+            structured = [h for h in heal_instructions if isinstance(h, dict)]
+            free_text = [h for h in heal_instructions if isinstance(h, str)]
+
+            lines = ["\n\nHEAL INSTRUCTIONS from Inspector — fix ALL of these before calling finish_build:"]
+            if structured:
+                lines.append("\nPrecise targets (use str_replace_editor for surgical fixes):")
+                for item in structured:
+                    sev = item.get("severity", "error").upper()
+                    f = item.get("file", "?")
+                    ln = item.get("line", 0)
+                    loc = f"{f}:{ln}" if ln else f
+                    lines.append(f"  [{sev}] {loc}")
+                    lines.append(f"    Issue: {item.get('issue', '')}")
+                    lines.append(f"    Fix:   {item.get('fix', '')}")
+            if free_text:
+                lines.append("\nAdditional context:")
+                lines.extend(f"  - {h}" for h in free_text)
+            heal_section = "\n".join(lines)
 
         manifest_section = ""
         if manifest_snapshot:
@@ -175,6 +190,7 @@ class BuilderAgent:
         _model = model or CLAUDE_SONNET_MODEL
         context: list[dict] = []
         edits: list[dict] = []
+        verify_build_passed = False  # must be True before finish_build is accepted
 
         for turn in range(MAX_BUILDER_TURNS):
             raw = await workflow.execute_activity(
@@ -185,8 +201,24 @@ class BuilderAgent:
             context = raw["context"]
 
             if raw["type"] == "finish":
-                build_data = raw["build_data"]
                 tool_use_id = raw["tool_use_id"]
+                if not verify_build_passed and len(edits) > 0:
+                    # Reject finish_build — force a verify_build cycle first
+                    context = context + [{
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": tool_use_id,
+                            "content": (
+                                "ERROR: finish_build rejected — you must call verify_build first. "
+                                f"Call verify_build(repo_path='{repo_root}') and fix any errors, "
+                                "then call finish_build again."
+                            ),
+                        }],
+                    }]
+                    continue
+
+                build_data = raw["build_data"]
                 context = context + [{
                     "role": "user",
                     "content": [{"type": "tool_result", "tool_use_id": tool_use_id, "content": "Build complete."}],
@@ -235,24 +267,62 @@ class BuilderAgent:
                 ),
             )
 
-            tool_result = await self._dispatch(tool_name, tool_input)
+            try:
+                tool_result = await self._dispatch(tool_name, tool_input)
+            except Exception as exc:
+                tool_result = f"ERROR: activity failed after retries — {exc}"
+                log.warning("builder_activity_failed", tool=tool_name, error=str(exc))
 
-            # Track edits for the final report
-            if tool_name in ("write_file", "patch_file", "delete_file"):
+            tool_result_str = str(tool_result)
+            failed = tool_result_str.startswith("ERROR:")
+
+            # Track verify_build outcome to gate finish_build
+            if tool_name == "verify_build" and not failed:
+                result_lower = tool_result_str.lower()
+                if "no_tools" in result_lower or "no tools" in result_lower or "passed" in result_lower:
+                    verify_build_passed = True
+                elif "failed" in result_lower or "error" in result_lower:
+                    verify_build_passed = False  # reset — must pass before finish_build
+
+            # Only record edits when the operation actually succeeded
+            if not failed and tool_name in ("write_file", "patch_file", "delete_file"):
                 op = "create" if tool_name == "write_file" else ("delete" if tool_name == "delete_file" else "modify")
                 edits.append({
                     "path": tool_input.get("path", ""),
                     "operation": op,
                     "description": tool_input.get("description", ""),
                 })
+            elif not failed and tool_name == "str_replace_editor":
+                cmd = tool_input.get("command", "")
+                if cmd in ("str_replace", "create"):
+                    op = "create" if cmd == "create" else "modify"
+                    edits.append({
+                        "path": tool_input.get("path", ""),
+                        "operation": op,
+                        "description": tool_input.get("description", ""),
+                    })
+
+            # Warn early so the LLM wraps up before hitting the hard limit
+            turns_left = MAX_BUILDER_TURNS - turn - 1
+            if turns_left == 3:
+                tool_result_str += (
+                    "\n\n⚠ WARNING: 3 turns remaining. Call verify_build then finish_build NOW "
+                    "— do not start new files or features."
+                )
 
             context = context + [{
                 "role": "user",
-                "content": [{"type": "tool_result", "tool_use_id": tool_use_id, "content": str(tool_result)}],
+                "content": [{"type": "tool_result", "tool_use_id": tool_use_id, "content": tool_result_str}],
             }]
 
-        log.warning("builder_max_turns")
-        return json.dumps({"success": False, "edits": edits, "summary": "Builder hit max turns.", "errors": ["max_turns"]})
+        log.warning("builder_max_turns", edits=len(edits))
+        return json.dumps({
+            "success": len(edits) > 0,
+            "edits": edits,
+            "summary": f"Builder reached turn limit with {len(edits)} file(s) written — partial build.",
+            "errors": ["max_turns"],
+            "partial": True,
+        })
 
     async def _dispatch(self, tool_name: str, tool_input: dict) -> str:
         if tool_name == "read_file":

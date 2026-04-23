@@ -94,14 +94,11 @@ async def swarm_read_file(path: str) -> str:
 
 @activity.defn(name="swarm_write_file")
 async def swarm_write_file(path: str, content: str) -> str:
-    """Write (create or overwrite) a file."""
-    try:
-        p = Path(path)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(content, encoding="utf-8")
-        return f"Written: {path} ({len(content)} chars)"
-    except Exception as e:
-        return f"Error writing '{path}': {e}"
+    """Write (create or overwrite) a file. Raises on OS failure so Temporal retries."""
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(content, encoding="utf-8")
+    return f"Written: {path} ({len(content)} chars)"
 
 
 @activity.defn(name="swarm_patch_file")
@@ -110,15 +107,20 @@ async def swarm_patch_file(path: str, old_str: str, new_str: str) -> str:
     try:
         p = Path(path)
         original = p.read_text(encoding="utf-8")
-        if old_str not in original:
-            return f"Error: old_str not found in '{path}'. No changes made."
-        patched = original.replace(old_str, new_str, 1)
-        p.write_text(patched, encoding="utf-8")
-        return f"Patched: {path}"
     except FileNotFoundError:
-        return f"Error: file '{path}' not found."
-    except Exception as e:
-        return f"Error patching '{path}': {e}"
+        return f"ERROR: file '{path}' not found — use write_file to create it first."
+    if old_str not in original:
+        preview = "\n".join(f"{i+1:4d} | {l}" for i, l in enumerate(original.splitlines()[:20]))
+        return (
+            f"ERROR: old_str not found in '{path}'. No changes made.\n"
+            f"Use str_replace_editor to view the file, then retry with the exact string.\n"
+            f"First 20 lines:\n{preview}"
+        )
+    count = original.count(old_str)
+    if count > 1:
+        return f"ERROR: old_str appears {count} times in '{path}'. Make it more specific."
+    p.write_text(original.replace(old_str, new_str, 1), encoding="utf-8")
+    return f"Patched: {path}"
 
 
 @activity.defn(name="swarm_delete_file")
@@ -128,9 +130,9 @@ async def swarm_delete_file(path: str) -> str:
         Path(path).unlink()
         return f"Deleted: {path}"
     except FileNotFoundError:
-        return f"Error: file '{path}' not found."
+        return f"ERROR: file '{path}' not found — nothing to delete."
     except Exception as e:
-        return f"Error deleting '{path}': {e}"
+        return f"ERROR: could not delete '{path}': {e}"
 
 
 # ── Shell activity ────────────────────────────────────────────────────────────
@@ -391,36 +393,30 @@ async def swarm_str_replace_editor(
 
     if command == "str_replace":
         if not p.exists():
-            return f"Error: file '{path}' not found."
-        try:
-            original = p.read_text(encoding="utf-8")
-            if old_str not in original:
-                preview = "\n".join(
-                    f"{i+1:4d} | {l}"
-                    for i, l in enumerate(original.splitlines()[:40])
-                )
-                return (
-                    f"Error: old_str not found in '{path}'. No changes made.\n"
-                    f"First 40 lines of file:\n{preview}"
-                )
-            count = original.count(old_str)
-            if count > 1:
-                return (
-                    f"Error: old_str appears {count} times in '{path}'. "
-                    "Make it more specific to avoid ambiguous replacement."
-                )
-            p.write_text(original.replace(old_str, new_str, 1), encoding="utf-8")
-            return f"Replaced in {path}."
-        except Exception as e:
-            return f"Error editing '{path}': {e}"
+            return f"ERROR: file '{path}' not found — use 'create' command to create it first."
+        original = p.read_text(encoding="utf-8")
+        if old_str not in original:
+            preview = "\n".join(
+                f"{i+1:4d} | {l}"
+                for i, l in enumerate(original.splitlines()[:40])
+            )
+            return (
+                f"ERROR: old_str not found in '{path}'. No changes made.\n"
+                f"First 40 lines of file:\n{preview}"
+            )
+        count = original.count(old_str)
+        if count > 1:
+            return (
+                f"ERROR: old_str appears {count} times in '{path}'. "
+                "Make old_str longer and more specific to avoid ambiguous replacement."
+            )
+        p.write_text(original.replace(old_str, new_str, 1), encoding="utf-8")
+        return f"Replaced in {path}."
 
     if command == "create":
-        try:
-            p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(new_str, encoding="utf-8")
-            return f"Created: {path} ({len(new_str)} chars)"
-        except Exception as e:
-            return f"Error creating '{path}': {e}"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(new_str, encoding="utf-8")
+        return f"Created: {path} ({len(new_str)} chars)"
 
     return f"Error: unknown command '{command}'. Use 'view', 'str_replace', or 'create'."
 

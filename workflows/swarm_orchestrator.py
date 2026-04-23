@@ -23,6 +23,7 @@ import json
 import re
 import structlog
 from datetime import timedelta
+from pathlib import Path
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
@@ -637,6 +638,31 @@ class SwarmOrchestrator(BaseWorkflow):
                         ),
                     )
 
+                # Wave gate: verify prior wave's declared key_files exist on disk
+                # Missing files mean wave N-1 builder silently failed a write —
+                # flag it so the LLM context for this wave includes the gap.
+                if wave_idx > 0:
+                    prev_wave = track_waves[wave_idx - 1]
+                    missing_files: list[str] = []
+                    for prev_track in prev_wave[:max_parallel_tracks]:
+                        for kf in prev_track.get("key_files", []):
+                            kf_path = Path(kf) if Path(kf).is_absolute() else Path(repo_path) / kf
+                            if not kf_path.exists():
+                                missing_files.append(kf)
+                    if missing_files:
+                        await adk.messages.create(
+                            task_id=task_id,
+                            content=TextContent(
+                                author="agent",
+                                content=(
+                                    f"[Foreman] ⚠ Wave {wave_idx} gate: {len(missing_files)} file(s) from "
+                                    f"prior wave not found on disk: {', '.join(missing_files[:5])}. "
+                                    "Wave continues — builders should re-create any missing dependencies."
+                                ),
+                            ),
+                        )
+                        log.warning("wave_gate_missing_files", wave=wave_idx, missing=missing_files)
+
                 # Update manifest snapshot for this wave — previous waves' edits are now visible
                 manifest_snapshot = json.dumps(self._manifest)
 
@@ -775,6 +801,46 @@ class SwarmOrchestrator(BaseWorkflow):
                 log.warning("builder_failed", cycle=cycle)
                 break
 
+            # ── Smoke test: compile + type-check before full Inspector run ─────
+            # Catches syntax/type errors cheaply (~10s) before burning 5+ minutes
+            # on the full test suite. If smoke fails, inject errors as heal
+            # instructions and skip the Inspector for this cycle.
+            try:
+                smoke_result: dict = await workflow.execute_activity(
+                    "swarm_verify_build",
+                    args=[repo_path],
+                    start_to_close_timeout=timedelta(seconds=120),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                )
+                smoke_status = smoke_result.get("status", "no_tools")
+                if smoke_status == "failed":
+                    smoke_errors = smoke_result.get("errors", [])
+                    smoke_summary = smoke_result.get("summary", "compile/type errors detected")
+                    heal_instructions = [f"Compile/type error: {e}" for e in smoke_errors[:10]]
+                    heal_cycles += 1
+                    await adk.messages.create(
+                        task_id=task_id,
+                        content=TextContent(
+                            author="agent",
+                            content=(
+                                f"[Foreman] Smoke test failed — {smoke_summary}. "
+                                f"Dispatching targeted heal ({len(heal_instructions)} error(s))."
+                            ),
+                        ),
+                    )
+                    tracks = [{"label": "heal", "implementation_steps": heal_instructions, "key_files": []}]
+                    continue  # skip Inspector, go straight to heal cycle
+                else:
+                    await adk.messages.create(
+                        task_id=task_id,
+                        content=TextContent(
+                            author="agent",
+                            content=f"[Foreman] Smoke test {'passed' if smoke_status == 'passed' else 'skipped (no tools detected)'} — dispatching Inspector",
+                        ),
+                    )
+            except Exception:
+                pass  # smoke test unavailable — proceed to Inspector as before
+
             # Inspector
             await adk.messages.create(
                 task_id=task_id,
@@ -808,7 +874,9 @@ class SwarmOrchestrator(BaseWorkflow):
                 )
                 break
 
-            heal_instructions = inspector_report.get("heal_instructions", [])
+            # Merge structured heal_items (precise) with free-text heal_instructions
+            heal_items = inspector_report.get("heal_items", [])
+            heal_instructions = heal_items + inspector_report.get("heal_instructions", [])
             heal_cycles += 1
 
             await adk.messages.create(

@@ -101,7 +101,11 @@ class InspectorAgent:
             "7. Use list_ports to check port availability before run_application.\n"
             "8. Use check_secrets if tests fail with auth or connection errors.\n"
             "9. Use web_search to look up unfamiliar error messages.\n"
-            "10. Read failing files for context, then call report_inspection with concrete heal_instructions."
+            "10. Read failing files for context, then call report_inspection.\n"
+            "    - Populate heal_items with one entry per error: {file (absolute path), line, issue, fix, severity}.\n"
+            "    - Also populate heal_instructions as a summary for context.\n"
+            "    - heal_items are used first by the heal Builder — precise file+line+fix entries produce surgical edits.\n"
+            "    - For each test failure: read the failing file, find the exact line, write a targeted fix instruction."
         )
 
         context: list[dict] = []

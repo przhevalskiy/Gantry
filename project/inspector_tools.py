@@ -245,7 +245,33 @@ INSPECTOR_TOOLS: list[dict] = [
                 "heal_instructions": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Concrete fix instructions for the Builder if checks failed.",
+                    "description": (
+                        "Free-text fix instructions for the Builder. "
+                        "Also populate heal_items for precision — it is used first."
+                    ),
+                },
+                "heal_items": {
+                    "type": "array",
+                    "description": (
+                        "Structured, line-level fix targets. "
+                        "The heal Builder reads these first — they produce precise, surgical edits. "
+                        "Include one entry per distinct error location."
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "file": {"type": "string", "description": "Absolute path to the file with the error."},
+                            "line": {"type": "integer", "description": "Line number of the error (0 if unknown)."},
+                            "issue": {"type": "string", "description": "Short description of what is wrong."},
+                            "fix": {"type": "string", "description": "Exact fix to apply — what to change and to what."},
+                            "severity": {
+                                "type": "string",
+                                "enum": ["error", "warning", "info"],
+                                "description": "'error' blocks the build, 'warning' is optional, 'info' is advisory.",
+                            },
+                        },
+                        "required": ["file", "issue", "fix"],
+                    },
                 },
                 "test_passed": {"type": "integer", "description": "Number of tests passed."},
                 "test_failed": {"type": "integer", "description": "Number of tests failed."},
