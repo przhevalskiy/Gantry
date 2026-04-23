@@ -1,8 +1,17 @@
-"""LLM planning layer — Claude tool-use loop for swarm agents."""
+"""LLM planning layer — multi-provider tool-use loop for swarm agents.
+
+Supported providers:
+  - Anthropic Claude  (model names starting with "claude-")
+  - Mistral           (model names starting with "mistral-", "open-mistral-", etc.)
+
+The provider is selected automatically from the model name passed to next_step().
+Tool schemas use standard JSON Schema (input_schema), which both providers accept.
+"""
 from __future__ import annotations
 
 import asyncio
 import json
+import os
 import structlog
 from dataclasses import dataclass
 from typing import Any
@@ -11,7 +20,7 @@ import anthropic
 
 from project.config import ANTHROPIC_API_KEY, CLAUDE_MODEL
 from project.rate_limit_config import (
-    get_rate_config, get_rate_tracker, log_rate_limit_warning, 
+    get_rate_config, get_rate_tracker, log_rate_limit_warning,
     log_rate_limit_hit, log_rate_limit_recovery
 )
 
@@ -37,7 +46,7 @@ class FinalAnswer:
 
 
 class PlannerError(Exception):
-    """Raised when the planner cannot complete a step (rate limit exhausted, API error, etc.)."""
+    """Raised when the planner cannot complete a step."""
     def __init__(self, message: str):
         super().__init__(message)
         self.message = message
@@ -45,12 +54,11 @@ class PlannerError(Exception):
 
 PlannerResult = PlannerStep | FinalAnswer | PlannerError
 
-# Global semaphore — cap concurrent Claude calls across all activities in this worker
+# Global semaphore — cap concurrent LLM calls across all activities in this worker
 _LLM_SEMAPHORE = asyncio.Semaphore(4)
 
 
 def _extract_task_prompt(params: dict | None) -> str:
-    """Extract the user's goal string from task params."""
     if not params:
         return "No task prompt provided."
     return (
@@ -59,13 +67,15 @@ def _extract_task_prompt(params: dict | None) -> str:
         or params.get("query")
         or str(params)
     )
+
+
 _PROMPT_CACHE_BETA = "prompt-caching-2024-07-31"
-_TOOL_RESULT_MAX_CHARS = 800    # hard cap on any single tool result
-_SUMMARIZE_AFTER_TURNS = 6      # compress history every N assistant turns
-_KEEP_RECENT_TURNS = 3          # always keep last N turn-pairs fresh
+_TOOL_RESULT_MAX_CHARS = 800
+_SUMMARIZE_AFTER_TURNS = 6
+_KEEP_RECENT_TURNS = 3
 
 
-# ── 1. Tool result truncation ─────────────────────────────────────────────────
+# ── Tool result truncation ────────────────────────────────────────────────────
 
 def _truncate_text(text: str, limit: int) -> str:
     if len(text) <= limit:
@@ -103,10 +113,9 @@ def _cap_all_tool_results(context: list[dict[str, Any]]) -> list[dict[str, Any]]
     return result
 
 
-# ── 2. Consume already-processed read_file results ────────────────────────────
+# ── Consume already-processed read_file results ───────────────────────────────
 
 def _consume_read_results(context: list[dict[str, Any]], keep_last: int = 1) -> list[dict[str, Any]]:
-    """Replace old read_file results with a consumed marker — keep only the last `keep_last`."""
     read_ids: list[str] = []
     for msg in context:
         if msg.get("role") != "assistant":
@@ -138,7 +147,7 @@ def _consume_read_results(context: list[dict[str, Any]], keep_last: int = 1) -> 
     return result
 
 
-# ── 3. Periodic summarization ─────────────────────────────────────────────────
+# ── Periodic summarization ────────────────────────────────────────────────────
 
 def _extract_tool_actions(context: list[dict[str, Any]]) -> dict[str, list[str]]:
     written: list[str] = []
@@ -162,7 +171,6 @@ def _extract_tool_actions(context: list[dict[str, Any]]) -> dict[str, list[str]]
 
 
 def _compress_context(context: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """After SUMMARIZE_AFTER_TURNS turns, collapse middle history into a compact summary."""
     assistant_turns = sum(1 for m in context if m.get("role") == "assistant")
     if assistant_turns < _SUMMARIZE_AFTER_TURNS:
         return context
@@ -170,7 +178,6 @@ def _compress_context(context: list[dict[str, Any]]) -> list[dict[str, Any]]:
     actions = _extract_tool_actions(context)
     parts = []
     if actions["written"]:
-        # dedupe preserving order
         seen: dict[str, None] = {}
         for p in actions["written"]:
             seen[p] = None
@@ -184,12 +191,9 @@ def _compress_context(context: list[dict[str, Any]]) -> list[dict[str, Any]]:
         parts.append("Commands: " + ", ".join(actions["run"]))
 
     summary = "[Progress — " + ". ".join(parts) + ".]" if parts else "[No file operations yet.]"
-
     tail = context[-(_KEEP_RECENT_TURNS * 2):]
     return [context[0], {"role": "user", "content": summary}] + tail
 
-
-# ── Cacheable task prompt ─────────────────────────────────────────────────────
 
 def _cacheable_task_prompt(task_prompt: str) -> list[dict[str, Any]]:
     return [{
@@ -199,8 +203,9 @@ def _cacheable_task_prompt(task_prompt: str) -> list[dict[str, Any]]:
     }]
 
 
-async def _make_claude_request(client, kwargs: dict[str, Any]) -> Any:
-    """Make Claude API request with concurrency cap, token tracking, and exponential backoff."""
+# ── Anthropic backend ─────────────────────────────────────────────────────────
+
+async def _make_claude_request(client: Any, kwargs: dict[str, Any]) -> Any:
     config = get_rate_config()
     tracker = get_rate_tracker()
 
@@ -217,12 +222,8 @@ async def _make_claude_request(client, kwargs: dict[str, Any]) -> Any:
                     extra_headers={"anthropic-beta": _PROMPT_CACHE_BETA},
                     **kwargs,
                 )
-
-                if hasattr(response, 'usage'):
-                    tracker.add_tokens(
-                        response.usage.input_tokens,
-                        response.usage.output_tokens,
-                    )
+                if hasattr(response, "usage"):
+                    tracker.add_tokens(response.usage.input_tokens, response.usage.output_tokens)
                 if retry_count > 0:
                     log_rate_limit_recovery()
                 return response
@@ -230,22 +231,207 @@ async def _make_claude_request(client, kwargs: dict[str, Any]) -> Any:
             except anthropic.RateLimitError as e:
                 retry_count += 1
                 if retry_count > config.max_retries:
-                    logger.error("rate_limit_max_retries_exceeded", retries=retry_count, error=str(e))
                     raise PlannerError(f"Rate limit exhausted after {retry_count} retries: {e}")
                 log_rate_limit_hit(retry_count, delay, str(e))
                 await asyncio.sleep(delay)
                 delay = min(delay * 2, config.max_retry_delay)
 
             except anthropic.APIError as e:
-                logger.error("claude_api_error", error=str(e), type=type(e).__name__)
                 raise PlannerError(f"Claude API error: {e}")
 
             except Exception as e:
-                logger.error("unexpected_planner_error", error=str(e), type=type(e).__name__)
                 raise PlannerError(f"Unexpected error: {e}")
 
     raise PlannerError(f"Failed after {config.max_retries} retries")
 
+
+# ── Mistral backend ───────────────────────────────────────────────────────────
+
+def _is_mistral_model(model: str) -> bool:
+    return model.startswith(("mistral-", "open-mistral-", "open-mixtral-", "codestral-"))
+
+
+def _to_mistral_tools(tools: list[dict]) -> list[dict]:
+    """Convert Anthropic tool schema format to Mistral/OpenAI function format."""
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": t["name"],
+                "description": t.get("description", ""),
+                "parameters": t.get("input_schema", {"type": "object", "properties": {}}),
+            },
+        }
+        for t in tools
+    ]
+
+
+def _anthropic_context_to_mistral(messages: list[dict], system_prompt: str) -> list[dict]:
+    """Convert Anthropic-format message context to Mistral/OpenAI format."""
+    api_messages: list[dict] = [{"role": "system", "content": system_prompt}]
+
+    for msg in messages:
+        role = msg["role"]
+        content = msg["content"]
+
+        if isinstance(content, str):
+            api_messages.append({"role": role, "content": content})
+            continue
+
+        if not isinstance(content, list):
+            continue
+
+        text_parts: list[str] = []
+        tool_calls: list[dict] = []
+        tool_results: list[dict] = []
+
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            btype = block.get("type")
+            if btype == "text":
+                text_parts.append(block.get("text", ""))
+            elif btype == "tool_use":
+                tool_calls.append({
+                    "id": block["id"],
+                    "type": "function",
+                    "function": {
+                        "name": block["name"],
+                        "arguments": json.dumps(block.get("input", {})),
+                    },
+                })
+            elif btype == "tool_result":
+                tool_results.append({
+                    "role": "tool",
+                    "tool_call_id": block["tool_use_id"],
+                    "content": str(block.get("content", "")),
+                })
+
+        if tool_results:
+            api_messages.extend(tool_results)
+        elif tool_calls:
+            api_messages.append({
+                "role": "assistant",
+                "content": " ".join(text_parts) if text_parts else None,
+                "tool_calls": tool_calls,
+            })
+        elif text_parts:
+            api_messages.append({"role": role, "content": " ".join(text_parts)})
+
+    return api_messages
+
+
+async def _make_mistral_request(
+    messages: list[dict],
+    tools: list[dict] | None,
+    system_prompt: str,
+    model: str,
+) -> tuple[str, list[dict], dict]:
+    """
+    Call Mistral API. Returns (stop_reason, content_blocks, usage_dict).
+    Uses mistralai SDK if installed, falls back to httpx for raw REST.
+    stop_reason: "end_turn" | "tool_use"
+    content_blocks: same shape as Anthropic blocks for unified handling in next_step()
+    """
+    mistral_key = os.environ.get("MISTRAL_API_KEY", "")
+    if not mistral_key:
+        raise PlannerError("MISTRAL_API_KEY not set in environment.")
+
+    api_messages = _anthropic_context_to_mistral(messages, system_prompt)
+
+    def _parse_response_data(choices: list, usage_data: Any) -> tuple[str, list[dict], dict]:
+        choice = choices[0]
+        finish_reason = getattr(choice, "finish_reason", None) or choice.get("finish_reason", "stop")
+        msg = getattr(choice, "message", None) or choice.get("message", {})
+
+        blocks: list[dict] = []
+        msg_content = getattr(msg, "content", None) or (msg.get("content") if isinstance(msg, dict) else None)
+        if msg_content:
+            blocks.append({"type": "text", "text": msg_content})
+
+        tool_calls = getattr(msg, "tool_calls", None) or (msg.get("tool_calls") if isinstance(msg, dict) else None) or []
+        for tc in tool_calls:
+            fn = getattr(tc, "function", None) or (tc.get("function") if isinstance(tc, dict) else {})
+            tc_id = getattr(tc, "id", None) or (tc.get("id") if isinstance(tc, dict) else "")
+            fn_name = getattr(fn, "name", None) or (fn.get("name") if isinstance(fn, dict) else "")
+            fn_args = getattr(fn, "arguments", None) or (fn.get("arguments") if isinstance(fn, dict) else "{}")
+            try:
+                args = json.loads(fn_args) if isinstance(fn_args, str) else fn_args
+            except (json.JSONDecodeError, TypeError):
+                args = {}
+            blocks.append({"type": "tool_use", "id": tc_id, "name": fn_name, "input": args})
+
+        stop = "tool_use" if (
+            finish_reason == "tool_calls"
+            or any(b["type"] == "tool_use" for b in blocks)
+        ) else "end_turn"
+
+        if isinstance(usage_data, dict):
+            usage = {
+                "input_tokens": usage_data.get("prompt_tokens", 0),
+                "output_tokens": usage_data.get("completion_tokens", 0),
+            }
+        else:
+            usage = {
+                "input_tokens": getattr(usage_data, "prompt_tokens", 0),
+                "output_tokens": getattr(usage_data, "completion_tokens", 0),
+            }
+        return stop, blocks, usage
+
+    # Try mistralai SDK first
+    try:
+        from mistralai import Mistral  # type: ignore
+        client = Mistral(api_key=mistral_key)
+        call_kwargs: dict[str, Any] = {
+            "model": model,
+            "messages": api_messages,
+            "max_tokens": 8192,
+        }
+        if tools:
+            call_kwargs["tools"] = _to_mistral_tools(tools)
+            call_kwargs["tool_choice"] = "auto"
+
+        async with _LLM_SEMAPHORE:
+            response = await client.chat.complete_async(**call_kwargs)
+
+        return _parse_response_data(response.choices, response.usage)
+
+    except ImportError:
+        pass  # fall through to httpx
+
+    # Fallback: raw REST via httpx
+    try:
+        import httpx
+    except ImportError:
+        raise PlannerError("Neither mistralai nor httpx is installed. Run: uv add mistralai")
+
+    payload: dict[str, Any] = {
+        "model": model,
+        "messages": api_messages,
+        "max_tokens": 8192,
+    }
+    if tools:
+        payload["tools"] = _to_mistral_tools(tools)
+        payload["tool_choice"] = "auto"
+
+    async with _LLM_SEMAPHORE:
+        async with httpx.AsyncClient(timeout=120) as http:
+            resp = await http.post(
+                "https://api.mistral.ai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {mistral_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+        if resp.status_code != 200:
+            raise PlannerError(f"Mistral API error {resp.status_code}: {resp.text[:300]}")
+        data = resp.json()
+
+    return _parse_response_data(data["choices"], data.get("usage", {}))
+
+
+# ── Unified entry point ───────────────────────────────────────────────────────
 
 async def next_step(
     task_prompt: str,
@@ -255,7 +441,8 @@ async def next_step(
     model: str = CLAUDE_MODEL,
 ) -> tuple[PlannerResult, list[dict]]:
     """
-    Make one Claude API call and return the next step plus the updated context.
+    Make one LLM API call and return the next step plus the updated context.
+    Routes to Mistral or Anthropic based on the model name prefix.
     Context is never mutated in place — a new list is always returned.
     """
     if not context:
@@ -266,16 +453,63 @@ async def next_step(
         ctx = _cap_all_tool_results(ctx)
         messages = ctx
 
-    client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
     system = system_prompt or _DEFAULT_SYSTEM
+    log = logger.bind(turn=len([m for m in messages if m["role"] == "assistant"]) + 1)
+    log.info("planner_call", model=model, message_count=len(messages))
+
+    # ── Mistral path ──────────────────────────────────────────────────────────
+    if _is_mistral_model(model):
+        try:
+            stop_reason, content_blocks, usage = await _make_mistral_request(
+                messages=messages,
+                tools=tools,
+                system_prompt=system,
+                model=model,
+            )
+        except PlannerError:
+            raise
+        except Exception as e:
+            raise PlannerError(f"Mistral request failed: {e}")
+
+        log.info("planner_response", stop_reason=stop_reason,
+                 input_tokens=usage.get("input_tokens", 0),
+                 output_tokens=usage.get("output_tokens", 0))
+
+        assistant_msg = {"role": "assistant", "content": content_blocks}
+        new_context = messages + [assistant_msg]
+
+        if stop_reason == "end_turn":
+            text_parts = [b["text"] for b in content_blocks if b.get("type") == "text"]
+            return FinalAnswer(answer=" ".join(text_parts) or "Task complete."), new_context
+
+        # stop_reason == "tool_use"
+        tool_blocks = [b for b in content_blocks if b.get("type") == "tool_use"]
+        first = tool_blocks[0] if tool_blocks else None
+        if len(tool_blocks) > 1:
+            stubs = [
+                {"type": "tool_result", "tool_use_id": b["id"],
+                 "content": "Skipped: only one tool call per turn is supported."}
+                for b in tool_blocks[1:]
+            ]
+            new_context = new_context + [{"role": "user", "content": stubs}]
+        if first:
+            if first["name"] == "finish":
+                return FinalAnswer(answer=first["input"].get("answer", "Task complete.")), new_context
+            return PlannerStep(
+                tool_name=first["name"],
+                tool_use_id=first["id"],
+                tool_input=first["input"],
+            ), new_context
+
+        return FinalAnswer(answer="Task complete (unexpected stop reason)."), new_context
+
+    # ── Anthropic / Claude path ───────────────────────────────────────────────
+    client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
     system_payload: list[dict[str, Any]] = [{
         "type": "text",
         "text": system,
         "cache_control": {"type": "ephemeral"},
     }]
-
-    log = logger.bind(turn=len([m for m in messages if m["role"] == "assistant"]) + 1)
-    log.info("planner_call", model=model, message_count=len(messages))
 
     kwargs: dict[str, Any] = dict(
         model=model,
@@ -295,7 +529,7 @@ async def next_step(
         output_tokens=response.usage.output_tokens,
     )
 
-    def _serialize(b) -> dict:
+    def _serialize(b: Any) -> dict:
         if b.type == "text":
             return {"type": "text", "text": b.text}
         if b.type == "tool_use":
@@ -313,7 +547,6 @@ async def next_step(
         tool_blocks = [b for b in response.content if b.type == "tool_use"]
         first = tool_blocks[0] if tool_blocks else None
 
-        # Stub out any extra parallel tool calls so context stays valid
         if len(tool_blocks) > 1:
             stubs = [
                 {"type": "tool_result", "tool_use_id": b.id,
