@@ -4,9 +4,9 @@ build:
   context:
     root: ../
     include_paths:
-      - Keystone
-    dockerfile: Keystone/Dockerfile
-    dockerignore: Keystone/.dockerignore
+      - Gantry
+    dockerfile: Gantry/Dockerfile
+    dockerignore: Gantry/.dockerignore
 
 local_development:
   agent:

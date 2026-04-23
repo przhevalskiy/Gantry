@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dev.sh — Keystone development launcher
+# dev.sh — Gantry development launcher
 #
 # Assumes the Agentex platform (Docker) is already running via:
 #   cd scale-agentex/agentex && docker compose up -d
@@ -8,7 +8,7 @@
 #   1. Kills stale processes on local ports (8000, 8233, 3000)
 #   2. Starts Temporal dev server if not running (:7233)
 #   3. Starts the web-scout agent (ACP :8000 + Temporal worker)
-#   4. Starts keystone-ui (:3000)
+#   4. Starts gantry-ui (:3000)
 #
 # Usage:
 #   ./dev.sh               Start (live browser + search)
@@ -73,13 +73,13 @@ _stop_all() {
 
 _show_status() {
   echo ""
-  for svc_port in "Agentex API:5003" "Temporal:7233" "Temporal UI:8080" "Agent ACP:8000" "keystone-ui:3000" "Redis:6379"; do
+  for svc_port in "Agentex API:5003" "Temporal:7233" "Temporal UI:8080" "Agent ACP:8000" "gantry-ui:3000" "Redis:6379"; do
     label="${svc_port%%:*}"; port="${svc_port##*:}"
     printf "  %-20s" "$label (:$port)"
     nc -z localhost "$port" 2>/dev/null && echo -e "${GREEN}running${NC}" || echo -e "${RED}stopped${NC}"
   done
   echo ""
-  echo "  http://localhost:3000       keystone-ui"
+  echo "  http://localhost:3000       gantry-ui"
   echo "  http://localhost:5003/swagger  Agentex API"
   echo "  http://localhost:8080       Temporal UI"
   echo ""
@@ -168,23 +168,23 @@ fi
 AGENTEX_ARGS="--manifest manifest.yaml"
 [ "$CLEANUP" = true ] && AGENTEX_ARGS="$AGENTEX_ARGS --cleanup-on-start"
 
-agentex agents run $AGENTEX_ARGS >/tmp/keystone-agent.log 2>&1 &
+agentex agents run $AGENTEX_ARGS >/tmp/gantry-agent.log 2>&1 &
 AGENT_PID=$!
-echo "    PID $AGENT_PID — logs: tail -f /tmp/keystone-agent.log"
+echo "    PID $AGENT_PID — logs: tail -f /tmp/gantry-agent.log"
 wait_for_port 8000 "Agent ACP" 30
 ok "Agent running"
 
-# ── Step 4: keystone-ui ───────────────────────────────────────────────────────
-header "Starting keystone-ui"
+# ── Step 4: gantry-ui ────────────────────────────────────────────────────────
+header "Starting gantry-ui"
 
 if [ ! -d "$UI_DIR" ]; then
-  warn "keystone-ui not found at $UI_DIR — skipping"
+  warn "gantry-ui not found at $UI_DIR — skipping"
 else
   [ ! -d "$UI_DIR/node_modules" ] && (cd "$UI_DIR" && npm install --silent)
-  (cd "$UI_DIR" && npm run dev) >/tmp/keystone-ui.log 2>&1 &
+  (cd "$UI_DIR" && npm run dev) >/tmp/gantry-ui.log 2>&1 &
   UI_PID=$!
-  echo "    PID $UI_PID — logs: tail -f /tmp/keystone-ui.log"
-  wait_for_port 3000 "keystone-ui" 30
+  echo "    PID $UI_PID — logs: tail -f /tmp/gantry-ui.log"
+  wait_for_port 3000 "gantry-ui" 30
   ok "UI running"
 fi
 
@@ -193,11 +193,11 @@ echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  Ready${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo "  http://localhost:3000           keystone-ui"
+echo "  http://localhost:3000           gantry-ui"
 echo "  http://localhost:5003/swagger   Agentex API"
 echo "  http://localhost:8080           Temporal UI"
-echo "  tail -f /tmp/keystone-agent.log"
-echo "  tail -f /tmp/keystone-ui.log"
+echo "  tail -f /tmp/gantry-agent.log"
+echo "  tail -f /tmp/gantry-ui.log"
 echo "  ./dev.sh --stop   to tear down"
 echo ""
 
