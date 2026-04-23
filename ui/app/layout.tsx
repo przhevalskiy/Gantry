@@ -2,11 +2,11 @@ import type { Metadata } from 'next';
 import { GeistSans } from 'geist/font/sans';
 import './globals.css';
 import { Providers } from '@/components/providers';
-import { Sidebar } from '@/components/sidebar';
+import { AppShell } from '@/components/app-shell';
 
 export const metadata: Metadata = {
-  title: 'Keystone — Deep Research',
-  description: 'AI-powered web research. Multi-source synthesis with live browser.',
+  title: 'Gantry — Durable Engineering Crew',
+  description: 'Multi-agent software engineering factory.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -18,12 +18,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={GeistSans.className}>
       <body>
         <Providers agentexAPIBaseURL={agentexAPIBaseURL} agentName={agentName}>
-          <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-            <Sidebar />
-            <main style={{ flex: 1, overflowY: 'auto', height: '100vh' }}>
-              {children}
-            </main>
-          </div>
+          <AppShell>
+            {children}
+          </AppShell>
         </Providers>
       </body>
     </html>

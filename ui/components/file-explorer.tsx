@@ -1,6 +1,26 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { ChibiAvatar, BUILDER_RING_COLORS, type SwarmRole } from '@/components/chibi-avatar';
+import type { AgentFileEntry } from '@/components/swarm-view';
+
+function AgentBadge({ entry, size, pulse }: { entry: AgentFileEntry; size: number; pulse: boolean }) {
+  const ringColor = entry.role === 'builder'
+    ? BUILDER_RING_COLORS[entry.builderIdx % BUILDER_RING_COLORS.length]
+    : 'transparent';
+  return (
+    <div style={{
+      flexShrink: 0,
+      borderRadius: '50%',
+      padding: entry.role === 'builder' ? '2px' : 0,
+      background: entry.role === 'builder' ? ringColor : 'transparent',
+      animation: pulse ? 'writePulse 1.2s ease-in-out infinite' : undefined,
+      opacity: pulse ? 1 : 0.55,
+    }}>
+      <ChibiAvatar role={entry.role as SwarmRole} size={size} />
+    </div>
+  );
+}
 import hljs from 'highlight.js/lib/core';
 import typescript from 'highlight.js/lib/languages/typescript';
 import javascript from 'highlight.js/lib/languages/javascript';
@@ -85,12 +105,13 @@ function FileIcon({ name }: { name: string }) {
 // ── Tree node ─────────────────────────────────────────────────────────────────
 
 function TreeItem({
-  node, depth, selected, activeFiles, onSelect, defaultOpen,
+  node, depth, selected, activeFiles, agentOnFile, onSelect, defaultOpen,
 }: {
   node: TreeNode;
   depth: number;
   selected: string | null;
   activeFiles: Set<string>;
+  agentOnFile: Map<string, AgentFileEntry>;
   onSelect: (relPath: string) => void;
   defaultOpen: boolean;
 }) {
@@ -117,7 +138,7 @@ function TreeItem({
         </div>
         {open && node.children.map(child => (
           <TreeItem key={child.relPath} node={child} depth={depth + 1}
-            selected={selected} activeFiles={activeFiles}
+            selected={selected} activeFiles={activeFiles} agentOnFile={agentOnFile}
             onSelect={onSelect} defaultOpen={false} />
         ))}
       </div>
@@ -126,6 +147,37 @@ function TreeItem({
 
   const isSelected = selected === node.relPath;
   const isActive = activeFiles.has(node.relPath);
+  const entry = agentOnFile.get(node.relPath);
+  const ringColor = entry?.role === 'builder'
+    ? BUILDER_RING_COLORS[entry.builderIdx % BUILDER_RING_COLORS.length]
+    : null;
+
+  // Track when this file was first seen so we can flash it
+  const firstSeenRef = useRef<boolean>(false);
+  const [isNew, setIsNew] = useState(false);
+  useEffect(() => {
+    if (!firstSeenRef.current) {
+      firstSeenRef.current = true;
+      // Only flash if a builder is actively writing it (not on initial load)
+      if (isActive && entry) {
+        setIsNew(true);
+        const t = setTimeout(() => setIsNew(false), 900);
+        return () => clearTimeout(t);
+      }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Also flash when the file transitions to active (builder starts writing it)
+  const prevActiveRef = useRef(isActive);
+  useEffect(() => {
+    if (!prevActiveRef.current && isActive && entry) {
+      setIsNew(true);
+      const t = setTimeout(() => setIsNew(false), 900);
+      prevActiveRef.current = isActive;
+      return () => clearTimeout(t);
+    }
+    prevActiveRef.current = isActive;
+  }, [isActive, entry]);
 
   return (
     <div
@@ -135,26 +187,32 @@ function TreeItem({
         padding: '0.2rem 0.5rem', paddingLeft: `${0.5 + depth * 0.875}rem`,
         cursor: 'pointer', borderRadius: '4px', userSelect: 'none',
         fontSize: '0.78rem',
-        background: isSelected ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : 'transparent',
+        background: isNew && ringColor
+          ? `color-mix(in srgb, ${ringColor} 18%, transparent)`
+          : isSelected
+          ? 'color-mix(in srgb, var(--accent) 12%, transparent)'
+          : isActive && ringColor
+          ? `color-mix(in srgb, ${ringColor} 8%, transparent)`
+          : 'transparent',
         color: isSelected ? 'var(--accent)' : 'var(--text-secondary)',
         fontWeight: isSelected ? 600 : 400,
+        transition: isNew ? 'background 0.8s ease-out' : 'background 0.1s',
+        borderLeft: isActive && ringColor ? `2px solid ${ringColor}60` : '2px solid transparent',
       }}
-      onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'var(--surface-raised)'; }}
-      onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
+      onMouseEnter={e => { if (!isSelected && !isNew) (e.currentTarget as HTMLDivElement).style.background = 'var(--surface-raised)'; }}
+      onMouseLeave={e => {
+        if (!isSelected && !isNew) {
+          (e.currentTarget as HTMLDivElement).style.background =
+            isActive && ringColor ? `color-mix(in srgb, ${ringColor} 8%, transparent)` : 'transparent';
+        }
+      }}
     >
       <FileIcon name={node.name} />
+      <style>{`@keyframes writePulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {node.name}
       </span>
-      {isActive && (
-        <>
-          <style>{`@keyframes writePulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
-          <span style={{
-            width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)',
-            animation: 'writePulse 1s ease-in-out infinite', flexShrink: 0,
-          }} />
-        </>
-      )}
+      {entry && <AgentBadge entry={entry} size={16} pulse={isActive} />}
     </div>
   );
 }
@@ -299,15 +357,29 @@ interface Tab {
 export function FileExplorer({
   repoRoot,
   writtenPaths,
+  agentOnFile = new Map(),
   isRunning,
 }: {
   repoRoot: string;
   writtenPaths: string[];
+  agentOnFile?: Map<string, AgentFileEntry>;
   isRunning: boolean;
 }) {
+  const tabsKey = `ks_fe_tabs:${repoRoot}`;
+  const activeKey = `ks_fe_active:${repoRoot}`;
+
   const [files, setFiles] = useState<string[]>([]);
-  const [tabs, setTabs] = useState<Tab[]>([]);
-  const [activeTab, setActiveTab] = useState<string | null>(null);
+  const [tabs, setTabs] = useState<Tab[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = localStorage.getItem(tabsKey);
+      return saved ? (JSON.parse(saved) as string[]).map(p => ({ relPath: p, content: '' })) : [];
+    } catch { return []; }
+  });
+  const [activeTab, setActiveTab] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(activeKey) ?? null;
+  });
   const [treeWidth] = useState(200);
 
   const recentRel = new Set(
@@ -315,6 +387,17 @@ export function FileExplorer({
       p.startsWith(repoRoot) ? p.slice(repoRoot.length).replace(/^\//, '') : p
     )
   );
+
+  // Persist tab list whenever it changes
+  useEffect(() => {
+    localStorage.setItem(tabsKey, JSON.stringify(tabs.map(t => t.relPath)));
+  }, [tabs, tabsKey]);
+
+  // Persist active tab whenever it changes
+  useEffect(() => {
+    if (activeTab) localStorage.setItem(activeKey, activeTab);
+    else localStorage.removeItem(activeKey);
+  }, [activeTab, activeKey]);
 
   // Poll file tree
   useEffect(() => {
@@ -342,6 +425,18 @@ export function FileExplorer({
       return data.content ?? null;
     } catch { return null; }
   }, [repoRoot]);
+
+  // Re-fetch content for tabs restored from localStorage (runs once repoRoot is ready)
+  useEffect(() => {
+    if (!repoRoot) return;
+    tabs.forEach(async (tab) => {
+      if (tab.content !== '') return;
+      const content = await fetchContent(tab.relPath);
+      if (content !== null) {
+        setTabs(prev => prev.map(t => t.relPath === tab.relPath ? { ...t, content } : t));
+      }
+    });
+  }, [repoRoot, fetchContent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Open or focus a tab when a file is selected from the tree
   const openTab = useCallback(async (rel: string) => {
@@ -439,6 +534,7 @@ export function FileExplorer({
               depth={0}
               selected={activeTab}
               activeFiles={recentRel}
+              agentOnFile={agentOnFile}
               onSelect={openTab}
               defaultOpen={true}
             />
@@ -491,8 +587,8 @@ export function FileExplorer({
                     <span style={{ fontSize: '0.78rem', fontWeight: isActive ? 600 : 400, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                       {fileName}
                     </span>
-                    {isDirty && (
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, animation: 'writePulse 1s ease-in-out infinite' }} />
+                    {agentOnFile.get(tab.relPath) && (
+                      <AgentBadge entry={agentOnFile.get(tab.relPath)!} size={14} pulse={isDirty} />
                     )}
                     <span
                       onClick={(e) => closeTab(tab.relPath, e)}

@@ -3,16 +3,18 @@
 import { useAgentConfigStore, DEFAULT_CONFIG, type AgentModel, type AgentConfig } from '@/lib/agent-config-store';
 
 const MODEL_OPTIONS: { value: AgentModel; label: string }[] = [
-  { value: 'default',          label: 'Default (Sonnet 4.6)' },
-  { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
-  { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 (cheaper)' },
+  { value: 'default',               label: 'Default (auto-routed by tier)' },
+  { value: 'claude-sonnet-4-6',     label: 'Claude Sonnet 4.6' },
+  { value: 'claude-haiku-4-5',      label: 'Claude Haiku 4.5 (cheaper)' },
+  { value: 'mistral-large-latest',  label: 'Mistral Large (requires MISTRAL_API_KEY)' },
+  { value: 'mistral-small-latest',  label: 'Mistral Small (cheaper, requires MISTRAL_API_KEY)' },
 ];
 
 const SWARM_AGENTS: { key: keyof AgentConfig; label: string; hint: string }[] = [
-  { key: 'modelArchitect', label: 'Architect', hint: 'Maps repo, plans tracks — keep Sonnet' },
-  { key: 'modelBuilder',   label: 'Builder',   hint: 'Writes code — Sonnet recommended' },
-  { key: 'modelInspector', label: 'Inspector', hint: 'Runs QA, generates heal instructions' },
-  { key: 'modelSecurity',  label: 'Security',  hint: 'Scans for secrets and CVEs' },
+  { key: 'modelArchitect', label: 'Architect', hint: 'Maps repo, plans tracks — auto-routed by tier (Sonnet for tier ≥ 2)' },
+  { key: 'modelBuilder',   label: 'Builder',   hint: 'Writes code — auto-routed by tier (Haiku for tier 0/1, Sonnet for tier 2+)' },
+  { key: 'modelInspector', label: 'Inspector', hint: 'Runs QA — auto-routed by tier (Haiku for tier 0/1, Sonnet for tier 2+)' },
+  { key: 'modelSecurity',  label: 'Security',  hint: 'Scans for secrets and CVEs — Haiku (sufficient for scanning)' },
   { key: 'modelDevOps',    label: 'DevOps',    hint: 'Git, branch, PR — Haiku is fine' },
 ];
 
@@ -190,12 +192,32 @@ export function ConfigPanel() {
           <SettingRow label="Max heal cycles" hint="How many times the Inspector can send the Builder back to fix failures">
             <SliderInput value={config.swarmMaxHealCycles} min={1} max={5} onChange={v => setConfig({ swarmMaxHealCycles: v })} />
           </SettingRow>
+          <SettingRow
+            label="Tier override"
+            hint="Auto = LLM classifies complexity. Force a tier to skip classification and control cost/quality."
+          >
+            <Select
+              value={String(config.tierOverride)}
+              options={[
+                { value: '-1', label: 'Auto (LLM classifies)' },
+                { value: '0',  label: 'Tier 0 — Micro (bug fix, rename)' },
+                { value: '1',  label: 'Tier 1 — Lightweight (simple app)' },
+                { value: '2',  label: 'Tier 2 — Standard (multi-file feature)' },
+                { value: '3',  label: 'Tier 3 — Full Crew (SaaS, payments)' },
+              ]}
+              onChange={v => setConfig({ tierOverride: parseInt(v, 10) })}
+            />
+          </SettingRow>
         </div>
       </div>
 
       {/* Model per agent */}
       <div style={{ marginBottom: '2rem' }}>
         <SectionLabel>Model per Agent</SectionLabel>
+        <p style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', marginBottom: '0.875rem', lineHeight: 1.5 }}>
+          Models are auto-routed by tier: Haiku for Tier 0/1 tasks, Sonnet for Tier 2/3.
+          These selectors apply when Tier Override is set to a specific tier.
+        </p>
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '0 1rem' }}>
           {SWARM_AGENTS.map(({ key, label, hint }) => (
             <SettingRow key={String(key)} label={label} hint={hint}>
@@ -206,6 +228,45 @@ export function ConfigPanel() {
               />
             </SettingRow>
           ))}
+        </div>
+      </div>
+
+      {/* GitHub */}
+      <div style={{ marginBottom: '2rem' }}>
+        <SectionLabel>GitHub</SectionLabel>
+        <p style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', marginBottom: '0.875rem', lineHeight: 1.5 }}>
+          A Personal Access Token lets the swarm clone private repos, push branches, and open pull requests.
+          Needs <code style={{ fontFamily: 'monospace', fontSize: '0.8em' }}>repo</code> scope (or <code style={{ fontFamily: 'monospace', fontSize: '0.8em' }}>contents:write</code> + <code style={{ fontFamily: 'monospace', fontSize: '0.8em' }}>pull_requests:write</code> for fine-grained tokens).
+          Stored in your browser only — never sent to third parties.
+        </p>
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '0 1rem' }}>
+          <SettingRow
+            label="Personal Access Token"
+            hint="github.com → Settings → Developer settings → Personal access tokens"
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <input
+                type="password"
+                value={config.githubToken}
+                onChange={e => setConfig({ githubToken: e.target.value })}
+                placeholder="ghp_…"
+                style={{
+                  fontSize: '0.8125rem',
+                  color: 'var(--text-primary)',
+                  background: 'var(--surface-raised)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '6px',
+                  padding: '0.3rem 0.6rem',
+                  fontFamily: 'monospace',
+                  width: 220,
+                  outline: 'none',
+                }}
+              />
+              {config.githubToken && (
+                <span style={{ fontSize: '0.72rem', color: 'var(--success)', fontWeight: 600 }}>✓ set</span>
+              )}
+            </div>
+          </SettingRow>
         </div>
       </div>
 

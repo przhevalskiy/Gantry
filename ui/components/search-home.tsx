@@ -230,6 +230,7 @@ export function SearchHome() {
   const fileDropdown = useDropdown();
   const projectDropdown = useDropdown();
   const [newProjectName, setNewProjectName] = useState('');
+  const [newGithubUrl, setNewGithubUrl] = useState('');
   const [creatingProject, setCreatingProject] = useState(false);
   const [showNewProjectInput, setShowNewProjectInput] = useState(false);
 
@@ -252,31 +253,53 @@ export function SearchHome() {
   const { files: attachedFiles, error: attachError, addFiles, removeFile, clearAll: clearFiles } = useFileAttachments();
   const { activeProject, projects, addProject, selectProject } = useActiveProject();
 
-  function handleSubmit(q: string) {
+  function goalToProjectName(goal: string): string {
+    // "Build a habit tracker with streaks" → "habit-tracker"
+    const stopWords = new Set(['a', 'an', 'the', 'with', 'and', 'or', 'for', 'to', 'of', 'in', 'on', 'at', 'by', 'from', 'build', 'create', 'make', 'add', 'implement', 'write', 'develop', 'design', 'set', 'up']);
+    const words = goal
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '')
+      .split(/\s+/)
+      .filter(w => w.length > 1 && !stopWords.has(w))
+      .slice(0, 3);
+    return words.join('-') || 'project';
+  }
+
+  async function handleSubmit(q: string) {
     const trimmed = q.trim();
     if (!trimmed) return;
-    if (!activeProject) {
-      setError('Select or create a project first.');
-      projectDropdown.setOpen(true);
-      return;
-    }
     setError('');
+
     const attachmentBlock = buildAttachmentBlock(attachedFiles);
     const fullQuery = trimmed + attachmentBlock;
     const tierOption = TIER_OPTIONS.find(t => t.key === tierKey);
     const extraTier = tierOption?.value !== undefined ? { tier: tierOption.value } : {};
 
+    // If no project is selected, auto-create one named from the goal
+    let project = activeProject;
+    if (!project) {
+      try {
+        const name = goalToProjectName(trimmed);
+        project = await addProject(name);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to create project.');
+        return;
+      }
+    }
+
     createTask({
       query: fullQuery,
       extraParams: {
-        repo_path: activeProject.repo_path,
+        repo_path: project.repo_path,
         branch_prefix: swarmConfig.swarmBranchPrefix || 'swarm',
         max_heal_cycles: swarmConfig.swarmMaxHealCycles,
         ...extraTier,
+        ...(project.github_url ? { github_url: project.github_url } : {}),
+        ...(swarmConfig.githubToken ? { github_token: swarmConfig.githubToken } : {}),
       },
     }, {
       onSuccess: (task) => {
-        saveReport({ taskId: task.id, query: trimmed, answer: '', createdAt: new Date().toISOString(), projectId: activeProject?.id });
+        saveReport({ taskId: task.id, query: trimmed, answer: '', createdAt: new Date().toISOString(), projectId: project!.id });
         clearFiles();
         router.push(`/task/${task.id}`);
       },
@@ -285,9 +308,9 @@ export function SearchHome() {
     });
   }
 
-  function onFormSubmit(e: React.FormEvent) { e.preventDefault(); handleSubmit(query); }
+  function onFormSubmit(e: React.FormEvent) { e.preventDefault(); void handleSubmit(query); }
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') { e.preventDefault(); handleSubmit(query); }
+    if (e.key === 'Enter') { e.preventDefault(); void handleSubmit(query); }
   }
 
   const canSubmit = !isPending && !!query.trim();
@@ -306,31 +329,63 @@ export function SearchHome() {
       backgroundSize: '48px 48px',
     }}>
       <style>{`
-        @keyframes logo-sheen {
-          0%        { transform: translateX(-150%) skewX(-20deg); }
-          16%       { transform: translateX(350%) skewX(-20deg); }
-          16.0001%, 100% { transform: translateX(-150%) skewX(-20deg); }
+        @keyframes chibi-wave {
+          0%    { transform: translateY(0px) scale(1); }
+          8%    { transform: translateY(-16px) scale(1.1); }
+          16%   { transform: translateY(0px) scale(1); }
+          100%  { transform: translateY(0px) scale(1); }
         }
-        .logo-sheen-overlay {
-          position: absolute; inset: 0; pointer-events: none; overflow: hidden;
-        }
-        .logo-sheen-overlay::after {
-          content: ''; position: absolute; top: 0; left: 0;
-          width: 35%; height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
-          animation: logo-sheen 6s ease-in-out infinite;
+        .chibi-avatar {
+          animation: chibi-wave 9s ease-in-out infinite;
+          will-change: transform;
         }
       `}</style>
 
-      {/* Logo */}
-      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <div style={{ position: 'relative', display: 'inline-block', overflow: 'hidden', borderRadius: '8px', lineHeight: 0 }}>
-          <img
-            src="/Keystone.png"
-            alt="Keystone"
-            style={{ height: '64px', width: 'auto', objectFit: 'contain', display: 'block', marginBottom: '1rem' }}
-          />
-          <div className="logo-sheen-overlay" />
+      {/* Chibi crew row — one avatar per agent in the platform */}
+      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          {[
+            { n: 1,  label: 'Foreman',   color: '#f97316' }, // orange
+            { n: 4,  label: 'PM',         color: '#8b5cf6' }, // violet
+            { n: 7,  label: 'Architect',  color: '#3b82f6' }, // blue
+            { n: 10, label: 'Builder',    color: '#10b981' }, // emerald
+            { n: 18, label: 'Inspector',  color: '#f59e0b' }, // amber
+            { n: 22, label: 'Security',   color: '#ef4444' }, // red
+            { n: 25, label: 'DevOps',     color: '#06b6d4' }, // cyan
+          ].map(({ n, label, color }, i) => (
+            <div
+              key={label}
+              title={label}
+              className="chibi-avatar"
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                padding: '3px',
+                background: color,
+                marginLeft: i === 0 ? '0' : '-18px',
+                zIndex: i,
+                position: 'relative',
+                animationDelay: `${(i * 0.22).toFixed(2)}s`,
+                flexShrink: 0,
+                boxSizing: 'border-box',
+                filter: 'drop-shadow(-3px 0 4px rgba(0,0,0,0.15))',
+              }}
+            >
+              <img
+                src={`/avatars/avatar-${String(n).padStart(2, '0')}.png`}
+                alt={label}
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  borderRadius: '50%',
+                  display: 'block',
+                  background: 'var(--background)',
+                }}
+              />
+            </div>
+          ))}
         </div>
         <p style={{ fontSize: '1.33rem', fontWeight: 500, color: 'var(--text-secondary)', letterSpacing: '0.01em' }}>
           Your durable engineering crew
@@ -553,8 +608,11 @@ export function SearchHome() {
                 >
                   <IconFolder size={11} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {activeProject ? activeProject.name : 'No project'}
+                    {activeProject ? activeProject.name : 'New project'}
                   </span>
+                  {activeProject?.github_url && (
+                    <span title={activeProject.github_url} style={{ fontSize: '0.6rem', opacity: 0.7, flexShrink: 0 }}>⎇</span>
+                  )}
                   <span style={{ opacity: 0.4, fontSize: '0.6rem', flexShrink: 0 }}>▾</span>
                 </button>
 
@@ -567,7 +625,31 @@ export function SearchHome() {
                     boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
                     zIndex: 200, minWidth: '220px',
                   }}>
-                    {projects.length === 0 && !showNewProjectInput && (
+                    {/* Deselect option — only shown when a project is active */}
+                    {activeProject && (
+                      <button
+                        type="button"
+                        onMouseDown={e => {
+                          e.preventDefault();
+                          selectProject(null as unknown as string);
+                          projectDropdown.setOpen(false);
+                        }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '0.5rem',
+                          width: '100%', padding: '0.625rem 0.875rem',
+                          background: 'transparent', border: 'none',
+                          borderBottom: '1px solid var(--border)',
+                          cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                          color: 'var(--text-secondary)', fontSize: '0.8125rem',
+                        }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-raised)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                      >
+                        <span style={{ opacity: 0.4, fontSize: '0.75rem' }}>✕</span>
+                        <span>New project (auto)</span>
+                      </button>
+                    )}
+                    {projects.length === 0 && !showNewProjectInput && !activeProject && (
                       <div style={{ padding: '0.625rem 0.875rem' }}>
                         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>No projects yet</span>
                       </div>
@@ -602,7 +684,7 @@ export function SearchHome() {
                     })}
 
                     {showNewProjectInput ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.5rem 0.75rem', borderTop: projects.length > 0 ? '1px solid var(--border)' : 'none' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', padding: '0.5rem 0.75rem', borderTop: projects.length > 0 ? '1px solid var(--border)' : 'none' }}>
                         <input
                           autoFocus
                           value={newProjectName}
@@ -614,48 +696,63 @@ export function SearchHome() {
                             if (!name || creatingProject) return;
                             setCreatingProject(true);
                             try {
-                              await addProject(name);
+                              await addProject(name, newGithubUrl.trim() || undefined);
                               setNewProjectName('');
+                              setNewGithubUrl('');
                               setShowNewProjectInput(false);
                               projectDropdown.setOpen(false);
                             } catch { /* keep open */ } finally { setCreatingProject(false); }
                           }}
                           placeholder="Project name"
                           style={{
-                            flex: 1, border: '1px solid var(--border)', borderRadius: '6px',
+                            border: '1px solid var(--border)', borderRadius: '6px',
                             padding: '0.25rem 0.5rem', fontSize: '0.78rem',
                             background: 'var(--surface-raised)', color: 'var(--text-primary)',
                             fontFamily: 'inherit', outline: 'none',
                           }}
                         />
-                        <button
-                          type="button"
-                          disabled={creatingProject || !newProjectName.trim()}
-                          onClick={async () => {
-                            const name = newProjectName.trim();
-                            if (!name || creatingProject) return;
-                            setCreatingProject(true);
-                            try {
-                              await addProject(name);
-                              setNewProjectName('');
-                              setShowNewProjectInput(false);
-                              projectDropdown.setOpen(false);
-                            } catch { /* keep open */ } finally { setCreatingProject(false); }
-                          }}
+                        <input
+                          value={newGithubUrl}
+                          onChange={e => setNewGithubUrl(e.target.value)}
+                          placeholder="GitHub URL (optional) — https://github.com/owner/repo"
                           style={{
-                            background: ACCENT, border: 'none', borderRadius: '6px',
-                            padding: '0.25rem 0.5rem', color: 'white',
-                            fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer',
-                            fontFamily: 'inherit', opacity: creatingProject ? 0.6 : 1,
+                            border: '1px solid var(--border)', borderRadius: '6px',
+                            padding: '0.25rem 0.5rem', fontSize: '0.72rem',
+                            background: 'var(--surface-raised)', color: 'var(--text-secondary)',
+                            fontFamily: 'monospace', outline: 'none',
                           }}
-                        >
-                          {creatingProject ? '…' : 'Create'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setShowNewProjectInput(false); setNewProjectName(''); }}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-secondary)', padding: 0 }}
-                        >✕</button>
+                        />
+                        <div style={{ display: 'flex', gap: '0.375rem' }}>
+                          <button
+                            type="button"
+                            disabled={creatingProject || !newProjectName.trim()}
+                            onClick={async () => {
+                              const name = newProjectName.trim();
+                              if (!name || creatingProject) return;
+                              setCreatingProject(true);
+                              try {
+                                await addProject(name, newGithubUrl.trim() || undefined);
+                                setNewProjectName('');
+                                setNewGithubUrl('');
+                                setShowNewProjectInput(false);
+                                projectDropdown.setOpen(false);
+                              } catch { /* keep open */ } finally { setCreatingProject(false); }
+                            }}
+                            style={{
+                              flex: 1, background: ACCENT, border: 'none', borderRadius: '6px',
+                              padding: '0.25rem 0.5rem', color: 'white',
+                              fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer',
+                              fontFamily: 'inherit', opacity: creatingProject ? 0.6 : 1,
+                            }}
+                          >
+                            {creatingProject ? '…' : 'Create'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setShowNewProjectInput(false); setNewProjectName(''); setNewGithubUrl(''); }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-secondary)', padding: '0 0.25rem' }}
+                          >✕</button>
+                        </div>
                       </div>
                     ) : (
                       <button

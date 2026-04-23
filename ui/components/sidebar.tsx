@@ -41,6 +41,15 @@ function IconPlus() {
   );
 }
 
+function IconBook() {
+  return (
+    <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+    </svg>
+  );
+}
+
 function IconSettings() {
   return (
     <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -70,20 +79,21 @@ const NAV_ITEMS: NavItem[] = [
   { icon: <IconPlus />,    label: 'New Build',  href: '/' },
   { icon: <IconGrid />,    label: 'Projects',   href: '/projects' },
   { icon: <IconAgents />,  label: 'Agents',     href: '/agents' },
+  { icon: <IconBook />,    label: 'Docs',       href: '/docs' },
 ];
 
-export function Sidebar() {
+export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const [collapsed, setCollapsed] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
-    const stored = localStorage.getItem('keystone_sidebar_collapsed');
+    const stored = localStorage.getItem('gantry_sidebar_collapsed');
     if (stored === 'true') setCollapsed(true);
   }, []);
 
   function toggleCollapsed() {
     setCollapsed(c => {
-      localStorage.setItem('keystone_sidebar_collapsed', String(!c));
+      localStorage.setItem('gantry_sidebar_collapsed', String(!c));
       return !c;
     });
   }
@@ -119,7 +129,7 @@ export function Sidebar() {
             fontWeight: 600,
             letterSpacing: '-0.02em',
           }}>
-            Keystone
+            Gantry
           </Link>
         )}
         <button

@@ -82,7 +82,7 @@ export function SharedReportView({ taskId }: { taskId: string }) {
           letterSpacing: '-0.01em',
           flexShrink: 0,
         }}>
-          ← Keystone
+          ← Gantry
         </Link>
 
         <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -141,7 +141,7 @@ export function SharedReportView({ taskId }: { taskId: string }) {
           justifyContent: 'space-between',
         }}>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-            Built by Keystone · {date}
+            Built by Gantry · {date}
           </p>
           <Link href="/" style={{
             fontSize: '0.8125rem',

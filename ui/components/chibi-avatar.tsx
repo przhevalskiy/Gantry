@@ -1,65 +1,56 @@
 'use client';
 
-// 3×4 sprite sheet — /agents-sheet.png (construction crew, row-major, idx 0–11)
-// Row 0: [0 director/foreman, 1 clipboard/architect, 2 lumber/builder, 3 inspector-pointing]
-// Row 1: [4 rope-coil,        5 small-tool,          6 hammer/builder2, 7 wrench/devops]
-// Row 2: [8 welder/security,  9 crouching,           10 standing,       11 surveyor]
-
-const SPRITE_COLS = 4;
-const SPRITE_ROWS = 3;
+// Individual chibi avatar PNGs — sliced from the 5×5 construction crew sheet.
+// Numbers map to /public/avatars/avatar-XX.png (01–25).
 
 export type SwarmRole =
-  | 'foreman' | 'architect' | 'builder'
+  | 'foreman' | 'pm' | 'architect' | 'builder'
   | 'inspector' | 'security' | 'devops'
   | 'scout' | 'analyst' | 'verifier' | 'critic';
 
-const ROLE_TO_SPRITE: Record<SwarmRole, number> = {
-  foreman:   0,  // directing supervisor
-  architect: 11, // surveyor — plans & measures
-  builder:   2,  // carrying lumber
-  inspector: 3,  // pointing/checking
-  security:  8,  // welder mask — protective
-  devops:    7,  // wrench — mechanical/deploy
-  scout:     1,  // clipboard = scout
-  analyst:   5,
-  verifier:  9,
-  critic:    10,
+const ROLE_TO_AVATAR: Record<SwarmRole, number> = {
+  foreman:   1,  // bearded man
+  pm:        4,  // ponytail girl
+  architect: 7,  // goggles
+  builder:   10, // braided girl
+  inspector: 18, // plain young man
+  security:  22, // long-hair woman
+  devops:    25, // curly hair
+  scout:     13, // plain man (row 3 col 3)
+  analyst:   15, // woman glasses (row 3 col 5)
+  verifier:  19, // girl glasses (row 4 col 4)
+  critic:    23, // man glasses (row 5 col 3)
 };
 
-function spritePosition(idx: number) {
-  const col = idx % SPRITE_COLS;
-  const row = Math.floor(idx / SPRITE_COLS);
-  const xPct = (col / (SPRITE_COLS - 1)) * 100;
-  const yPct = (row / (SPRITE_ROWS - 1)) * 100;
-  return { xPct, yPct };
+function avatarSrc(n: number): string {
+  return `/avatars/avatar-${String(n).padStart(2, '0')}.png`;
 }
 
 export function ChibiAvatar({
   role,
   size = 32,
+  avatarN,
+  // legacy prop name kept for callers that pass spriteIdx — treat as avatarN
   spriteIdx,
   style,
 }: {
   role?: SwarmRole;
   size?: number;
+  avatarN?: number;
   spriteIdx?: number;
   style?: React.CSSProperties;
 }) {
-  const idx = spriteIdx ?? (role ? (ROLE_TO_SPRITE[role] ?? 0) : 0);
-  const { xPct, yPct } = spritePosition(idx);
-
+  const n = avatarN ?? spriteIdx ?? (role ? ROLE_TO_AVATAR[role] : 1) ?? 1;
   return (
-    <div
+    <img
+      src={avatarSrc(n)}
+      alt={role ?? ''}
       style={{
         width: size,
         height: size,
         flexShrink: 0,
         borderRadius: '50%',
-        overflow: 'hidden',
-        backgroundImage: 'url(/agents-sheet.png)',
-        backgroundSize: `${SPRITE_COLS * 100}% ${SPRITE_ROWS * 100}%`,
-        backgroundPosition: `${xPct}% ${yPct}%`,
-        backgroundRepeat: 'no-repeat',
+        objectFit: 'cover',
         ...style,
       }}
     />
@@ -67,18 +58,23 @@ export function ChibiAvatar({
 }
 
 export function spriteStyleForIdx(idx: number, size = 32): React.CSSProperties {
-  const { xPct, yPct } = spritePosition(idx);
   return {
     width: size,
     height: size,
     flexShrink: 0,
     borderRadius: '50%',
-    overflow: 'hidden',
-    backgroundImage: 'url(/agents-sheet.png)',
-    backgroundSize: `${SPRITE_COLS * 100}% ${SPRITE_ROWS * 100}%`,
-    backgroundPosition: `${xPct}% ${yPct}%`,
-    backgroundRepeat: 'no-repeat',
+    objectFit: 'cover' as const,
+    content: `url(${avatarSrc(idx)})`,
   };
 }
 
-export { ROLE_TO_SPRITE };
+export { ROLE_TO_AVATAR as ROLE_TO_SPRITE };
+
+export const BUILDER_RING_COLORS = [
+  '#10b981', // emerald
+  '#3b82f6', // blue
+  '#8b5cf6', // violet
+  '#f97316', // orange
+  '#ec4899', // pink
+  '#f59e0b', // amber
+];
