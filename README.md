@@ -1,127 +1,170 @@
-# Keystone
+# Gantry
 
-**Multi-dimensional agent ecosystem that researches, reasons, and acts.**
+**A durable, parallel software engineering factory powered by a crew of specialised agents.**
 
-Role-differentiated agents, dynamically spawned, working in parallel to complete any task — not just reporting on things, but doing them. Built entirely on the [Scale Agentex](https://github.com/scaleapi/scale-agentex) stack with Temporal as the durable execution backbone.
+You describe what to build. Gantry plans it, writes it, tests it, secures it, and opens a pull request — surviving crashes, network drops, and multi-day builds without losing a step.
 
 ---
 
 ## What it does
 
-Keystone takes a natural language task and routes it through a pipeline of specialized agents:
+Gantry takes a natural language goal and runs it through a structured pipeline:
 
-**Research mode** — answers questions by reading the web in parallel
 ```
-Strategist → Scout → N Analysts → Critic → Verifiers → Synthesizer
-```
-
-**Execution mode** — takes actions on websites and APIs
-```
-Strategist → Scout → Analyst → TaskPlanner → Executor → Verifier
+PM → Architect → Builders (parallel) → Inspector → Security → DevOps
 ```
 
-The same infrastructure handles both. The Strategist determines which mode (or both) based on the query.
+Each stage is a separate agent with a focused toolset. The Architect decomposes the goal into independent tracks. Multiple Builder agents write code simultaneously. The Inspector runs tests and lint, triggering self-healing cycles if anything fails. Security scans for secrets and CVEs. DevOps branches, commits, pushes, and opens a PR.
+
+The whole pipeline is a [Temporal](https://temporal.io) workflow. Close your laptop mid-build — it continues when the worker comes back.
 
 ---
 
-## Architecture
+## What makes it different
 
-### Agent roles
+**Parallel by design.** The Architect splits work into independent tracks (frontend, backend, tests, infra). Builders run simultaneously. A full-stack feature that would take one agent 45 minutes sequentially takes 15 in parallel.
 
-| Agent | Responsibility | Tools |
+**Self-correcting.** When the Inspector finds failures, it generates concrete fix instructions and re-invokes the Builder. If the original plan was structurally wrong, the Architect re-decomposes before burning heal cycles. The swarm escalates to you only after exhausting every automated recovery path.
+
+**Code-aware.** After each build, a symbol index maps every function, class, and type to its file and line number. Agents query the index instead of reading files blind. Builders use it to locate definitions before editing. The Architect uses it to plan on re-runs.
+
+**GitHub-native.** Connect a GitHub repo by URL. Gantry clones it, builds on it, and pushes a branch with a PR. Works with public and private repos via a Personal Access Token.
+
+**Durable.** Every agent is a Temporal child workflow. Every file write, LLM call, and shell command is a retryable activity. Crashes replay from the last checkpoint. Nothing is lost.
+
+---
+
+## The crew
+
+| Agent | Role | Model |
 |---|---|---|
-| **Strategist** | Classifies task, plans queries, sets agent count (2–8) | LLM only |
-| **Scout** | Finds URLs via parallel web searches | `search_web` |
-| **Analyst** | Deep-reads assigned URLs, extracts structured claims | `navigate`, `report_claim`, `request_spawn` |
-| **Critic** | Reviews all claims, flags contradictions, spawns verifiers | LLM only |
-| **Verifier** | Verifies contested claims against live sources | `search_web`, `navigate`, `report_verdict` |
-| **Synthesizer** | Assembles final answer from verified/annotated claims | LLM only |
-| **TaskPlanner** | Produces a `TaskPlan` (one LLM call, deterministic execution) | LLM only |
-| **Executor** | Carries out the plan step by step — no LLM in the loop | `fill_input`, `submit_form`, `http_request`, `navigate`, `click_element` |
+| **Foreman** | Orchestrates the pipeline, manages heal loops, HITL checkpoints | — |
+| **PM** | Enriches the goal, asks clarifying questions (tier ≥ 1) | Sonnet / Haiku |
+| **Architect** | Maps the repo, decomposes into parallel tracks with dependency ordering | Sonnet |
+| **Builder** | Writes code, self-verifies with lint + type-check before finishing | Sonnet / Haiku |
+| **Inspector** | Runs tests, lint, type-check, coverage; generates heal instructions | Sonnet / Haiku |
+| **Security** | Scans for secrets, CVEs, insecure patterns; blocks PR on critical findings | Haiku |
+| **DevOps** | Branches, commits, pushes, opens PR via `gh` CLI | Haiku |
 
-### Why this is different from a single-agent loop
+Model routing is automatic: Haiku for Tier 0/1 tasks (micro fixes, simple scripts), Sonnet for Tier 2/3 (features, full-stack builds). ~10x cost reduction on simple tasks.
 
-Most browser agents (Manus, etc.) use one generalist agent doing everything sequentially. Keystone uses **role differentiation and parallelism**:
+---
 
-- Scout runs 6–8 searches simultaneously
-- N Analysts read different URLs in parallel
-- Critic catches contradictions across all claims
-- Verifiers only spawn for contested claims (capped at 3)
-- Executor is deterministic — no LLM per step, just dispatch
+## Complexity tiers
 
-### Cheap execution
+Gantry classifies every goal using a fast LLM call before dispatching agents:
 
-Actions use text-based DOM interaction (`get_page_structure`, `fill_input`, `click_element`) and direct HTTP calls (`http_request` via httpx). No vision, no screenshots during execution. Cost per task: ~$0.02–0.05 vs $0.50–2.00 for screenshot-based computer use.
+| Tier | Label | Tracks | Heal cycles | Security | HITL |
+|---|---|---|---|---|---|
+| 0 | Micro | 1 | 0 | ✗ | ✗ |
+| 1 | Lightweight | 1 | 1 | ✗ | ✗ |
+| 2 | Standard | 2 | 2 | ✓ | Architect review |
+| 3 | Full Crew | 4 | 2 | ✓ | Architect + DevOps |
 
-### Durable by default
+Override with `tier=0–3` in the task params or via the Settings panel.
 
-Every agent is a Temporal workflow. Every action is a Temporal activity. Crashes replay from the last checkpoint. Activity retries are built-in. Nothing is lost.
+---
+
+## Self-healing loop
+
+```
+Builder writes code
+    ↓
+verify_build (lint + types inline)
+    ↓
+Inspector runs full test suite
+    ↓ fail
+heal_instructions → Builder (up to max_heal_cycles)
+    ↓ still failing
+Architect re-decomposes with Inspector findings
+    ↓ still failing
+HITL checkpoint → user decides
+```
+
+Each heal cycle starts from a git snapshot taken before the cycle began. A bad heal can't corrupt a good previous state.
 
 ---
 
 ## Stack
 
 **Backend**
-- [Scale Agentex SDK](https://github.com/scaleapi/scale-agentex) — agent lifecycle, task management, message persistence
-- [Temporal](https://temporal.io) — durable workflow orchestration
-- [Anthropic Claude](https://anthropic.com) (`claude-sonnet-4-6`) — all LLM reasoning
-- [Playwright](https://playwright.dev) — text-based browser automation
-- [Tavily](https://tavily.com) — web search API (`search_depth="advanced"`)
-- [httpx](https://www.python-httpx.org) — direct API calls
+- [Scale Agentex](https://github.com/scaleapi/scale-agentex) — agent hosting, ACP protocol, message streaming
+- [Temporal](https://temporal.io) — durable workflow orchestration, activity retries, child workflows
+- [Anthropic Claude](https://anthropic.com) (`claude-sonnet-4-6`, `claude-3-5-haiku-latest`) — all LLM reasoning
 - Python 3.12 / [uv](https://github.com/astral-sh/uv)
 
 **Frontend**
-- [Next.js 16](https://nextjs.org) / React 19
+- [Next.js](https://nextjs.org) / React 19
 - [TanStack Query](https://tanstack.com/query)
-- [Framer Motion](https://www.framer.com/motion/)
 - [Zustand](https://zustand-demo.pmnd.rs)
-- Tailwind CSS v4
 
 ---
 
 ## Project structure
 
 ```
-keystone/
-├── activities/                  # Temporal activities
-│   ├── strategist_activity.py   # dynamic research + mode planning
-│   ├── scout_planner_activity.py
-│   ├── analyst_planner_activity.py
-│   ├── critic_activity.py       # contradiction detection
-│   ├── verifier_planner_activity.py
-│   ├── synthesize_activity.py   # claim-based synthesis
-│   ├── browser.py               # Playwright navigate/click
-│   ├── browser_actions.py       # fill_input, submit_form, get_page_structure
-│   ├── http_request_activity.py # direct API calls via httpx
-│   ├── task_planner_activity.py # LLM → TaskPlan
-│   ├── extract.py               # page content extraction
-│   └── search.py                # Tavily search
+Gantry/
+├── activities/
+│   ├── swarm_activities.py          # file I/O, git, shell, web, SQL, symbol search
+│   ├── memory_activities.py         # facts store + episodic memory
+│   ├── classify_tier_activity.py    # LLM-based complexity classification
+│   ├── builder_planner_activity.py
+│   ├── architect_planner_activity.py
+│   ├── inspector_planner_activity.py
+│   ├── security_planner_activity.py
+│   ├── devops_planner_activity.py
+│   └── pm_planner_activity.py
 │
-├── workflows/                   # Temporal workflows
-│   ├── research_orchestrator.py # "web-scout" entry point
-│   ├── execution_orchestrator.py # "task-executor" entry point
-│   ├── scout_agent.py
-│   ├── analyst_agent.py
-│   ├── verifier_agent.py
-│   └── executor_agent.py
+├── workflows/
+│   ├── swarm_orchestrator.py        # Foreman — top-level pipeline
+│   ├── architect_agent.py
+│   ├── builder_agent.py
+│   ├── inspector_agent.py
+│   ├── security_agent.py
+│   ├── devops_agent.py
+│   └── pm_agent.py
 │
-├── project/                     # shared config and schemas
-│   ├── config.py                # env vars, model, caps
-│   ├── claim_schema.py          # Claim, ResearchPlan
-│   ├── task_schema.py           # TaskStep, TaskPlan, ExecutionSummary
-│   ├── synthesizer.py
-│   ├── run_worker.py            # Temporal worker entrypoint
-│   └── acp.py                   # Agentex ACP server
+├── project/
+│   ├── config.py                    # env vars, model constants, GH_TOKEN
+│   ├── planner.py                   # Claude tool-use loop, context management
+│   ├── complexity.py                # tier params + regex fallback
+│   ├── architect_tools.py
+│   ├── builder_tools.py             # includes verify_build, find_symbol, query_index
+│   ├── inspector_tools.py           # includes run_coverage
+│   ├── devops_tools.py
+│   ├── security_tools.py
+│   ├── pm_tools.py
+│   ├── memory_tools.py
+│   ├── run_worker.py                # Temporal worker entrypoint
+│   └── acp.py                       # Agentex ACP server
 │
-├── ui/                          # Next.js frontend
+├── ui/                              # Next.js frontend
 │   ├── app/
+│   │   ├── page.tsx                 # home / search
+│   │   ├── task/[taskId]/           # live build view
+│   │   ├── projects/                # project dashboard
+│   │   ├── agents/                  # agent directory + live monitor + settings
+│   │   ├── docs/                    # platform documentation
+│   │   └── api/
+│   │       ├── projects/            # project CRUD + registry
+│   │       └── github/repos/        # GitHub repo proxy (PAT-authenticated)
 │   ├── components/
-│   └── hooks/
+│   │   ├── swarm-view.tsx           # 70/30 split: file explorer + activity feed
+│   │   ├── message-feed.tsx         # real-time agent message renderer
+│   │   ├── search-home.tsx          # goal input + project selector
+│   │   ├── sidebar.tsx
+│   │   └── agents/
+│   │       ├── config-panel.tsx     # swarm settings + GitHub PAT
+│   │       └── agent-directory.tsx
+│   └── lib/
+│       ├── agent-config-store.ts    # Zustand: swarm config + GitHub token
+│       ├── project-repository.ts   # project + GitHub repo API client
+│       └── use-projects.ts
 │
-├── manifest.yaml                # Agentex agent manifest
-├── dev.sh                       # dev launcher
-├── setup.sh
-└── pyproject.toml
+├── manifest.yaml                    # Agentex agent manifest
+├── dev.sh                           # dev launcher
+├── pyproject.toml
+└── .env.example
 ```
 
 ---
@@ -130,20 +173,25 @@ keystone/
 
 ### Prerequisites
 
-- Python 3.12+
-- [uv](https://github.com/astral-sh/uv)
+- Python 3.12+ and [uv](https://github.com/astral-sh/uv)
 - Node.js 20+
-- [Temporal CLI](https://docs.temporal.io/cli) (`brew install temporal`)
-- Scale Agentex platform running locally (`cd scale-agentex/agentex && docker compose up -d`)
-- Playwright browsers (`playwright install chromium`)
+- [Temporal CLI](https://docs.temporal.io/cli) — `brew install temporal`
+- Scale Agentex platform — `cd scale-agentex/agentex && docker compose up -d`
 
 ### Setup
 
 ```bash
 cp .env.example .env
-# fill in ANTHROPIC_API_KEY and TAVILY_API_KEY
+# Required: ANTHROPIC_API_KEY
+# Optional: GH_TOKEN (for GitHub clone + push), BRAVE_SEARCH_API_KEY (for web search in builders)
+```
 
-./setup.sh
+```bash
+# Install Python deps
+uv sync
+
+# Install UI deps
+cd ui && npm install
 ```
 
 ### Run
@@ -152,38 +200,56 @@ cp .env.example .env
 ./dev.sh
 ```
 
-This starts:
-- Temporal dev server (`:7233`)
-- Agentex ACP agent (`:8000`)
-- Next.js UI (`:3000`)
+Starts:
+1. Temporal dev server (`:7233`)
+2. Agentex platform (`:5003`)
+3. Gantry worker — ACP server (`:8000`) + Temporal worker
+4. Next.js UI (`:3000`)
 
 Open [http://localhost:3000](http://localhost:3000).
 
-### Run with mocks (no Playwright, no Tavily)
+---
 
-```bash
-./dev.sh --mock
-```
+## GitHub integration
+
+To build on an existing GitHub repo:
+
+1. Go to **Agents → Settings → GitHub** and paste a Personal Access Token
+   - Classic PAT: needs `repo` scope
+   - Fine-grained: needs `contents: write` + `pull_requests: write`
+2. Create a project and paste the GitHub HTTPS URL (e.g. `https://github.com/owner/repo`)
+3. Submit a goal — Gantry clones the repo, builds, and opens a PR
+
+The token is stored in your browser only. It's passed to the worker as a task param and used only for clone and push operations.
 
 ---
 
-## Two workflow entry points
+## Memory
 
-| Workflow name | Class | Use for |
+Gantry maintains two persistent memory layers per repo under `.gantry/`:
+
+**Facts store** (`.gantry/memory/facts.json`) — key/value facts written by any agent during a build. Architects store tech stack decisions. Builders store known failure patterns. Facts with `arch.` or `pm.` prefixes expire after 90 days.
+
+**Episodic memory** (`.gantry/memory/episodes.jsonl`) — one record per completed build. Architects search past episodes before planning to avoid repeating failed approaches.
+
+---
+
+## Configuration
+
+All swarm parameters are configurable from **Agents → Settings**:
+
+| Setting | Default | Description |
 |---|---|---|
-| `web-scout` | `ResearchOrchestrator` | questions, research, analysis |
-| `task-executor` | `ExecutionOrchestrator` | form submissions, API calls, web actions |
-
-Both run on the same worker and task queue (`web_scout_queue`).
+| Branch prefix | `swarm` | Git branches named `prefix/task-id` |
+| Max parallel tracks | 4 | Concurrent Builder agents |
+| Max heal cycles | 3 | Inspector → Builder retry limit |
+| Tier override | Auto | Force a specific complexity tier |
+| GitHub PAT | — | Token for clone + push |
 
 ---
 
 ## Roadmap
 
-See [PLAN.md](./PLAN.md) for the full implementation plan.
-
-Next:
-- Public API (`POST /v1/run`, SSE stream, API key auth)
-- Agent tree UI — live visualization of the spawning hierarchy
-- Integration registry — pre-built auth configs for Notion, Slack, Linear, GitHub
-- Bug: `adk.messages.create` not persisting from child workflows (sub-agent messages don't surface to UI)
+- **Phase 5**: Observability (structured traces per agent decision), build quality scoring (LLM eval 0–10 stored in episodic memory), multi-repo support
+- **Phase 6**: Cost budgets + estimation, pre-flight track conflict validation, agent specialisation profiles (database builder, React builder, API builder)
+- **Production**: Supabase Postgres for project registry, persistent volume for repo files, Vercel for UI, Fly.io for worker
