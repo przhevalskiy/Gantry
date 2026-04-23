@@ -578,7 +578,7 @@ async def swarm_web_search(query: str, num_results: int = 5) -> str:
             f"https://api.duckduckgo.com/?q={urllib.parse.quote(query)}"
             "&format=json&no_redirect=1&no_html=1&skip_disambig=1"
         )
-        req = urllib.request.Request(ddg_url, headers={"User-Agent": "Keystone/1.0"})
+        req = urllib.request.Request(ddg_url, headers={"User-Agent": "Gantry/1.0"})
         with urllib.request.urlopen(req, timeout=12) as resp:
             data = json.loads(resp.read())
         lines = []
@@ -611,7 +611,7 @@ async def swarm_fetch_url(url: str, max_chars: int = 8000) -> str:
     """Fetch a URL and return its text content with HTML stripped."""
     try:
         req = urllib.request.Request(url, headers={
-            "User-Agent": "Mozilla/5.0 (compatible; Keystone/1.0)",
+            "User-Agent": "Mozilla/5.0 (compatible; Gantry/1.0)",
             "Accept": "text/html,text/plain,application/xhtml+xml,*/*",
         })
         with urllib.request.urlopen(req, timeout=15) as resp:
@@ -800,12 +800,74 @@ async def swarm_deploy(platform: str = "auto", cwd: str | None = None) -> str:
     return output.strip() or "(no output)"
 
 
+# ── Shared manifest activities ────────────────────────────────────────────────
+# .gantry/manifest.json is written by the orchestrator after the Architect
+# finishes and read by every Builder before it starts writing code.
+# This gives parallel builders visibility into what other tracks own and export,
+# preventing file-ownership collisions and enabling safe cross-track imports.
+
+_MANIFEST_FILE = ".gantry/manifest.json"
+
+
+@activity.defn(name="manifest_write")
+async def manifest_write(repo_path: str, tracks: list[dict]) -> str:
+    """Initialize the shared manifest from the architect's tracks array."""
+    p = Path(repo_path) / _MANIFEST_FILE
+    p.parent.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "version": 1,
+        "tracks": [
+            {
+                "label": t.get("label", "unknown"),
+                "key_files": t.get("key_files", []),
+                "exports": t.get("exports", []),
+                "goal_summary": t.get("implementation_steps", [""])[0][:120] if t.get("implementation_steps") else "",
+            }
+            for t in tracks
+        ],
+        "completed_edits": [],
+    }
+    p.write_text(json.dumps(manifest, indent=2))
+    total_files = sum(len(t.get("key_files", [])) for t in tracks)
+    return f"Manifest initialized: {len(tracks)} track(s), {total_files} file ownership entries."
+
+
+@activity.defn(name="manifest_read")
+async def manifest_read(repo_path: str) -> str:
+    """Return the shared manifest as a JSON string. Returns empty manifest if not yet written."""
+    p = Path(repo_path) / _MANIFEST_FILE
+    if not p.exists():
+        return json.dumps({"version": 1, "tracks": [], "completed_edits": []})
+    try:
+        return p.read_text(encoding="utf-8")
+    except Exception as e:
+        return json.dumps({"error": str(e), "tracks": [], "completed_edits": []})
+
+
+@activity.defn(name="manifest_append_edits")
+async def manifest_append_edits(repo_path: str, track_label: str, edits: list[dict]) -> str:
+    """Append a builder's completed edits to the manifest for heal-cycle and follow-up context."""
+    p = Path(repo_path) / _MANIFEST_FILE
+    try:
+        manifest = json.loads(p.read_text()) if p.exists() else {"version": 1, "tracks": [], "completed_edits": []}
+    except Exception:
+        manifest = {"version": 1, "tracks": [], "completed_edits": []}
+    for edit in edits:
+        manifest["completed_edits"].append({
+            "track": track_label,
+            "path": edit.get("path", ""),
+            "operation": edit.get("operation", ""),
+        })
+    p.write_text(json.dumps(manifest, indent=2))
+    return f"Manifest updated: +{len(edits)} edits from track '{track_label}'."
+
+
 # ── Agent memory activities ───────────────────────────────────────────────────
-# These delegate to the shared .keystone/memory/facts.json layer so all agents
+# These delegate to the shared .gantry/memory/facts.json layer so all agents
 # read from the same store regardless of whether they call the old swarm_* names
 # or the new memory_write_fact / memory_read_facts activities.
 
-_MEMORY_DIR = ".keystone/memory"
+_MEMORY_DIR = ".gantry/memory"
 _FACTS_FILE = "facts.json"
 
 
@@ -861,3 +923,496 @@ async def swarm_memory_read(repo_path: str, keys: list[str] | None = None) -> st
         else:
             lines.append(f"**{k}**: {v}")
     return "\n".join(lines)
+
+
+# ── Build verification activity ───────────────────────────────────────────────
+
+_VERIFY_SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", ".next", "dist", "build", "coverage"}
+
+def _detect_verify_commands(repo_path: str) -> list[tuple[str, str]]:
+    """
+    Auto-detect the right verification commands for this repo.
+    Returns list of (label, command) pairs to run in order.
+    Stops at first failure — commands are ordered cheapest/fastest first.
+    """
+    base = Path(repo_path)
+    commands: list[tuple[str, str]] = []
+
+    # Python
+    if (base / "pyproject.toml").exists() or (base / "setup.py").exists():
+        # ruff is fast; fall back to flake8
+        ruff = _run("ruff --version", cwd=repo_path, timeout=5)
+        if ruff["returncode"] == 0:
+            commands.append(("ruff", f"ruff check {repo_path} --select E,F,W --quiet"))
+        else:
+            flake8 = _run("flake8 --version", cwd=repo_path, timeout=5)
+            if flake8["returncode"] == 0:
+                commands.append(("flake8", f"flake8 {repo_path} --max-line-length=120 --count --quiet"))
+        # mypy type check (non-blocking — only add if mypy is installed)
+        mypy = _run("mypy --version", cwd=repo_path, timeout=5)
+        if mypy["returncode"] == 0:
+            commands.append(("mypy", f"mypy {repo_path} --ignore-missing-imports --no-error-summary --quiet"))
+
+    # TypeScript / JavaScript
+    pkg_json = base / "package.json"
+    if pkg_json.exists():
+        try:
+            pkg = json.loads(pkg_json.read_text())
+            scripts = pkg.get("scripts", {})
+            deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
+        except Exception:
+            scripts, deps = {}, {}
+
+        # TypeScript compile check
+        tsconfig = (base / "tsconfig.json").exists()
+        if tsconfig and "typescript" in deps:
+            commands.append(("tsc", "npx tsc --noEmit"))
+
+        # ESLint
+        eslint_cfg = any(
+            (base / f).exists()
+            for f in (".eslintrc", ".eslintrc.js", ".eslintrc.json", ".eslintrc.cjs", "eslint.config.js", "eslint.config.mjs")
+        )
+        if eslint_cfg and ("eslint" in deps or "lint" in scripts):
+            lint_cmd = scripts.get("lint", "npx eslint . --max-warnings=0")
+            commands.append(("eslint", lint_cmd))
+
+    return commands
+
+
+@activity.defn(name="swarm_verify_build")
+async def swarm_verify_build(repo_path: str) -> dict:
+    """
+    Auto-detect and run lightweight verification checks (lint, type-check) on the repo.
+    Returns {passed: bool, checks: [{label, passed, output}], summary: str}.
+    Does NOT run full test suites — that's the Inspector's job.
+    Designed to be called by the Builder before finish_build for fast self-correction.
+    """
+    commands = _detect_verify_commands(repo_path)
+
+    if not commands:
+        return {
+            "passed": True,
+            "checks": [],
+            "summary": "No verification tools detected (no pyproject.toml, tsconfig.json, or eslint config found).",
+        }
+
+    checks: list[dict] = []
+    overall_passed = True
+
+    for label, cmd in commands:
+        result = _run(cmd, cwd=repo_path, timeout=60)
+        passed = result["returncode"] == 0
+        output = (result["stdout"] + "\n" + result["stderr"]).strip()
+        # Truncate noisy output
+        if len(output) > 2000:
+            output = output[:2000] + "\n[truncated]"
+        checks.append({"label": label, "passed": passed, "output": output})
+        if not passed:
+            overall_passed = False
+
+    passed_labels = [c["label"] for c in checks if c["passed"]]
+    failed_labels = [c["label"] for c in checks if not c["passed"]]
+
+    parts = []
+    if passed_labels:
+        parts.append(f"✓ {', '.join(passed_labels)}")
+    if failed_labels:
+        parts.append(f"✗ {', '.join(failed_labels)}")
+
+    return {
+        "passed": overall_passed,
+        "checks": checks,
+        "summary": " | ".join(parts) or "No checks ran.",
+    }
+
+
+# ── Git snapshot activities (#6) ──────────────────────────────────────────────
+
+@activity.defn(name="swarm_git_snapshot_save")
+async def swarm_git_snapshot_save(repo_path: str, snapshot_ref: str) -> str:
+    """
+    Save a lightweight git snapshot before a build cycle by stashing or creating
+    a temp branch. Returns the snapshot ref that can be passed to restore.
+    Prefers stash (no branch clutter); falls back to a temp branch if stash fails
+    (e.g. nothing to stash, or repo has no commits yet).
+    """
+    # Only snapshot if there's actually a git repo
+    check = _run("git rev-parse --git-dir", cwd=repo_path, timeout=5)
+    if check["returncode"] != 0:
+        return json.dumps({"ok": False, "reason": "not a git repo", "ref": snapshot_ref})
+
+    # Try stash first
+    stash_result = _run(
+        f'git stash push -u -m "swarm-snapshot-{snapshot_ref}"',
+        cwd=repo_path, timeout=15,
+    )
+    if stash_result["returncode"] == 0 and "No local changes" not in stash_result["stdout"]:
+        return json.dumps({"ok": True, "method": "stash", "ref": snapshot_ref})
+
+    # Nothing to stash (clean tree) — record HEAD SHA as the restore point
+    head = _run("git rev-parse HEAD", cwd=repo_path, timeout=5)
+    sha = head["stdout"].strip() if head["returncode"] == 0 else ""
+    if sha:
+        return json.dumps({"ok": True, "method": "head_sha", "ref": sha})
+
+    return json.dumps({"ok": False, "reason": "clean tree, nothing to snapshot", "ref": snapshot_ref})
+
+
+@activity.defn(name="swarm_git_snapshot_restore")
+async def swarm_git_snapshot_restore(repo_path: str, snapshot_json: str) -> str:
+    """
+    Restore a previously saved git snapshot.
+    Accepts the JSON string returned by swarm_git_snapshot_save.
+    """
+    try:
+        snap = json.loads(snapshot_json)
+    except Exception:
+        return "Error: invalid snapshot JSON."
+
+    if not snap.get("ok"):
+        return f"Snapshot was not saved ({snap.get('reason', 'unknown')}), nothing to restore."
+
+    method = snap.get("method")
+    ref = snap.get("ref", "")
+
+    if method == "stash":
+        # Find the stash entry by message
+        list_result = _run("git stash list", cwd=repo_path, timeout=10)
+        stash_idx = None
+        for line in (list_result["stdout"] or "").splitlines():
+            if f"swarm-snapshot-{ref}" in line:
+                stash_idx = line.split(":")[0]  # e.g. "stash@{0}"
+                break
+        if stash_idx is None:
+            return f"Stash entry for snapshot '{ref}' not found — may have already been applied."
+        # Hard-reset to HEAD first, then pop the stash
+        _run("git checkout -- .", cwd=repo_path, timeout=10)
+        pop = _run(f"git stash pop {stash_idx}", cwd=repo_path, timeout=15)
+        if pop["returncode"] != 0:
+            return f"Stash restore failed: {pop['stderr'][:300]}"
+        return f"Restored snapshot '{ref}' from stash."
+
+    if method == "head_sha":
+        reset = _run(f"git reset --hard {ref}", cwd=repo_path, timeout=15)
+        if reset["returncode"] != 0:
+            return f"Reset to {ref} failed: {reset['stderr'][:300]}"
+        return f"Restored to HEAD SHA {ref[:8]}."
+
+    return f"Unknown snapshot method '{method}'."
+
+
+# ── Semantic symbol search activity (#9) ─────────────────────────────────────
+
+_SYMBOL_SKIP = {".git", "node_modules", "__pycache__", ".venv", ".next", "dist", "build", "coverage"}
+
+# Language-aware symbol patterns: (file_extension_set, regex_pattern, capture_group_index)
+_SYMBOL_PATTERNS: list[tuple[frozenset[str], str, int]] = [
+    # Python: def foo / async def foo / class Foo
+    (frozenset({".py"}),    r"^(?:async\s+)?def\s+(\w+)\s*\(",  1),
+    (frozenset({".py"}),    r"^class\s+(\w+)\s*[:(]",           1),
+    # TypeScript / JavaScript: function foo / const foo = / export function / class Foo
+    (frozenset({".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}),
+     r"(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*[\(<]",    1),
+    (frozenset({".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}),
+     r"(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\(",  1),
+    (frozenset({".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}),
+     r"(?:export\s+)?class\s+(\w+)\s*(?:extends|implements|{)",  1),
+    (frozenset({".ts", ".tsx"}),
+     r"(?:export\s+)?(?:type|interface)\s+(\w+)\s*[={<]",        1),
+    # Go
+    (frozenset({".go"}), r"^func\s+(?:\(\w+\s+\*?\w+\)\s+)?(\w+)\s*\(", 1),
+    (frozenset({".go"}), r"^type\s+(\w+)\s+(?:struct|interface)",         1),
+    # Rust
+    (frozenset({".rs"}), r"^(?:pub\s+)?fn\s+(\w+)\s*[\(<]",    1),
+    (frozenset({".rs"}), r"^(?:pub\s+)?(?:struct|enum|trait)\s+(\w+)", 1),
+]
+
+
+@activity.defn(name="swarm_find_symbol")
+async def swarm_find_symbol(
+    symbol: str,
+    repo_path: str,
+    exact: bool = False,
+) -> str:
+    """
+    Find where a function, class, type, or interface is defined in the repo.
+    Returns matching file paths, line numbers, and the matching line.
+    Much faster than reading files one-by-one — use this before read_file
+    when you need to locate a symbol definition.
+
+    Args:
+        symbol:    Name to search for (case-insensitive substring match by default).
+        repo_path: Absolute repo root path.
+        exact:     If True, match the exact symbol name only (word boundary).
+    """
+    base = Path(repo_path)
+    if not base.exists():
+        return f"Error: repo_path '{repo_path}' does not exist."
+
+    results: list[str] = []
+    symbol_lower = symbol.lower()
+
+    for file_path in sorted(base.rglob("*")):
+        if not file_path.is_file():
+            continue
+        if any(part in _SYMBOL_SKIP for part in file_path.parts):
+            continue
+        ext = file_path.suffix.lower()
+
+        # Find applicable patterns for this file extension
+        applicable = [
+            (pat, grp)
+            for (exts, pat, grp) in _SYMBOL_PATTERNS
+            if ext in exts
+        ]
+        if not applicable:
+            continue
+
+        try:
+            lines = file_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except Exception:
+            continue
+
+        for lineno, line in enumerate(lines, 1):
+            for pat, grp in applicable:
+                m = re.search(pat, line)
+                if not m:
+                    continue
+                try:
+                    name = m.group(grp)
+                except IndexError:
+                    continue
+                if exact:
+                    if name != symbol:
+                        continue
+                else:
+                    if symbol_lower not in name.lower():
+                        continue
+                try:
+                    rel = str(file_path.relative_to(base))
+                except ValueError:
+                    rel = str(file_path)
+                results.append(f"{rel}:{lineno}: {line.strip()}")
+                break  # one match per line is enough
+
+        if len(results) >= 50:
+            results.append("… (showing first 50 results — use exact=true to narrow)")
+            break
+
+    if not results:
+        return f"Symbol '{symbol}' not found in '{repo_path}'."
+    return "\n".join(results)
+
+
+# ── Repo index activities (#10) ───────────────────────────────────────────────
+# .gantry/index.json maps every symbol to its file + line number.
+# Built after each build cycle. Architects and builders query it instead of
+# exploring the repo blind — the difference between "grep and hope" and
+# "look it up in the index."
+
+_INDEX_FILE = ".gantry/index.json"
+_INDEX_SKIP = {".git", "node_modules", "__pycache__", ".venv", ".next", "dist", "build", "coverage", ".gantry"}
+_INDEX_BINARY_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".ttf", ".lock", ".bin", ".pyc", ".so", ".dll", ".map"}
+
+# Reuse the same language patterns from find_symbol
+_INDEX_PATTERNS: list[tuple[frozenset[str], str, int, str]] = [
+    # (extensions, regex, capture_group, kind)
+    (frozenset({".py"}),    r"^(?:async\s+)?def\s+(\w+)\s*\(",  1, "function"),
+    (frozenset({".py"}),    r"^class\s+(\w+)\s*[:(]",           1, "class"),
+    (frozenset({".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}),
+     r"(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*[\(<]",    1, "function"),
+    (frozenset({".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}),
+     r"(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\(",  1, "function"),
+    (frozenset({".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}),
+     r"(?:export\s+)?class\s+(\w+)\s*(?:extends|implements|{)",  1, "class"),
+    (frozenset({".ts", ".tsx"}),
+     r"(?:export\s+)?(?:type|interface)\s+(\w+)\s*[={<]",        1, "type"),
+    (frozenset({".go"}), r"^func\s+(?:\(\w+\s+\*?\w+\)\s+)?(\w+)\s*\(", 1, "function"),
+    (frozenset({".go"}), r"^type\s+(\w+)\s+(?:struct|interface)",         1, "type"),
+    (frozenset({".rs"}), r"^(?:pub\s+)?fn\s+(\w+)\s*[\(<]",    1, "function"),
+    (frozenset({".rs"}), r"^(?:pub\s+)?(?:struct|enum|trait)\s+(\w+)", 1, "type"),
+]
+
+
+@activity.defn(name="swarm_build_repo_index")
+async def swarm_build_repo_index(repo_path: str) -> str:
+    """
+    Walk the repo and build a symbol index: {symbol_name: [{file, line, kind}]}.
+    Written to .gantry/index.json. Returns a summary of what was indexed.
+    Called after each build cycle so the index stays current.
+    """
+    base = Path(repo_path)
+    if not base.exists():
+        return f"Error: repo_path '{repo_path}' does not exist."
+
+    index: dict[str, list[dict]] = {}
+    files_scanned = 0
+    symbols_found = 0
+
+    for file_path in sorted(base.rglob("*")):
+        if not file_path.is_file():
+            continue
+        if any(part in _INDEX_SKIP for part in file_path.parts):
+            continue
+        ext = file_path.suffix.lower()
+        if ext in _INDEX_BINARY_EXTS:
+            continue
+
+        applicable = [
+            (pat, grp, kind)
+            for (exts, pat, grp, kind) in _INDEX_PATTERNS
+            if ext in exts
+        ]
+        if not applicable:
+            continue
+
+        try:
+            lines = file_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except Exception:
+            continue
+
+        files_scanned += 1
+        try:
+            rel = str(file_path.relative_to(base))
+        except ValueError:
+            rel = str(file_path)
+
+        for lineno, line in enumerate(lines, 1):
+            for pat, grp, kind in applicable:
+                m = re.search(pat, line)
+                if not m:
+                    continue
+                try:
+                    name = m.group(grp)
+                except IndexError:
+                    continue
+                if name not in index:
+                    index[name] = []
+                index[name].append({"file": rel, "line": lineno, "kind": kind})
+                symbols_found += 1
+                break  # one match per line
+
+    # Write index
+    index_path = Path(repo_path) / _INDEX_FILE
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index_path.write_text(json.dumps(index, indent=2))
+
+    return (
+        f"Index built: {symbols_found} symbol(s) across {files_scanned} file(s). "
+        f"Written to {_INDEX_FILE}."
+    )
+
+
+@activity.defn(name="swarm_query_repo_index")
+async def swarm_query_repo_index(repo_path: str, query: str, top_k: int = 20) -> str:
+    """
+    Query the repo index for symbols matching a name (substring, case-insensitive).
+    Returns file paths and line numbers — use to locate definitions before read_file.
+    Falls back to swarm_find_symbol if the index doesn't exist yet.
+    """
+    index_path = Path(repo_path) / _INDEX_FILE
+    if not index_path.exists():
+        return f"Index not built yet for '{repo_path}'. Use find_symbol instead."
+
+    try:
+        index: dict = json.loads(index_path.read_text())
+    except Exception:
+        return "Error reading index (malformed JSON). Use find_symbol instead."
+
+    query_lower = query.lower()
+    matches: list[tuple[str, list[dict]]] = [
+        (name, locs)
+        for name, locs in index.items()
+        if query_lower in name.lower()
+    ]
+
+    # Sort: exact matches first, then by name length (shorter = more likely what you want)
+    matches.sort(key=lambda x: (x[0].lower() != query_lower, len(x[0])))
+    matches = matches[:top_k]
+
+    if not matches:
+        return f"No symbols matching '{query}' found in index."
+
+    lines = [f"Symbols matching '{query}' ({len(matches)} result(s)):"]
+    for name, locs in matches:
+        for loc in locs[:3]:  # max 3 locations per symbol (handles overloads)
+            lines.append(f"  {name} [{loc['kind']}] → {loc['file']}:{loc['line']}")
+    return "\n".join(lines)
+
+
+# ── GitHub / remote repo activities ──────────────────────────────────────────
+
+@activity.defn(name="swarm_git_clone")
+async def swarm_git_clone(
+    github_url: str,
+    dest_path: str,
+    github_token: str | None = None,
+) -> str:
+    """
+    Clone a GitHub (or any git) repository to dest_path.
+    If github_token is provided, injects it into the HTTPS URL so no interactive
+    auth is needed. Works with GitHub PATs, fine-grained tokens, and OAuth tokens.
+
+    Returns a JSON string: {ok: bool, path: str, message: str}
+    """
+    import shutil
+
+    dest = Path(dest_path)
+
+    # If dest already exists and is a git repo, do a fetch+reset instead of clone
+    if (dest / ".git").exists():
+        pull = _run("git fetch origin && git reset --hard origin/HEAD", cwd=dest_path, timeout=120)
+        if pull["returncode"] == 0:
+            return json.dumps({"ok": True, "path": dest_path, "message": "Repo already exists — reset to origin/HEAD."})
+        # Fall through to re-clone if fetch fails
+
+    # Remove stale directory if it exists but isn't a valid git repo
+    if dest.exists():
+        try:
+            shutil.rmtree(dest_path)
+        except Exception as e:
+            return json.dumps({"ok": False, "path": dest_path, "message": f"Failed to remove stale directory: {e}"})
+
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    # Inject token into HTTPS URL if provided
+    clone_url = github_url
+    if github_token and github_url.startswith("https://"):
+        # https://github.com/owner/repo → https://TOKEN@github.com/owner/repo
+        clone_url = github_url.replace("https://", f"https://{github_token}@", 1)
+
+    result = _run(
+        f'git clone --depth=50 "{clone_url}" "{dest_path}"',
+        timeout=300,
+    )
+
+    if result["returncode"] != 0:
+        # Scrub token from error message before returning
+        err = result["stderr"].replace(github_token or "", "***") if github_token else result["stderr"]
+        return json.dumps({"ok": False, "path": dest_path, "message": f"Clone failed: {err[:400]}"})
+
+    return json.dumps({"ok": True, "path": dest_path, "message": f"Cloned {github_url} → {dest_path}"})
+
+
+@activity.defn(name="swarm_git_configure_remote")
+async def swarm_git_configure_remote(
+    repo_path: str,
+    github_token: str,
+    github_url: str,
+) -> str:
+    """
+    Configure the git remote to use token-authenticated HTTPS so push/PR work
+    without interactive auth. Called once after clone, before DevOps runs.
+    """
+    # Set the remote URL with embedded token
+    auth_url = github_url.replace("https://", f"https://{github_token}@", 1) if github_url.startswith("https://") else github_url
+    result = _run(f'git remote set-url origin "{auth_url}"', cwd=repo_path, timeout=15)
+    if result["returncode"] != 0:
+        return f"Error configuring remote: {result['stderr'][:200]}"
+
+    # Also configure git user identity if not already set (required for commits)
+    _run('git config user.email "swarm@gantry.local"', cwd=repo_path, timeout=5)
+    _run('git config user.name "Gantry Swarm"', cwd=repo_path, timeout=5)
+
+    return "Remote configured with token auth."

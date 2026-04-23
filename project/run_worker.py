@@ -50,6 +50,17 @@ from activities.swarm_activities import (
     swarm_deploy,
     swarm_memory_write,
     swarm_memory_read,
+    swarm_verify_build,
+    swarm_git_snapshot_save,
+    swarm_git_snapshot_restore,
+    swarm_find_symbol,
+    swarm_build_repo_index,
+    swarm_query_repo_index,
+    swarm_git_clone,
+    swarm_git_configure_remote,
+    manifest_write,
+    manifest_read,
+    manifest_append_edits,
 )
 from activities.memory_activities import (
     memory_write_fact,
@@ -63,6 +74,7 @@ from activities.builder_planner_activity import plan_builder_step
 from activities.inspector_planner_activity import plan_inspector_step
 from activities.security_planner_activity import plan_security_step
 from activities.devops_planner_activity import plan_devops_step
+from activities.classify_tier_activity import classify_tier_llm
 
 logger = make_logger(__name__)
 
@@ -100,6 +112,17 @@ async def main():
         swarm_deploy,
         swarm_memory_write,
         swarm_memory_read,
+        swarm_verify_build,
+        swarm_git_snapshot_save,
+        swarm_git_snapshot_restore,
+        swarm_find_symbol,
+        swarm_build_repo_index,
+        swarm_query_repo_index,
+        swarm_git_clone,
+        swarm_git_configure_remote,
+        manifest_write,
+        manifest_read,
+        manifest_append_edits,
         memory_write_fact,
         memory_read_facts,
         memory_append_episode,
@@ -110,6 +133,7 @@ async def main():
         plan_inspector_step,
         plan_security_step,
         plan_devops_step,
+        classify_tier_llm,
     ]
 
     all_activities = get_all_activities() + custom_activities

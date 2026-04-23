@@ -55,6 +55,8 @@ class BuilderAgent:
         parent_task_id: str,
         heal_instructions: list[str] | None = None,
         track_label: str | None = None,
+        manifest_snapshot: str | None = None,
+        model: str | None = None,
     ) -> str:
         tag = f"Builder ({track_label})" if track_label else "Builder"
         log = logger.bind(parent_task_id=parent_task_id, track=track_label)
@@ -66,6 +68,40 @@ class BuilderAgent:
                 "\n\nHEAL INSTRUCTIONS from Inspector (fix these before finishing):\n"
                 + "\n".join(f"  - {h}" for h in heal_instructions)
             )
+
+        manifest_section = ""
+        if manifest_snapshot:
+            try:
+                manifest = json.loads(manifest_snapshot)
+                sibling_tracks = [
+                    t for t in manifest.get("tracks", [])
+                    if t.get("label") != track_label
+                ]
+                own_track = next(
+                    (t for t in manifest.get("tracks", []) if t.get("label") == track_label),
+                    None,
+                )
+                lines = ["\n\nSHARED MANIFEST — collaboration context from the Architect:"]
+                if own_track:
+                    own_files = own_track.get("key_files", [])
+                    lines.append(f"\nYour track ({track_label}) OWNS these files — write freely:")
+                    lines.extend(f"  {f}" for f in own_files)
+                if sibling_tracks:
+                    lines.append("\nSIBLING TRACKS running in parallel — DO NOT write their files:")
+                    for st in sibling_tracks:
+                        st_files = st.get("key_files", [])
+                        st_exports = st.get("exports", [])
+                        lines.append(f"\n  [{st['label']}] owns: {', '.join(st_files[:8]) or '(TBD)'}")
+                        if st_exports:
+                            lines.append(f"    exports for you to import: {', '.join(st_exports)}")
+                completed = manifest.get("completed_edits", [])
+                if completed:
+                    written = list({e["path"] for e in completed})[:12]
+                    lines.append(f"\nAlready written by other builders: {', '.join(written)}")
+                    lines.append("  Prefer patch_file / str_replace_editor over write_file for these paths.")
+                manifest_section = "\n".join(lines)
+            except Exception:
+                pass  # malformed manifest — skip silently
 
         steps_text = "\n".join(
             f"  {i+1}. {s}" for i, s in enumerate(architect_plan.get("implementation_steps", []))
@@ -94,6 +130,22 @@ class BuilderAgent:
 
         repo_root = architect_plan.get('repo_root', '.')
 
+        # ── #12: Test-driven building — inject test spec if architect provided one ──
+        track_test_spec = architect_plan.get("test_spec", [])
+        tdd_section = ""
+        if track_test_spec and not heal_instructions:
+            test_cases = "\n".join(f"  - {tc}" for tc in track_test_spec[:12])
+            tdd_section = (
+                "\n\nTEST-DRIVEN DEVELOPMENT — follow this order strictly:\n"
+                "STEP 1: Write the following tests FIRST (before any implementation):\n"
+                f"{test_cases}\n"
+                "STEP 2: Run verify_build to confirm the tests exist and are syntactically valid.\n"
+                "STEP 3: Implement the code to make the tests pass.\n"
+                "STEP 4: Run verify_build again to confirm tests pass.\n"
+                "STEP 5: Call finish_build.\n"
+                "Do NOT skip to implementation before writing tests."
+            )
+
         task_prompt = (
             f"You are the Builder agent{f' working on the {track_label} track' if track_label else ''}. "
             f"Your goal:\n{goal}\n\n"
@@ -101,27 +153,33 @@ class BuilderAgent:
             f"Repo root: {repo_root}\n\n"
             f"Key files:\n{key_files_text}\n\n"
             f"Implementation steps:\n{steps_text}"
-            f"{heal_section}\n\n"
+            f"{heal_section}"
+            f"{tdd_section}"
+            f"{manifest_section}\n\n"
             "RULES — read carefully before starting:\n"
             f"- ALL file paths MUST be absolute, starting with {repo_root}. "
             f"Example: {repo_root}/src/App.tsx — NEVER just src/App.tsx.\n"
             "- Use read_file to read files. NEVER use run_command to cat or read files.\n"
             "- For package installation use install_packages — do NOT use run_command for installs.\n"
             "- Use str_replace_editor (preferred) or patch_file for targeted edits; write_file for new files.\n"
+            "- Use query_index first to locate symbol definitions, then find_symbol if not indexed, then read_file.\n"
             "- Use search_files to locate files by name or content before editing.\n"
             "- Use web_search / fetch_url when uncertain about a library's API or an error message.\n"
             "- Use git_diff before finish_build to verify all intended changes are present.\n"
             f"- Use memory_read(repo_path='{repo_root}') at the start to check Architect notes.\n"
-            "- Call finish_build when all steps are done."
+            f"- Call verify_build(repo_path='{repo_root}') after all files are written. Fix any failures before finishing.\n"
+            "- Call finish_build only after verify_build passes (or reports no tools detected)."
         )
 
+        from project.config import CLAUDE_SONNET_MODEL
+        _model = model or CLAUDE_SONNET_MODEL
         context: list[dict] = []
         edits: list[dict] = []
 
         for turn in range(MAX_BUILDER_TURNS):
             raw = await workflow.execute_activity(
                 "plan_builder_step",
-                args=[task_prompt, context],
+                args=[task_prompt, context, _model],
                 **PLANNER_OPTIONS,
             )
             context = raw["context"]
@@ -293,6 +351,25 @@ class BuilderAgent:
             return await workflow.execute_activity(
                 "swarm_memory_write",
                 args=[tool_input.get("key", ""), tool_input.get("value", ""), tool_input.get("repo_path", "."), "builder"],
+                **IO_OPTIONS,
+            )
+        if tool_name == "verify_build":
+            return await workflow.execute_activity(
+                "swarm_verify_build",
+                args=[tool_input.get("repo_path", ".")],
+                start_to_close_timeout=timedelta(seconds=120),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        if tool_name == "find_symbol":
+            return await workflow.execute_activity(
+                "swarm_find_symbol",
+                args=[tool_input.get("symbol", ""), tool_input.get("repo_path", "."), tool_input.get("exact", False)],
+                **IO_OPTIONS,
+            )
+        if tool_name == "query_index":
+            return await workflow.execute_activity(
+                "swarm_query_repo_index",
+                args=[tool_input.get("repo_path", "."), tool_input.get("query", ""), tool_input.get("top_k", 20)],
                 **IO_OPTIONS,
             )
         return f"Error: tool '{tool_name}' not dispatched."
