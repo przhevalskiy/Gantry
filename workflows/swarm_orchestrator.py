@@ -673,6 +673,35 @@ class SwarmOrchestrator(BaseWorkflow):
         )
 
         log.info("swarm_complete", heal_cycles=heal_cycles, pr=devops_result.get("pr_url"))
+
+        # ── Episodic memory: record this build for future agent context ────────
+        try:
+            from project.complexity import TIER_LABELS
+            episode = {
+                "goal": goal[:300],
+                "tier": tier,
+                "tier_label": TIER_LABELS.get(tier, str(tier)),
+                "outcome": "success" if not inspector_report.get("blocked_by") else "blocked",
+                "inspector_passed": inspector_report.get("passed", False),
+                "security_passed": security_report.get("passed", False),
+                "heal_cycles": heal_cycles,
+                "tracks": [t.get("label") for t in tracks],
+                "files_modified": len(build_result.get("edits", [])),
+                "pr_url": devops_result.get("pr_url", "") if devops_result else "",
+                "key_decisions": [
+                    f"tracks={[t.get('label') for t in tracks]}",
+                    f"tech_stack={architect_plan.get('tech_stack', [])}",
+                ],
+            }
+            await workflow.execute_activity(
+                "memory_append_episode",
+                args=[repo_path, episode],
+                start_to_close_timeout=timedelta(seconds=15),
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            )
+        except Exception:
+            pass  # episode write is non-critical
+
         return final
 
 

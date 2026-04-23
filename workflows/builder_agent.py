@@ -292,7 +292,7 @@ class BuilderAgent:
         if tool_name == "memory_write":
             return await workflow.execute_activity(
                 "swarm_memory_write",
-                args=[tool_input.get("key", ""), tool_input.get("value", ""), tool_input.get("repo_path", ".")],
+                args=[tool_input.get("key", ""), tool_input.get("value", ""), tool_input.get("repo_path", "."), "builder"],
                 **IO_OPTIONS,
             )
         return f"Error: tool '{tool_name}' not dispatched."

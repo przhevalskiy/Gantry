@@ -84,17 +84,34 @@ ARCHITECT_TOOLS: list[dict] = [
     {
         "name": "memory_write",
         "description": (
-            "Store a context note for Builder and Inspector agents to read during this build. "
-            "Use to record key decisions, missing secrets, DB schema notes, or architecture constraints."
+            "Store a durable fact for all agents — current build and future builds. "
+            "Use to record key decisions, missing secrets, DB schema, architecture constraints. "
+            "Use scoped keys, e.g. 'arch.db_orm', 'arch.auth_pattern', 'arch.monorepo'."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "key": {"type": "string", "description": "Note key (e.g. 'auth_pattern', 'missing_secrets', 'db_url')."},
-                "value": {"type": "string", "description": "Note content."},
+                "key": {"type": "string", "description": "Scoped fact key (e.g. 'arch.db_orm')."},
+                "value": {"type": "string", "description": "Fact content."},
                 "repo_path": {"type": "string", "description": "Absolute repo root path."},
             },
             "required": ["key", "value", "repo_path"],
+        },
+    },
+    {
+        "name": "memory_search_episodes",
+        "description": (
+            "Search past build episodes to find prior decisions for similar goals. "
+            "Call early in planning to avoid repeating failed approaches."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "repo_path": {"type": "string", "description": "Absolute repo root path."},
+                "query": {"type": "string", "description": "Keywords for the current goal."},
+                "top_k": {"type": "integer", "description": "Max episodes to return (default 5)."},
+            },
+            "required": ["repo_path", "query"],
         },
     },
     {
@@ -171,3 +188,4 @@ ARCHITECT_TOOLS: list[dict] = [
 ]
 
 ARCHITECT_VALID_TOOL_NAMES: frozenset[str] = frozenset(t["name"] for t in ARCHITECT_TOOLS)
+

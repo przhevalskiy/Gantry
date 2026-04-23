@@ -114,15 +114,34 @@ INSPECTOR_TOOLS: list[dict] = [
     },
     {
         "name": "memory_write",
-        "description": "Store a QA finding or diagnosis note for the Builder's next heal cycle.",
+        "description": (
+            "Store a durable QA finding or recurring failure pattern. "
+            "Use scoped keys, e.g. 'inspector.fragile_auth', 'inspector.lint_ignores'."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "key": {"type": "string", "description": "Note key."},
-                "value": {"type": "string", "description": "Note content."},
+                "key": {"type": "string", "description": "Scoped fact key."},
+                "value": {"type": "string", "description": "Finding or note content."},
                 "repo_path": {"type": "string", "description": "Absolute repo root path."},
             },
             "required": ["key", "value", "repo_path"],
+        },
+    },
+    {
+        "name": "memory_search_episodes",
+        "description": (
+            "Search past build episodes to find recurring failure patterns. "
+            "Use when a test keeps failing and you want to know if it has failed before."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "repo_path": {"type": "string", "description": "Absolute repo root path."},
+                "query": {"type": "string", "description": "Keywords for the failure or area."},
+                "top_k": {"type": "integer", "description": "Max episodes to return (default 5)."},
+            },
+            "required": ["repo_path", "query"],
         },
     },
     {

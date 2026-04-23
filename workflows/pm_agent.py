@@ -68,11 +68,13 @@ class PMAgent:
             f"Repository root: {repo_path}\n\n"
             f"IMPORTANT: ALL file paths MUST be absolute, starting with {repo_path}.\n\n"
             f"Your job:\n"
-            f"1. Scan the repo quickly (list_directory, read README/package.json/pyproject.toml).\n"
-            f"2. Decide if the goal needs clarification before the team starts building.\n"
-            f"3. If yes: call ask_clarification with your most critical questions (max 5).\n"
-            f"4. Call report_pm with the enriched goal — include discovered context and any answers.\n"
-            f"5. Use memory_write(repo_path='{repo_path}') to store key constraints for later agents.\n\n"
+            f"1. Call memory_search_episodes(repo_path='{repo_path}', query=<goal keywords>) to check "
+            f"if similar work was done before — surface prior decisions to avoid repeating mistakes.\n"
+            f"2. Scan the repo quickly (list_directory, read README/package.json/pyproject.toml).\n"
+            f"3. Decide if the goal needs clarification before the team starts building.\n"
+            f"4. If yes: call ask_clarification with your most critical questions (max 5).\n"
+            f"5. Call report_pm with the enriched goal — include discovered context, episode insights, and any answers.\n"
+            f"6. Use memory_write(repo_path='{repo_path}') with key prefixed 'pm.' to store key constraints for later agents.\n\n"
             f"Be efficient. The team is waiting."
         )
 
@@ -238,7 +240,13 @@ class PMAgent:
         if tool_name == "memory_write":
             return await workflow.execute_activity(
                 "swarm_memory_write",
-                args=[tool_input.get("key", ""), tool_input.get("value", ""), tool_input.get("repo_path", ".")],
+                args=[tool_input.get("key", ""), tool_input.get("value", ""), tool_input.get("repo_path", "."), "pm"],
+                **IO_OPTIONS,
+            )
+        if tool_name == "memory_search_episodes":
+            return await workflow.execute_activity(
+                "memory_search_episodes",
+                args=[tool_input.get("repo_path", "."), tool_input.get("query", ""), tool_input.get("top_k", 5)],
                 **IO_OPTIONS,
             )
         return f"Error: tool '{tool_name}' not dispatched."

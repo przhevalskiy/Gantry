@@ -216,7 +216,13 @@ class InspectorAgent:
         if tool_name == "memory_write":
             return await workflow.execute_activity(
                 "swarm_memory_write",
-                args=[tool_input.get("key", ""), tool_input.get("value", ""), tool_input.get("repo_path", ".")],
+                args=[tool_input.get("key", ""), tool_input.get("value", ""), tool_input.get("repo_path", "."), "inspector"],
+                **IO_OPTIONS,
+            )
+        if tool_name == "memory_search_episodes":
+            return await workflow.execute_activity(
+                "memory_search_episodes",
+                args=[tool_input.get("repo_path", "."), tool_input.get("query", ""), tool_input.get("top_k", 5)],
                 **IO_OPTIONS,
             )
         return f"Error: tool '{tool_name}' not dispatched."

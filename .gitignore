@@ -18,7 +18,7 @@ build/
 .python-version
 
 # Screenshots
-keystone_screenshots/
+gantry_screenshots/
 
 # IDE
 .idea/
@@ -42,6 +42,10 @@ htmlcov/
 ui/node_modules/
 ui/.next/
 ui/tsconfig.tsbuildinfo
+ui/public/avatars/
+
+# Generated / downloaded images
+Gemini_Generated_Image_*.png
 
 # scale-agentex local platform (not part of this repo)
 scale-agentex/

@@ -801,35 +801,63 @@ async def swarm_deploy(platform: str = "auto", cwd: str | None = None) -> str:
 
 
 # ── Agent memory activities ───────────────────────────────────────────────────
+# These delegate to the shared .keystone/memory/facts.json layer so all agents
+# read from the same store regardless of whether they call the old swarm_* names
+# or the new memory_write_fact / memory_read_facts activities.
 
-_MEMORY_FILE = ".keystone/build_context.json"
+_MEMORY_DIR = ".keystone/memory"
+_FACTS_FILE = "facts.json"
+
+
+def _facts_path(repo_path: str):
+    from datetime import datetime, timezone
+    p = Path(repo_path) / _MEMORY_DIR
+    p.mkdir(parents=True, exist_ok=True)
+    return p / _FACTS_FILE
 
 
 @activity.defn(name="swarm_memory_write")
-async def swarm_memory_write(key: str, value: str, repo_path: str) -> str:
-    """Store a context note in the repo so other agents in this build can read it."""
-    mem_path = Path(repo_path) / _MEMORY_FILE
-    mem_path.parent.mkdir(parents=True, exist_ok=True)
+async def swarm_memory_write(
+    key: str,
+    value: str,
+    repo_path: str,
+    agent: str = "unknown",
+    confidence: float = 1.0,
+) -> str:
+    """Store a durable fact in the shared memory layer."""
+    from datetime import datetime, timezone
+    fp = _facts_path(repo_path)
     try:
-        data: dict = json.loads(mem_path.read_text()) if mem_path.exists() else {}
+        data: dict = json.loads(fp.read_text()) if fp.exists() else {}
     except Exception:
         data = {}
-    data[key] = value
-    mem_path.write_text(json.dumps(data, indent=2))
-    return f"Stored context key '{key}'."
+    data[key] = {
+        "value": value,
+        "agent": agent,
+        "confidence": round(confidence, 2),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    fp.write_text(json.dumps(data, indent=2))
+    return f"Fact '{key}' stored by {agent}."
 
 
 @activity.defn(name="swarm_memory_read")
 async def swarm_memory_read(repo_path: str, keys: list[str] | None = None) -> str:
-    """Read context notes left by earlier agents in this build."""
-    mem_path = Path(repo_path) / _MEMORY_FILE
-    if not mem_path.exists():
-        return "No build context stored yet."
+    """Read facts stored by any agent."""
+    fp = _facts_path(repo_path)
+    if not fp.exists():
+        return "No facts stored yet."
     try:
-        data: dict = json.loads(mem_path.read_text())
+        data: dict = json.loads(fp.read_text())
     except Exception:
-        return "Error reading build context (malformed JSON)."
+        return "Error reading facts (malformed JSON)."
     subset = {k: data[k] for k in keys if k in data} if keys else data
     if not subset:
-        return "Build context is empty." if not keys else f"Keys not found: {', '.join(keys)}"
-    return "\n".join(f"**{k}**: {v}" for k, v in subset.items())
+        return "No matching facts found." if keys else "Facts store is empty."
+    lines = []
+    for k, v in subset.items():
+        if isinstance(v, dict):
+            lines.append(f"**{k}** [{v.get('agent', '?')}]: {v.get('value', '')}")
+        else:
+            lines.append(f"**{k}**: {v}")
+    return "\n".join(lines)

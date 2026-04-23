@@ -87,15 +87,34 @@ PM_TOOLS: list[dict] = [
     },
     {
         "name": "memory_write",
-        "description": "Store key findings for Builder and Inspector agents to read during this build.",
+        "description": (
+            "Store a durable fact for all agents to read — current build and future builds. "
+            "Use scoped keys, e.g. 'pm.user_prefers_typescript', 'pm.db_dialect', 'pm.scope_limit'."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
-                "key": {"type": "string", "description": "Note key (e.g. 'requirements', 'constraints', 'tech_decisions')."},
-                "value": {"type": "string", "description": "Note content."},
+                "key": {"type": "string", "description": "Scoped fact key."},
+                "value": {"type": "string", "description": "Fact content."},
                 "repo_path": {"type": "string", "description": "Absolute repo root path."},
             },
             "required": ["key", "value", "repo_path"],
+        },
+    },
+    {
+        "name": "memory_search_episodes",
+        "description": (
+            "Search past build episodes to understand how similar goals were handled before. "
+            "Use to avoid repeating failed approaches and to surface relevant prior decisions."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "repo_path": {"type": "string", "description": "Absolute repo root path."},
+                "query": {"type": "string", "description": "Keywords for the current goal."},
+                "top_k": {"type": "integer", "description": "Max episodes to return (default 5)."},
+            },
+            "required": ["repo_path", "query"],
         },
     },
     {
@@ -127,3 +146,4 @@ PM_TOOLS: list[dict] = [
 ]
 
 PM_VALID_TOOL_NAMES: frozenset[str] = frozenset(t["name"] for t in PM_TOOLS)
+

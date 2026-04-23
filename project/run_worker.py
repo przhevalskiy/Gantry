@@ -51,6 +51,12 @@ from activities.swarm_activities import (
     swarm_memory_write,
     swarm_memory_read,
 )
+from activities.memory_activities import (
+    memory_write_fact,
+    memory_read_facts,
+    memory_append_episode,
+    memory_search_episodes,
+)
 from activities.pm_planner_activity import plan_pm_step
 from activities.architect_planner_activity import plan_architect_step
 from activities.builder_planner_activity import plan_builder_step
@@ -94,6 +100,10 @@ async def main():
         swarm_deploy,
         swarm_memory_write,
         swarm_memory_read,
+        memory_write_fact,
+        memory_read_facts,
+        memory_append_episode,
+        memory_search_episodes,
         plan_pm_step,
         plan_architect_step,
         plan_builder_step,
