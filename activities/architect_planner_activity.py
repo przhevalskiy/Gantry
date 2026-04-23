@@ -6,7 +6,7 @@ import json
 
 from temporalio import activity
 
-from project.config import CLAUDE_SONNET_MODEL
+from project.config import CLAUDE_SONNET_MODEL, CLAUDE_HAIKU_MODEL
 from project.planner import next_step, PlannerStep, FinalAnswer, PlannerError
 from project.architect_tools import ARCHITECT_TOOLS
 
@@ -25,7 +25,11 @@ _ARCHITECT_SYSTEM = (
 
 
 @activity.defn(name="plan_architect_step")
-async def plan_architect_step(task_prompt: str, context: list[dict]) -> dict:
+async def plan_architect_step(
+    task_prompt: str,
+    context: list[dict],
+    model: str = CLAUDE_SONNET_MODEL,
+) -> dict:
     """Execute one Claude planning step for the Architect agent."""
     try:
         result, new_context = await next_step(
@@ -33,7 +37,7 @@ async def plan_architect_step(task_prompt: str, context: list[dict]) -> dict:
             context,
             tools=ARCHITECT_TOOLS,
             system_prompt=_ARCHITECT_SYSTEM,
-            model=CLAUDE_SONNET_MODEL,
+            model=model,
         )
     except PlannerError as e:
         return {"type": "error", "message": str(e), "context": context}

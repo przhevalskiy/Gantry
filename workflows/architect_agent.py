@@ -47,16 +47,32 @@ class ArchitectAgent:
         repo_path: str,
         parent_task_id: str,
         conversation_history: list[dict] | None = None,
+        failure_context: dict | None = None,
     ) -> str:
-        log = logger.bind(parent_task_id=parent_task_id, repo_path=repo_path)
-        log.info("architect_started", followup=bool(conversation_history))
+        """
+        Map the repository and produce a multi-track ArchitectPlan.
 
+        failure_context (optional): passed when the Foreman is re-planning after a
+        build failure or exhausted heal cycles. Shape:
+          {
+            "reason": "builder_failure" | "heal_exhausted",
+            "failed_tracks": [{"label": str, "summary": str}],
+            "heal_instructions": [str],   # Inspector's accumulated fixes
+          }
+        The Architect uses this to produce a revised plan that avoids the same mistakes.
+        """
+        log = logger.bind(parent_task_id=parent_task_id, repo_path=repo_path)
+        is_replan = bool(failure_context)
+        log.info("architect_started", followup=bool(conversation_history), replan=is_replan)
+
+        status_msg = (
+            "[Architect] Re-planning after build failure — revising track decomposition..."
+            if is_replan
+            else "[Architect] Mapping repository and decomposing into parallel tracks..."
+        )
         await adk.messages.create(
             task_id=parent_task_id,
-            content=TextContent(
-                author="agent",
-                content="[Architect] Mapping repository and decomposing into parallel tracks...",
-            ),
+            content=TextContent(author="agent", content=status_msg),
         )
 
         history_block = ""
@@ -75,29 +91,70 @@ class ArchitectAgent:
                 "do not recreate files that are already correct. Focus only on what the new goal requires.\n"
             )
 
+        failure_block = ""
+        if failure_context:
+            reason = failure_context.get("reason", "unknown")
+            failed_tracks = failure_context.get("failed_tracks", [])
+            heal_instructions = failure_context.get("heal_instructions", [])
+
+            failure_lines = [
+                f"\n\nRE-PLANNING CONTEXT — previous attempt failed ({reason}):",
+                "You MUST produce a different decomposition that avoids the same mistakes.",
+                "",
+            ]
+            if failed_tracks:
+                failure_lines.append("Failed tracks from previous attempt:")
+                for ft in failed_tracks:
+                    failure_lines.append(f"  - [{ft.get('label', '?')}]: {ft.get('summary', '')[:200]}")
+            if heal_instructions:
+                failure_lines.append("\nInspector's unresolved issues (your new plan must address these):")
+                for h in heal_instructions[:8]:
+                    failure_lines.append(f"  - {h}")
+            failure_lines += [
+                "",
+                "RULES for re-planning:",
+                "1. Read the files that failed — understand WHY they failed before re-decomposing.",
+                "2. Consider merging tracks that had cross-track dependency issues.",
+                "3. Consider splitting a track that was too large for one builder.",
+                "4. Add explicit steps to fix the Inspector's unresolved issues.",
+                "5. Do NOT repeat the same track structure that already failed.",
+            ]
+            failure_block = "\n".join(failure_lines)
+
         task_prompt = (
             f"You are the Architect agent. Your goal:\n{goal}\n\n"
             f"Repository root: {repo_path}\n"
             f"IMPORTANT: ALL tool calls (list_directory, read_file) MUST use absolute paths "
             f"starting with {repo_path}. NEVER use relative paths like '.' or 'src/'.\n"
-            f"{history_block}\n"
+            f"{history_block}"
+            f"{failure_block}\n"
             "Instructions:\n"
-            f"1. Start by listing the root directory: list_directory(path='{repo_path}').\n"
+            f"1. Start with query_index(repo_path='{repo_path}', query='') to check if a symbol index exists.\n"
+            f"   If not, list the root directory: list_directory(path='{repo_path}').\n"
             "2. Read key config files (pyproject.toml, package.json, README, etc.) using absolute paths.\n"
             "3. Read the main entry points and core modules relevant to the goal.\n"
             "4. Identify the tech stack, key files, and dependencies.\n"
-            "5. Decompose the goal into INDEPENDENT parallel tracks:\n"
+            "   IMPORTANT: If the repo is EMPTY (no source files), this is a GREENFIELD build.\n"
+            "   For greenfield builds:\n"
+            "   - Infer the tech stack from the goal description and any PM notes in memory.\n"
+            "   - Call memory_read to check if the PM stored tech stack decisions.\n"
+            "   - Create a complete scaffold plan: project setup, core files, features, tests.\n"
+            "   - Do NOT produce 0 implementation steps — a greenfield build needs at minimum:\n"
+            "     scaffold, core feature implementation, basic tests.\n"
+            "5. Decompose the goal into parallel tracks:\n"
             "   - Each track should touch distinct, non-overlapping files.\n"
             "   - Use 1 track for simple tasks, 2-4 for larger ones.\n"
             "   - Example tracks: 'backend', 'frontend', 'tests', 'infra', 'docs'.\n"
-            "   - Tracks run SIMULTANEOUSLY — they must not depend on each other.\n"
+            "   - If a track imports symbols from another track, set depends_on=[other_track_label].\n"
+            "   - Tracks WITHOUT depends_on run SIMULTANEOUSLY. Tracks WITH depends_on wait for their dependencies.\n"
             f"6. Call report_plan with repo_root='{repo_path}' and the tracks array when ready.\n\n"
             "Additional tools available:\n"
+            "- query_index: look up symbol definitions by name (faster than search_files)\n"
             "- search_files: find files by glob or content regex instead of listing directories\n"
             "- web_search / fetch_url: look up unfamiliar libraries, APIs, or patterns\n"
             "- check_secrets: verify required env vars are present before planning\n"
-            f"- memory_write: store key findings (auth patterns, missing secrets, DB schema) for Builder agents to read. "
-            f"Always use repo_path='{repo_path}'."
+            f"- memory_read: read PM notes and prior decisions. Always use repo_path='{repo_path}'.\n"
+            f"- memory_write: store key findings for Builder agents. Always use repo_path='{repo_path}'."
         )
 
         context: list[dict] = []
@@ -113,6 +170,40 @@ class ArchitectAgent:
             if raw["type"] == "plan":
                 plan_data = raw["plan_data"]
                 tool_use_id = raw["tool_use_id"]
+
+                # Guard: reject a plan with 0 total implementation steps — force the
+                # Architect to keep planning. This catches the case where it calls
+                # report_plan immediately after listing an empty directory.
+                total_steps = sum(
+                    len(t.get("implementation_steps", []))
+                    for t in plan_data.get("tracks", [])
+                )
+                if total_steps == 0:
+                    log.warning("architect_zero_steps_rejected")
+                    context = context + [{
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": tool_use_id,
+                            "content": (
+                                "ERROR: implementation_steps array is empty. "
+                                "You MUST call report_plan again with non-empty implementation_steps.\n\n"
+                                "First call memory_read(repo_path='" + repo_path + "') to get tech stack.\n\n"
+                                "Then call report_plan with steps like this example:\n"
+                                '{"repo_root": "' + repo_path + '", '
+                                '"tech_stack": ["Python", "aiohttp", "BeautifulSoup"], '
+                                '"tracks": [{"label": "main", "implementation_steps": ['
+                                '"Create requirements.txt with aiohttp beautifulsoup4 lxml", '
+                                '"Create scraper.py with async fetch and retry logic", '
+                                '"Create parser.py with HTML extraction functions", '
+                                '"Create main.py with CLI entry point"'
+                                ']}]}\n\n'
+                                "Replace the example steps with steps specific to the goal: " + plan_data.get("notes", goal)[:200]
+                            ),
+                        }],
+                    }]
+                    continue  # force another planning turn
+
                 context = context + [{
                     "role": "user",
                     "content": [{"type": "tool_result", "tool_use_id": tool_use_id, "content": "Plan recorded."}],
@@ -201,6 +292,12 @@ class ArchitectAgent:
         })
 
     async def _dispatch(self, tool_name: str, tool_input: dict) -> str:
+        if tool_name == "query_index":
+            return await workflow.execute_activity(
+                "swarm_query_repo_index",
+                args=[tool_input.get("repo_path", "."), tool_input.get("query", ""), tool_input.get("top_k", 20)],
+                **IO_OPTIONS,
+            )
         if tool_name == "list_directory":
             return await workflow.execute_activity(
                 "swarm_list_directory",
@@ -241,6 +338,12 @@ class ArchitectAgent:
             return await workflow.execute_activity(
                 "swarm_memory_write",
                 args=[tool_input.get("key", ""), tool_input.get("value", ""), tool_input.get("repo_path", "."), "architect"],
+                **IO_OPTIONS,
+            )
+        if tool_name == "memory_read":
+            return await workflow.execute_activity(
+                "swarm_memory_read",
+                args=[tool_input.get("repo_path", "."), tool_input.get("keys")],
                 **IO_OPTIONS,
             )
         if tool_name == "memory_search_episodes":

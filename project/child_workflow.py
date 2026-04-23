@@ -12,7 +12,7 @@ from datetime import timedelta
 from temporalio import workflow
 
 
-@workflow.defn(name="keystone_approval")
+@workflow.defn(name="gantry_approval")
 class ApprovalWorkflow:
     def __init__(self):
         self._queue: asyncio.Queue[bool] = asyncio.Queue()
@@ -28,7 +28,7 @@ class ApprovalWorkflow:
         await self._queue.put(approved)
 
 
-@workflow.defn(name="keystone_clarification")
+@workflow.defn(name="gantry_clarification")
 class ClarificationWorkflow:
     """
     Waits for the user to answer PM clarification questions.

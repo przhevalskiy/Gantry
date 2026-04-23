@@ -3,7 +3,7 @@ PM planner activity — one LLM step for the Project Manager workflow.
 """
 from temporalio import activity
 
-from project.config import CLAUDE_SONNET_MODEL
+from project.config import CLAUDE_SONNET_MODEL, CLAUDE_HAIKU_MODEL
 from project.planner import next_step, PlannerStep, FinalAnswer, PlannerError
 from project.pm_tools import PM_TOOLS
 
@@ -26,7 +26,11 @@ _PM_SYSTEM = (
 
 
 @activity.defn(name="plan_pm_step")
-async def plan_pm_step(task_prompt: str, context: list[dict]) -> dict:
+async def plan_pm_step(
+    task_prompt: str,
+    context: list[dict],
+    model: str = CLAUDE_SONNET_MODEL,
+) -> dict:
     """Execute one Claude planning step for the PM agent."""
     try:
         result, new_context = await next_step(
@@ -34,7 +38,7 @@ async def plan_pm_step(task_prompt: str, context: list[dict]) -> dict:
             context,
             tools=PM_TOOLS,
             system_prompt=_PM_SYSTEM,
-            model=CLAUDE_SONNET_MODEL,
+            model=model,
         )
     except PlannerError as e:
         return {"type": "error", "message": str(e), "context": context}

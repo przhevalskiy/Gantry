@@ -49,9 +49,11 @@ class InspectorAgent:
         repo_path: str,
         parent_task_id: str,
         pre_existing_tests: list[str] | None = None,
+        model: str | None = None,
+        test_spec: list[str] | None = None,
     ) -> str:
         log = logger.bind(parent_task_id=parent_task_id)
-        log.info("inspector_started", pre_existing_tests=len(pre_existing_tests or []))
+        log.info("inspector_started", pre_existing_tests=len(pre_existing_tests or []), has_test_spec=bool(test_spec))
 
         await adk.messages.create(
             task_id=parent_task_id,
@@ -69,28 +71,47 @@ class InspectorAgent:
                 "If any of these tests now fail, that is a regression — list it as a HIGH priority heal instruction."
             )
 
+        tdd_note = ""
+        if test_spec:
+            spec_lines = "\n".join(f"  - {tc}" for tc in test_spec[:12])
+            tdd_note = (
+                f"\n\nTDD VERIFICATION — the Builder was asked to write these tests first:\n{spec_lines}\n"
+                "Verify:\n"
+                "1. Each test case above has a corresponding test in the test files.\n"
+                "2. All tests pass.\n"
+                "3. Run run_coverage to measure coverage on the new code.\n"
+                "If any test case is missing, add it to heal_instructions: "
+                "'Write test for: <description>'.\n"
+                "If coverage on new files is below 60%, add to heal_instructions: "
+                "'Increase test coverage for <file> — currently at X%'."
+            )
+
         task_prompt = (
             f"You are the Inspector agent. Your goal:\n{goal}\n\n"
             f"Repository root: {repo_path}\n"
-            f"{regression_note}\n"
+            f"{regression_note}"
+            f"{tdd_note}\n"
             "Instructions:\n"
             f"1. Start with memory_read(repo_path='{repo_path}') to check for known issues from Architect/Builder.\n"
             "2. Run the test suite (e.g. 'pytest --tb=short -q' or 'npm test -- --run').\n"
             "3. Run the linter (e.g. 'ruff check .' or 'eslint src/').\n"
             "4. Run type checking if applicable (e.g. 'mypy .' or 'tsc --noEmit').\n"
-            "5. Optionally use run_application to verify the app actually starts and serves traffic.\n"
-            "6. Use list_ports to check port availability before run_application.\n"
-            "7. Use check_secrets if tests fail with auth or connection errors.\n"
-            "8. Use web_search to look up unfamiliar error messages.\n"
-            "9. Read failing files for context, then call report_inspection with concrete heal_instructions."
+            "5. If a test_spec was provided above, run run_coverage to verify coverage.\n"
+            "6. Optionally use run_application to verify the app actually starts and serves traffic.\n"
+            "7. Use list_ports to check port availability before run_application.\n"
+            "8. Use check_secrets if tests fail with auth or connection errors.\n"
+            "9. Use web_search to look up unfamiliar error messages.\n"
+            "10. Read failing files for context, then call report_inspection with concrete heal_instructions."
         )
 
         context: list[dict] = []
 
+        from project.config import CLAUDE_SONNET_MODEL
+        _model = model or CLAUDE_SONNET_MODEL
         for turn in range(MAX_INSPECTOR_TURNS):
             raw = await workflow.execute_activity(
                 "plan_inspector_step",
-                args=[task_prompt, context],
+                args=[task_prompt, context, _model],
                 **PLANNER_OPTIONS,
             )
             context = raw["context"]
@@ -159,7 +180,7 @@ class InspectorAgent:
             return await workflow.execute_activity(
                 "swarm_read_file", args=[tool_input.get("path", "")], **IO_OPTIONS
             )
-        if tool_name in ("run_tests", "run_lint", "run_type_check"):
+        if tool_name in ("run_tests", "run_lint", "run_type_check", "run_coverage"):
             return await workflow.execute_activity(
                 "swarm_run_command",
                 args=[tool_input.get("command", ""), tool_input.get("cwd")],

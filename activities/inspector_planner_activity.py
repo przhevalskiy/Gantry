@@ -1,10 +1,11 @@
 """
 Inspector planner activity — one LLM step for the Inspector workflow.
 Uses INSPECTOR_TOOLS (run_tests, run_lint, run_type_check, read_file, report_inspection).
+Model is passed per-call to support tier-based routing.
 """
 from temporalio import activity
 
-from project.config import CLAUDE_SONNET_MODEL
+from project.config import CLAUDE_SONNET_MODEL, CLAUDE_HAIKU_MODEL
 from project.planner import next_step, PlannerStep, FinalAnswer, PlannerError
 from project.inspector_tools import INSPECTOR_TOOLS
 
@@ -21,7 +22,11 @@ _INSPECTOR_SYSTEM = (
 
 
 @activity.defn(name="plan_inspector_step")
-async def plan_inspector_step(task_prompt: str, context: list[dict]) -> dict:
+async def plan_inspector_step(
+    task_prompt: str,
+    context: list[dict],
+    model: str = CLAUDE_SONNET_MODEL,
+) -> dict:
     """Execute one Claude planning step for the Inspector agent."""
     try:
         result, new_context = await next_step(
@@ -29,7 +34,7 @@ async def plan_inspector_step(task_prompt: str, context: list[dict]) -> dict:
             context,
             tools=INSPECTOR_TOOLS,
             system_prompt=_INSPECTOR_SYSTEM,
-            model=CLAUDE_SONNET_MODEL,
+            model=model,
         )
     except PlannerError as e:
         return {"type": "error", "message": str(e), "context": context}

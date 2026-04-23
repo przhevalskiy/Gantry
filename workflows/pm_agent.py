@@ -50,6 +50,7 @@ class PMAgent:
         parent_task_id: str,
         task_queue: str,
         tier: int = 1,
+        model: str | None = None,
     ) -> str:
         log = logger.bind(parent_task_id=parent_task_id, tier=tier)
         log.info("pm_started")
@@ -66,26 +67,36 @@ class PMAgent:
             f"You are the Project Manager. The engineering team needs to accomplish this goal:\n\n"
             f"{goal}\n\n"
             f"Repository root: {repo_path}\n\n"
-            f"IMPORTANT: ALL file paths MUST be absolute, starting with {repo_path}.\n\n"
             f"Your job:\n"
-            f"1. Call memory_search_episodes(repo_path='{repo_path}', query=<goal keywords>) to check "
-            f"if similar work was done before — surface prior decisions to avoid repeating mistakes.\n"
-            f"2. Scan the repo quickly (list_directory, read README/package.json/pyproject.toml).\n"
-            f"3. Decide if the goal needs clarification before the team starts building.\n"
-            f"4. If yes: call ask_clarification with your most critical questions (max 5).\n"
-            f"5. Call report_pm with the enriched goal — include discovered context, episode insights, and any answers.\n"
-            f"6. Use memory_write(repo_path='{repo_path}') with key prefixed 'pm.' to store key constraints for later agents.\n\n"
-            f"Be efficient. The team is waiting."
+            f"1. Call list_directory(path='{repo_path}') to check if the repo has any files.\n"
+            f"2. If the directory is EMPTY (no files), you MUST call ask_clarification immediately.\n"
+            f"   An empty repo = greenfield build = tech stack is unknown = clarification required.\n"
+            f"   Ask these questions:\n"
+            f"   - 'What framework/language? (e.g. React + TypeScript, Vue, Python/FastAPI, React Native, Flutter)'\n"
+            f"   - 'Web app, mobile app, CLI tool, or API?'\n"
+            f"   - 'Any specific libraries or constraints?'\n"
+            f"   DO NOT skip this step for an empty repo. DO NOT call report_pm before asking.\n"
+            f"3. If the repo has existing code, read key files and only ask if there are genuine "
+            f"   ambiguities that would cause the build to fail.\n"
+            f"4. After receiving answers (or if repo has code), call report_pm with the enriched goal "
+            f"   that includes the tech stack and platform.\n"
+            f"5. Use memory_write(repo_path='{repo_path}', key='pm.tech_stack', value=<stack>) to store "
+            f"   the tech stack for the Architect.\n\n"
+            f"IMPORTANT: For an empty repo, the sequence MUST be:\n"
+            f"list_directory → ask_clarification → report_pm\n"
+            f"NOT: list_directory → report_pm"
         )
 
         context: list[dict] = []
         clarifications: dict = {}
         asked_clarification = False
 
+        from project.config import CLAUDE_SONNET_MODEL
+        _model = model or CLAUDE_SONNET_MODEL
         for turn in range(MAX_PM_TURNS):
             raw = await workflow.execute_activity(
                 "plan_pm_step",
-                args=[task_prompt, context],
+                args=[task_prompt, context, _model],
                 **PLANNER_OPTIONS,
             )
             context = raw["context"]
