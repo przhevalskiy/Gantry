@@ -13,9 +13,13 @@ function AgentBadge({ entry, size, pulse }: { entry: AgentFileEntry; size: numbe
       flexShrink: 0,
       borderRadius: '50%',
       padding: entry.role === 'builder' ? '2px' : 0,
-      background: entry.role === 'builder' ? ringColor : 'transparent',
+      background: entry.role === 'builder'
+        ? (pulse ? ringColor : `color-mix(in srgb, ${ringColor} 40%, var(--surface))`)
+        : 'transparent',
       animation: pulse ? 'writePulse 1.2s ease-in-out infinite' : undefined,
-      opacity: pulse ? 1 : 0.55,
+      opacity: pulse ? 1 : 0.4,
+      filter: pulse ? 'none' : 'grayscale(0.7)',
+      transition: 'opacity 0.4s, filter 0.4s',
     }}>
       <ChibiAvatar role={entry.role as SwarmRole} size={size} />
     </div>
@@ -105,7 +109,7 @@ function FileIcon({ name }: { name: string }) {
 // ── Tree node ─────────────────────────────────────────────────────────────────
 
 function TreeItem({
-  node, depth, selected, activeFiles, agentOnFile, onSelect, defaultOpen,
+  node, depth, selected, activeFiles, agentOnFile, onSelect, defaultOpen, onContextMenu,
 }: {
   node: TreeNode;
   depth: number;
@@ -114,6 +118,7 @@ function TreeItem({
   agentOnFile: Map<string, AgentFileEntry>;
   onSelect: (relPath: string) => void;
   defaultOpen: boolean;
+  onContextMenu?: (e: React.MouseEvent, relPath: string) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen || depth < 2);
 
@@ -139,7 +144,7 @@ function TreeItem({
         {open && node.children.map(child => (
           <TreeItem key={child.relPath} node={child} depth={depth + 1}
             selected={selected} activeFiles={activeFiles} agentOnFile={agentOnFile}
-            onSelect={onSelect} defaultOpen={false} />
+            onSelect={onSelect} defaultOpen={false} onContextMenu={onContextMenu} />
         ))}
       </div>
     );
@@ -182,6 +187,7 @@ function TreeItem({
   return (
     <div
       onClick={() => onSelect(node.relPath)}
+      onContextMenu={e => onContextMenu?.(e, node.relPath)}
       style={{
         display: 'flex', alignItems: 'center', gap: '0.4rem',
         padding: '0.2rem 0.5rem', paddingLeft: `${0.5 + depth * 0.875}rem`,
@@ -347,6 +353,8 @@ function EmptyPane({ repoRoot, isRunning }: { repoRoot: string; isRunning: boole
   );
 }
 
+const MAX_TABS = 4;
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 interface Tab {
@@ -359,11 +367,13 @@ export function FileExplorer({
   writtenPaths,
   agentOnFile = new Map(),
   isRunning,
+  taskStatus = 'RUNNING',
 }: {
   repoRoot: string;
   writtenPaths: string[];
   agentOnFile?: Map<string, AgentFileEntry>;
   isRunning: boolean;
+  taskStatus?: string;
 }) {
   const tabsKey = `ks_fe_tabs:${repoRoot}`;
   const activeKey = `ks_fe_active:${repoRoot}`;
@@ -443,13 +453,19 @@ export function FileExplorer({
     setActiveTab(rel);
     setTabs(prev => {
       if (prev.some(t => t.relPath === rel)) return prev;
-      return [...prev, { relPath: rel, content: '' }];
+      // Cap at MAX_TABS — evict the oldest tab that isn't currently active
+      let next = [...prev, { relPath: rel, content: '' }];
+      if (next.length > MAX_TABS) {
+        const evictIdx = next.findIndex(t => t.relPath !== activeTab);
+        if (evictIdx !== -1) next.splice(evictIdx, 1);
+      }
+      return next;
     });
     const content = await fetchContent(rel);
     if (content !== null) {
       setTabs(prev => prev.map(t => t.relPath === rel ? { ...t, content } : t));
     }
-  }, [fetchContent]);
+  }, [fetchContent, activeTab]);
 
   const closeTab = useCallback((rel: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -464,29 +480,102 @@ export function FileExplorer({
     });
   }, [activeTab]);
 
-  // Auto-open most recently written file
+  // Track whether the user manually selected a file recently (suppress auto-follow for 5s)
+  const userSelectedAtRef = useRef<number>(0);
+  const openTabUserGesture = useCallback(async (rel: string) => {
+    userSelectedAtRef.current = Date.now();
+    await openTab(rel);
+  }, [openTab]);
+
+  // Auto-follow: switch to the file a builder is actively editing
+  const agentOnFileKey = Array.from(agentOnFile.keys()).sort().join(',');
+  useEffect(() => {
+    if (agentOnFile.size === 0) return;
+    if (Date.now() - userSelectedAtRef.current < 5000) return; // user just picked something
+    // Prefer builder files, fall back to any agent
+    const builderEntry = Array.from(agentOnFile.entries()).find(([, e]) => e.role === 'builder');
+    const target = builderEntry ?? Array.from(agentOnFile.entries())[0];
+    if (!target) return;
+    const [relPath] = target;
+    openTab(relPath);
+  }, [agentOnFileKey]); // eslint-disable-line
+
+  // Auto-open most recently written file (when no agent is actively on a file)
   useEffect(() => {
     if (writtenPaths.length === 0) return;
+    if (agentOnFile.size > 0) return; // auto-follow handles it
+    if (Date.now() - userSelectedAtRef.current < 5000) return;
     const last = writtenPaths[writtenPaths.length - 1];
     const rel = last.startsWith(repoRoot) ? last.slice(repoRoot.length).replace(/^\//, '') : last;
     openTab(rel);
   }, [writtenPaths.length]); // eslint-disable-line
 
-  // Poll active tab content while running
+  // Poll active tab content — fast when a builder is on it, slower otherwise
   useEffect(() => {
     if (!activeTab || !isRunning) return;
+    const isHot = agentOnFile.has(activeTab);
     const id = setInterval(async () => {
       const content = await fetchContent(activeTab);
       if (content !== null) {
         setTabs(prev => prev.map(t => t.relPath === activeTab ? { ...t, content } : t));
       }
-    }, 2000);
+    }, isHot ? 800 : 2000);
     return () => clearInterval(id);
-  }, [activeTab, isRunning, fetchContent]);
+  }, [activeTab, isRunning, fetchContent, agentOnFileKey]); // eslint-disable-line
 
   const tree = buildTree(files);
   const activeTabData = tabs.find(t => t.relPath === activeTab) ?? null;
-  const isActiveFile = activeTab ? recentRel.has(activeTab) : false;
+  const isActiveFile = isRunning && (activeTab ? recentRel.has(activeTab) : false);
+
+  // Context menu state
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; relPath: string } | null>(null);
+  const ctxMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const close = (e: MouseEvent) => {
+      if (ctxMenuRef.current && !ctxMenuRef.current.contains(e.target as Node)) setCtxMenu(null);
+    };
+    const closeKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCtxMenu(null); };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', closeKey);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', closeKey); };
+  }, [ctxMenu]);
+
+  function handleContextMenu(e: React.MouseEvent, relPath: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    setCtxMenu({ x: e.clientX, y: e.clientY, relPath });
+  }
+
+  function ctxCopyPath() {
+    if (!ctxMenu) return;
+    navigator.clipboard.writeText(`${repoRoot}/${ctxMenu.relPath}`);
+    setCtxMenu(null);
+  }
+
+  function ctxCopyRelPath() {
+    if (!ctxMenu) return;
+    navigator.clipboard.writeText(ctxMenu.relPath);
+    setCtxMenu(null);
+  }
+
+  function ctxOpenTab() {
+    if (!ctxMenu) return;
+    openTabUserGesture(ctxMenu.relPath);
+    setCtxMenu(null);
+  }
+
+  function ctxCopyContent() {
+    if (!ctxMenu) return;
+    const tab = tabs.find(t => t.relPath === ctxMenu.relPath);
+    if (tab?.content) {
+      navigator.clipboard.writeText(tab.content);
+    } else {
+      fetchContent(ctxMenu.relPath).then(c => { if (c) navigator.clipboard.writeText(c); });
+    }
+    setCtxMenu(null);
+  }
 
   return (
     <div style={{
@@ -501,24 +590,10 @@ export function FileExplorer({
         overflow: 'hidden',
         background: 'var(--background)',
       }}>
-        {/* Tree header */}
-        <div style={{
-          padding: '0.5rem 0.75rem',
-          borderBottom: '1px solid var(--border)',
-          flexShrink: 0,
-        }}>
-          <p style={{
-            fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase',
-            letterSpacing: '0.08em', color: 'var(--text-secondary)', opacity: 0.5,
-          }}>
-            Explorer
-          </p>
-          {repoRoot && repoRoot !== '.' && (
-            <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', opacity: 0.4, fontFamily: 'monospace', marginTop: '0.15rem', wordBreak: 'break-all' }}>
-              {repoRoot.split('/').pop()}
-            </p>
-          )}
-        </div>
+        {/* Frozen state banner — shown when workflow is no longer running */}
+        {!isRunning && taskStatus !== 'COMPLETED' && taskStatus !== 'RUNNING' && (
+          <ExplorerFrozenBanner status={taskStatus} fileCount={files.length} />
+        )}
 
         {/* Tree body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0.375rem 0' }}>
@@ -527,16 +602,22 @@ export function FileExplorer({
               Building…
             </p>
           )}
+          {files.length === 0 && !isRunning && taskStatus !== 'COMPLETED' && (
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', opacity: 0.4, padding: '0.75rem', textAlign: 'center' }}>
+              No files written
+            </p>
+          )}
           {tree.map(node => (
             <TreeItem
               key={node.relPath}
               node={node}
               depth={0}
               selected={activeTab}
-              activeFiles={recentRel}
+              activeFiles={isRunning ? recentRel : new Set<string>()}
               agentOnFile={agentOnFile}
-              onSelect={openTab}
+              onSelect={openTabUserGesture}
               defaultOpen={true}
+              onContextMenu={handleContextMenu}
             />
           ))}
         </div>
@@ -565,11 +646,11 @@ export function FileExplorer({
                 const fileName = tab.relPath.split('/').pop() ?? tab.relPath;
                 const color = extColor(fileName);
                 const isActive = tab.relPath === activeTab;
-                const isDirty = recentRel.has(tab.relPath);
+                const isDirty = isRunning && recentRel.has(tab.relPath);
                 return (
                   <div
                     key={tab.relPath}
-                    onClick={() => setActiveTab(tab.relPath)}
+                    onClick={() => { userSelectedAtRef.current = Date.now(); setActiveTab(tab.relPath); }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '0.4rem',
                       padding: '0 0.75rem', height: '36px', flexShrink: 0,
@@ -619,6 +700,81 @@ export function FileExplorer({
           <EmptyPane repoRoot={repoRoot} isRunning={isRunning} />
         )}
       </div>
+
+      {/* Context menu portal */}
+      {ctxMenu && (
+        <div
+          ref={ctxMenuRef}
+          style={{
+            position: 'fixed',
+            top: ctxMenu.y,
+            left: ctxMenu.x,
+            zIndex: 1000,
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: '10px',
+            overflow: 'hidden',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+            minWidth: '180px',
+          }}
+        >
+          {[
+            { label: 'Open in tab', icon: '↗', action: ctxOpenTab },
+            { label: 'Copy relative path', icon: '📋', action: ctxCopyRelPath },
+            { label: 'Copy absolute path', icon: '📁', action: ctxCopyPath },
+            { label: 'Copy file content', icon: '📄', action: ctxCopyContent },
+          ].map(({ label, icon, action }) => (
+            <button
+              key={label}
+              onClick={action}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                width: '100%', padding: '0.55rem 0.875rem',
+                background: 'transparent', border: 'none',
+                cursor: 'pointer', fontFamily: 'inherit',
+                fontSize: '0.8rem', color: 'var(--text-primary)', textAlign: 'left',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-raised)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+            >
+              <span style={{ fontSize: '0.75rem', opacity: 0.6, width: 16 }}>{icon}</span>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const FROZEN_META: Record<string, { icon: string; label: string; color: string }> = {
+  TERMINATED: { icon: '⏹', label: 'Stopped',    color: 'var(--error)' },
+  CANCELED:   { icon: '✕', label: 'Canceled',   color: 'var(--text-secondary)' },
+  TIMED_OUT:  { icon: '⏱', label: 'Timed out',  color: 'var(--warning)' },
+  FAILED:     { icon: '✗', label: 'Failed',      color: 'var(--error)' },
+  DELETED:    { icon: '🗑', label: 'Deleted',    color: 'var(--text-secondary)' },
+};
+
+function ExplorerFrozenBanner({ status, fileCount }: { status: string; fileCount: number }) {
+  const meta = FROZEN_META[status] ?? { icon: '●', label: status, color: 'var(--text-secondary)' };
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '0.4rem',
+      padding: '0.35rem 0.625rem',
+      background: `color-mix(in srgb, ${meta.color} 10%, transparent)`,
+      borderBottom: `1px solid color-mix(in srgb, ${meta.color} 20%, transparent)`,
+      flexShrink: 0,
+    }}>
+      <span style={{ fontSize: '0.72rem', flexShrink: 0 }}>{meta.icon}</span>
+      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: meta.color, flexShrink: 0 }}>
+        {meta.label}
+      </span>
+      {fileCount > 0 && (
+        <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', opacity: 0.6 }}>
+          · {fileCount} file{fileCount !== 1 ? 's' : ''} preserved
+        </span>
+      )}
     </div>
   );
 }
