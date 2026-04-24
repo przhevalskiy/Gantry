@@ -20,3 +20,8 @@ GH_TOKEN: str = os.getenv("GH_TOKEN", os.getenv("GITHUB_TOKEN", ""))
 # mistral-* model name to any planner activity to use Mistral instead of Claude.
 # e.g. CLAUDE_SONNET_MODEL=mistral-large-latest in .env to route all agents to Mistral.
 MISTRAL_API_KEY: str = os.getenv("MISTRAL_API_KEY", "")
+
+# Central episode store — shared across all repos on this machine.
+# All completed builds append here; architect searches this for cross-repo learning.
+from pathlib import Path as _Path
+GANTRY_HOME: _Path = _Path(os.getenv("GANTRY_HOME", str(_Path.home() / ".gantry")))
