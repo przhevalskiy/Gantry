@@ -18,6 +18,66 @@ from pathlib import Path
 import structlog
 from temporalio import activity
 
+# ── Per-file write lock registry ──────────────────────────────────────────────
+# Prevents two parallel builder activities from writing the same file
+# simultaneously. All builder activities run in the same worker process, so
+# a process-level asyncio.Lock per absolute path is sufficient.
+# The lock is acquired for the duration of the write/patch/str_replace operation.
+# Reads are NOT locked — concurrent reads are always safe.
+#
+# Collision detection: if a builder tries to write a file that another builder
+# currently holds, it blocks until the lock is released, then proceeds with a
+# fresh read of the current content (the read-before-edit guard in builder_agent
+# handles this at the workflow level). The lock itself prevents torn writes.
+
+import threading as _threading
+
+_FILE_LOCKS: dict[str, asyncio.Lock] = {}
+_FILE_LOCKS_META: dict[str, str] = {}  # path → current owner (track label for logging)
+_REGISTRY_LOCK = _threading.Lock()  # protects _FILE_LOCKS dict itself
+
+
+def _get_file_lock(path: str) -> asyncio.Lock:
+    """Return (creating if needed) the asyncio.Lock for the given absolute path."""
+    abs_path = str(Path(path).resolve())
+    with _REGISTRY_LOCK:
+        if abs_path not in _FILE_LOCKS:
+            _FILE_LOCKS[abs_path] = asyncio.Lock()
+        return _FILE_LOCKS[abs_path]
+
+
+def _log_collision(path: str, requester: str) -> None:
+    """Log when a write is blocked waiting for another builder to release a file."""
+    abs_path = str(Path(path).resolve())
+    current_owner = _FILE_LOCKS_META.get(abs_path, "unknown")
+    logger.warning(
+        "file_write_collision",
+        path=abs_path,
+        blocked_by=current_owner,
+        requester=requester,
+    )
+
+
+async def _acquire_write_lock(path: str, owner: str = "unknown") -> asyncio.Lock:
+    """Acquire the write lock for path, logging if we had to wait."""
+    lock = _get_file_lock(path)
+    abs_path = str(Path(path).resolve())
+    if lock.locked():
+        _log_collision(path, owner)
+    await lock.acquire()
+    _FILE_LOCKS_META[abs_path] = owner
+    return lock
+
+
+def _release_write_lock(path: str) -> None:
+    lock = _get_file_lock(path)
+    abs_path = str(Path(path).resolve())
+    _FILE_LOCKS_META.pop(abs_path, None)
+    try:
+        lock.release()
+    except RuntimeError:
+        pass  # already released — safe to ignore
+
 logger = structlog.get_logger(__name__)
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -95,32 +155,53 @@ async def swarm_read_file(path: str) -> str:
 @activity.defn(name="swarm_write_file")
 async def swarm_write_file(path: str, content: str) -> str:
     """Write (create or overwrite) a file. Raises on OS failure so Temporal retries."""
-    p = Path(path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(content, encoding="utf-8")
-    return f"Written: {path} ({len(content)} chars)"
+    # Extract track label from activity info for collision logging
+    try:
+        info = activity.info()
+        owner = info.activity_id or "unknown"
+    except Exception:
+        owner = "unknown"
+
+    lock = await _acquire_write_lock(path, owner)
+    try:
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
+        return f"Written: {path} ({len(content)} chars)"
+    finally:
+        _release_write_lock(path)
 
 
 @activity.defn(name="swarm_patch_file")
 async def swarm_patch_file(path: str, old_str: str, new_str: str) -> str:
     """Apply a targeted string replacement to a file."""
     try:
+        info = activity.info()
+        owner = info.activity_id or "unknown"
+    except Exception:
+        owner = "unknown"
+
+    lock = await _acquire_write_lock(path, owner)
+    try:
         p = Path(path)
-        original = p.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return f"ERROR: file '{path}' not found — use write_file to create it first."
-    if old_str not in original:
-        preview = "\n".join(f"{i+1:4d} | {l}" for i, l in enumerate(original.splitlines()[:20]))
-        return (
-            f"ERROR: old_str not found in '{path}'. No changes made.\n"
-            f"Use str_replace_editor to view the file, then retry with the exact string.\n"
-            f"First 20 lines:\n{preview}"
-        )
-    count = original.count(old_str)
-    if count > 1:
-        return f"ERROR: old_str appears {count} times in '{path}'. Make it more specific."
-    p.write_text(original.replace(old_str, new_str, 1), encoding="utf-8")
-    return f"Patched: {path}"
+        try:
+            original = p.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return f"ERROR: file '{path}' not found — use write_file to create it first."
+        if old_str not in original:
+            preview = "\n".join(f"{i+1:4d} | {l}" for i, l in enumerate(original.splitlines()[:20]))
+            return (
+                f"ERROR: old_str not found in '{path}'. No changes made.\n"
+                f"Use str_replace_editor to view the file, then retry with the exact string.\n"
+                f"First 20 lines:\n{preview}"
+            )
+        count = original.count(old_str)
+        if count > 1:
+            return f"ERROR: old_str appears {count} times in '{path}'. Make it more specific."
+        p.write_text(original.replace(old_str, new_str, 1), encoding="utf-8")
+        return f"Patched: {path}"
+    finally:
+        _release_write_lock(path)
 
 
 @activity.defn(name="swarm_delete_file")
@@ -378,6 +459,7 @@ async def swarm_str_replace_editor(
     p = Path(path)
 
     if command == "view":
+        # Reads are never locked — concurrent reads are always safe
         if not p.exists():
             return f"Error: file '{path}' not found."
         try:
@@ -391,34 +473,48 @@ async def swarm_str_replace_editor(
         except Exception as e:
             return f"Error reading '{path}': {e}"
 
-    if command == "str_replace":
-        if not p.exists():
-            return f"ERROR: file '{path}' not found — use 'create' command to create it first."
-        original = p.read_text(encoding="utf-8")
-        if old_str not in original:
-            preview = "\n".join(
-                f"{i+1:4d} | {l}"
-                for i, l in enumerate(original.splitlines()[:40])
-            )
-            return (
-                f"ERROR: old_str not found in '{path}'. No changes made.\n"
-                f"First 40 lines of file:\n{preview}"
-            )
-        count = original.count(old_str)
-        if count > 1:
-            return (
-                f"ERROR: old_str appears {count} times in '{path}'. "
-                "Make old_str longer and more specific to avoid ambiguous replacement."
-            )
-        p.write_text(original.replace(old_str, new_str, 1), encoding="utf-8")
-        return f"Replaced in {path}."
+    # All write commands acquire the per-file lock
+    try:
+        info = activity.info()
+        owner = info.activity_id or "unknown"
+    except Exception:
+        owner = "unknown"
 
-    if command == "create":
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(new_str, encoding="utf-8")
-        return f"Created: {path} ({len(new_str)} chars)"
+    lock = await _acquire_write_lock(path, owner)
+    try:
+        if command == "str_replace":
+            if not p.exists():
+                return f"ERROR: file '{path}' not found — use 'create' command to create it first."
+            # Re-read under the lock so we always edit the latest content
+            original = p.read_text(encoding="utf-8")
+            if old_str not in original:
+                preview = "\n".join(
+                    f"{i+1:4d} | {l}"
+                    for i, l in enumerate(original.splitlines()[:60])
+                )
+                return (
+                    f"ERROR: old_str not found in '{path}'. No changes made.\n"
+                    f"STOP guessing — call str_replace_editor with command='view' on this file first, "
+                    f"copy the exact lines from the output, then retry.\n"
+                    f"Current file ({len(original.splitlines())} lines):\n{preview}"
+                )
+            count = original.count(old_str)
+            if count > 1:
+                return (
+                    f"ERROR: old_str appears {count} times in '{path}'. "
+                    "Make old_str longer and more specific to avoid ambiguous replacement."
+                )
+            p.write_text(original.replace(old_str, new_str, 1), encoding="utf-8")
+            return f"Replaced in {path}."
 
-    return f"Error: unknown command '{command}'. Use 'view', 'str_replace', or 'create'."
+        if command == "create":
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(new_str, encoding="utf-8")
+            return f"Created: {path} ({len(new_str)} chars)"
+
+        return f"Error: unknown command '{command}'. Use 'view', 'str_replace', or 'create'."
+    finally:
+        _release_write_lock(path)
 
 
 @activity.defn(name="swarm_install_packages")

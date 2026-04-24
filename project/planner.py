@@ -57,6 +57,14 @@ PlannerResult = PlannerStep | FinalAnswer | PlannerError
 # Global semaphore — cap concurrent LLM calls across all activities in this worker
 _LLM_SEMAPHORE = asyncio.Semaphore(4)
 
+# Last token usage — written by next_step(), read by planner activities for trace emission
+_last_usage: dict[str, int] = {"input_tokens": 0, "output_tokens": 0}
+
+
+def get_last_usage() -> dict[str, int]:
+    """Return the token usage from the most recent next_step() call."""
+    return dict(_last_usage)
+
 
 def _extract_task_prompt(params: dict | None) -> str:
     if not params:
@@ -191,7 +199,17 @@ def _compress_context(context: list[dict[str, Any]]) -> list[dict[str, Any]]:
         parts.append("Commands: " + ", ".join(actions["run"]))
 
     summary = "[Progress — " + ". ".join(parts) + ".]" if parts else "[No file operations yet.]"
-    tail = context[-(_KEEP_RECENT_TURNS * 2):]
+    raw_tail = context[-(_KEEP_RECENT_TURNS * 2):]
+
+    # Ensure the tail starts with an assistant message so every tool_result in the
+    # tail has its matching tool_use present.  If we slice mid-pair (user message
+    # with tool_result whose tool_use was in the compressed portion) Claude returns
+    # a 400: "unexpected tool_use_id found in tool_result blocks".
+    start = 0
+    while start < len(raw_tail) and raw_tail[start].get("role") != "assistant":
+        start += 1
+    tail = raw_tail[start:]
+
     return [context[0], {"role": "user", "content": summary}] + tail
 
 
@@ -475,6 +493,9 @@ async def next_step(
                  input_tokens=usage.get("input_tokens", 0),
                  output_tokens=usage.get("output_tokens", 0))
 
+        _last_usage["input_tokens"] = usage.get("input_tokens", 0)
+        _last_usage["output_tokens"] = usage.get("output_tokens", 0)
+
         assistant_msg = {"role": "assistant", "content": content_blocks}
         new_context = messages + [assistant_msg]
 
@@ -528,6 +549,9 @@ async def next_step(
         input_tokens=response.usage.input_tokens,
         output_tokens=response.usage.output_tokens,
     )
+
+    _last_usage["input_tokens"] = response.usage.input_tokens
+    _last_usage["output_tokens"] = response.usage.output_tokens
 
     def _serialize(b: Any) -> dict:
         if b.type == "text":
