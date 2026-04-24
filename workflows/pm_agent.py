@@ -216,6 +216,15 @@ class PMAgent:
                 }]
                 continue
 
+            _label = tool_input.get("path") or tool_input.get("pattern") or tool_input.get("query") or tool_input.get("key") or ""
+            await adk.messages.create(
+                task_id=parent_task_id,
+                content=TextContent(
+                    author="agent",
+                    content=f"[PM] {tool_name}: {str(_label)[:120]}",
+                ),
+            )
+
             tool_result = await self._dispatch(tool_name, tool_input)
             context = context + [{
                 "role": "user",

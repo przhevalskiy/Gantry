@@ -75,6 +75,8 @@ from activities.inspector_planner_activity import plan_inspector_step
 from activities.security_planner_activity import plan_security_step
 from activities.devops_planner_activity import plan_devops_step
 from activities.classify_tier_activity import classify_tier_llm
+from activities.quality_score_activity import score_build_quality
+from activities.trace_activity import trace_write, trace_read
 
 logger = make_logger(__name__)
 
@@ -134,6 +136,9 @@ async def main():
         plan_security_step,
         plan_devops_step,
         classify_tier_llm,
+        score_build_quality,
+        trace_write,
+        trace_read,
     ]
 
     all_activities = get_all_activities() + custom_activities

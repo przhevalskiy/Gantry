@@ -68,6 +68,9 @@ _stop_all() {
   kill_port 3000
   kill_port 8000
   kill_port 8233
+  # Kill worker processes that connect to Temporal (not port-bound, missed by kill_port)
+  pkill -f "project.run_worker" 2>/dev/null || true
+  pkill -f "agentex agents run" 2>/dev/null || true
   ok "Done."
 }
 

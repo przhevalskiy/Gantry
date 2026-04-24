@@ -1071,6 +1071,7 @@ class SwarmOrchestrator(BaseWorkflow):
                 devops_result=None,
                 heal_cycles=heal_cycles,
                 blocked_by="security",
+                quality_score=None,
             )
 
         await adk.messages.create(
@@ -1109,6 +1110,7 @@ class SwarmOrchestrator(BaseWorkflow):
                     devops_result=None,
                     heal_cycles=heal_cycles,
                     blocked_by="user rejected deployment",
+                    quality_score=None,
                 )
 
         await adk.messages.create(
@@ -1141,28 +1143,9 @@ class SwarmOrchestrator(BaseWorkflow):
             ),
         )
 
-        # ── Final report ──────────────────────────────────────────────────────
-        final = _build_final_report(
-            goal=goal,
-            tracks=tracks,
-            build_result=build_result,
-            inspector_report=inspector_report,
-            security_report=security_report,
-            devops_result=devops_result,
-            heal_cycles=heal_cycles,
-            quality_score=quality_score,
-        )
-
-        await adk.messages.create(
-            task_id=task_id,
-            content=TextContent(author="agent", content=final),
-        )
-
-        log.info("swarm_complete", heal_cycles=heal_cycles, pr=devops_result.get("pr_url"))
-
         # ── Quality scoring — Phase 5 (#15) ──────────────────────────────────
         # Run a lightweight Haiku eval after DevOps to score the build 0–10.
-        # Score is stored in the episode record for future Architect context.
+        # Score is stored in the episode record and shown in the final report.
         quality_score: dict = {"score": 5.0, "reasoning": "not scored"}
         try:
             edited_paths = [e.get("path", "") for e in build_result.get("edits", [])]
@@ -1192,6 +1175,25 @@ class SwarmOrchestrator(BaseWorkflow):
             )
         except Exception:
             pass  # non-critical
+
+        # ── Final report ──────────────────────────────────────────────────────
+        final = _build_final_report(
+            goal=goal,
+            tracks=tracks,
+            build_result=build_result,
+            inspector_report=inspector_report,
+            security_report=security_report,
+            devops_result=devops_result,
+            heal_cycles=heal_cycles,
+            quality_score=quality_score,
+        )
+
+        await adk.messages.create(
+            task_id=task_id,
+            content=TextContent(author="agent", content=final),
+        )
+
+        log.info("swarm_complete", heal_cycles=heal_cycles, pr=devops_result.get("pr_url"))
 
         # ── Episodic memory: record this build for future agent context ────────
         try:
