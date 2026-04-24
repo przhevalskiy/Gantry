@@ -67,48 +67,67 @@ type MsgContent = {
   [key: string]: unknown;
 };
 
+// ── Tool icons — lucide-style SVGs ───────────────────────────────────────────
+
+function ToolIcon({ name, size = 13, color = 'currentColor' }: { name: string; size?: number; color?: string }) {
+  const s = size;
+  const props = { width: s, height: s, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 1.75, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, style: { flexShrink: 0 } };
+  switch (name) {
+    case 'list_directory':
+      return <svg {...props}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>;
+    case 'read_file': case 'extract':
+      return <svg {...props}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>;
+    case 'write_file': case 'str_replace_editor': case 'patch_file':
+      return <svg {...props}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
+    case 'delete_file':
+      return <svg {...props}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>;
+    case 'run_command':
+      return <svg {...props}><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>;
+    case 'search_web': case 'run_lint': case 'find_symbol':
+      return <svg {...props}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
+    case 'navigate': case 'fetch_url':
+      return <svg {...props}><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>;
+    case 'finish': case 'finish_build':
+      return <svg {...props}><polyline points="20 6 9 17 4 12"/></svg>;
+    case 'verify_build': case 'run_type_check': case 'run_coverage':
+      return <svg {...props}><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>;
+    case 'query_index':
+      return <svg {...props}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>;
+    case 'install_packages':
+      return <svg {...props}><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>;
+    case 'git_diff':
+      return <svg {...props}><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>;
+    case 'run_migration': case 'execute_sql':
+      return <svg {...props}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>;
+    case 'run_tests':
+      return <svg {...props}><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>;
+    case 'run_application':
+      return <svg {...props}><polygon points="5 3 19 12 5 21 5 3"/></svg>;
+    case 'memory_read': case 'memory_write': case 'memory_search_episodes':
+      return <svg {...props}><path d="M12 2a8 8 0 0 0-8 8c0 5.4 7.05 11.5 7.35 11.76a1 1 0 0 0 1.3 0C12.95 21.5 20 15.4 20 10a8 8 0 0 0-8-8z"/><circle cx="12" cy="10" r="3"/></svg>;
+    case 'report_plan':
+      return <svg {...props}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>;
+    case 'click_element':
+      return <svg {...props}><path d="M5 3l14 9-7 1-3 7z"/></svg>;
+    default:
+      return <svg {...props}><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>;
+  }
+}
+
 // ── Tool metadata ─────────────────────────────────────────────────────────────
-const TOOL_ICONS: Record<string, string> = {
-  // research
-  search_web: '🔍', navigate: '🌐', extract: '📄',
-  finish: '✅', click_element: '🖱️',
-  // swarm — file ops
-  list_directory: '📁', read_file: '📄', write_file: '✏️',
-  patch_file: '🔧', delete_file: '🗑️', run_command: '⚡',
-  finish_build: '✅', report_plan: '📋',
-  // swarm — Phase 1-4 new tools
-  verify_build: '🔬',   // builder self-verification
-  find_symbol: '🔎',    // semantic symbol search
-  query_index: '📇',    // repo index lookup
-  run_coverage: '📊',   // test coverage measurement
-  str_replace_editor: '✏️',
-  install_packages: '📦',
-  git_diff: '🔀',
-  run_migration: '🗄️',
-  execute_sql: '🗄️',
-  fetch_url: '🌐',
-  run_tests: '🧪',
-  run_lint: '🔍',
-  run_type_check: '🔬',
-  run_application: '🚀',
-  memory_read: '🧠',
-  memory_write: '🧠',
-  memory_search_episodes: '🧠',
-};
 
 const TOOL_LABELS: Record<string, string> = {
   search_web: 'Searching', navigate: 'Navigating', extract: 'Extracting',
   finish: 'Synthesizing', click_element: 'Clicking',
-  list_directory: 'Listing directory', read_file: 'Reading file',
-  write_file: 'Writing file', patch_file: 'Patching file',
-  delete_file: 'Deleting file', run_command: 'Running command',
+  list_directory: 'Exploring project structure', read_file: 'Reading',
+  write_file: 'Writing', patch_file: 'Patching',
+  delete_file: 'Deleting', run_command: 'Running command',
   finish_build: 'Build complete', report_plan: 'Reporting plan',
-  // Phase 1-4 new tools
   verify_build: 'Verifying build',
   find_symbol: 'Finding symbol',
-  query_index: 'Querying index',
+  query_index: 'Looking up in index',
   run_coverage: 'Measuring coverage',
-  str_replace_editor: 'Editing file',
+  str_replace_editor: 'Editing',
   install_packages: 'Installing packages',
   git_diff: 'Checking diff',
   run_migration: 'Running migration',
@@ -118,9 +137,9 @@ const TOOL_LABELS: Record<string, string> = {
   run_lint: 'Linting',
   run_type_check: 'Type checking',
   run_application: 'Starting application',
-  memory_read: 'Reading memory',
-  memory_write: 'Writing memory',
-  memory_search_episodes: 'Searching episodes',
+  memory_read: 'Loading build context',
+  memory_write: 'Saving build context',
+  memory_search_episodes: 'Searching past builds',
 };
 
 // ── Agent tag parser ──────────────────────────────────────────────────────────
@@ -189,7 +208,6 @@ const ROLE_LABEL: Record<string, string> = {
 // ── Components ────────────────────────────────────────────────────────────────
 
 function ToolUseCard({ name, args }: { name: string; args: Record<string, unknown> }) {
-  const icon = TOOL_ICONS[name] ?? '⚙️';
   const label = TOOL_LABELS[name] ?? name;
 
   let detail = '';
@@ -205,7 +223,9 @@ function ToolUseCard({ name, args }: { name: string; args: Record<string, unknow
       background: 'var(--surface-raised)', borderRadius: '8px',
       border: '1px solid var(--border)', marginBottom: '0.3rem',
     }}>
-      <span style={{ fontSize: '0.875rem', lineHeight: 1.5, opacity: 0.7 }}>{icon}</span>
+      <span style={{ lineHeight: 1.5, opacity: 0.6, marginTop: '0.1rem', color: 'var(--text-secondary)' }}>
+        <ToolIcon name={name} size={14} />
+      </span>
       <div style={{ minWidth: 0 }}>
         <p style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
           {label}
@@ -320,8 +340,7 @@ function AgentRow({ text }: { text: string }) {
   const actionMatch = body.match(/^([a-z_]+):\s*([\s\S]*)/);
   const toolName = actionMatch ? actionMatch[1] : null;
   const toolDetail = actionMatch ? actionMatch[2].trim() : null;
-  const isKnownTool = toolName && (TOOL_ICONS[toolName] !== undefined || toolName.includes('_'));
-  const toolIcon = toolName ? (TOOL_ICONS[toolName] ?? '⚙️') : null;
+  const isKnownTool = toolName && (TOOL_LABELS[toolName] !== undefined || toolName.includes('_'));
   const hasRawDetail = !!(isKnownTool && toolDetail);
   const humanLabel = (isKnownTool && toolName) ? humanizeToolAction(toolName, toolDetail ?? '') : null;
   const bodyText = (!isKnownTool ? body.trim() : '') ?? '';
@@ -361,8 +380,9 @@ function AgentRow({ text }: { text: string }) {
             <span style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--success)', marginRight: '0.25rem' }}>✓</span>
           )}
           {humanLabel ? (
-            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-              {toolIcon} {humanLabel}
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+              {toolName && <ToolIcon name={toolName} size={12} color="var(--text-secondary)" />}
+              {humanLabel}
             </span>
           ) : bodyText ? (
             <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
@@ -427,9 +447,20 @@ function AgentRow({ text }: { text: string }) {
 // ── Track breakdown card (Architect decision detail) ─────────────────────────
 const TRACK_BREAKDOWN_RE = /^Track breakdown:\n([\s\S]+)$/;
 
+/** Condense a raw implementation step to a short human label. */
+function summariseStep(raw: string): string {
+  // Strip leading numbering
+  const s = raw.replace(/^\d+\.\s*/, '').trim();
+  // Take only the first sentence / clause (up to first colon, period, or 80 chars)
+  const firstClause = s.split(/[:\.]/)[0].trim();
+  if (firstClause.length >= 8 && firstClause.length <= 80) return firstClause;
+  return s.length > 80 ? s.slice(0, 77) + '…' : s;
+}
+
 function TrackBreakdownCard({ body }: { body: string }) {
   const m = body.match(TRACK_BREAKDOWN_RE);
   if (!m) return null;
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const blocks = m[1].split(/\n\n+/).map(block => {
     const lines = block.trim().split('\n');
@@ -453,29 +484,72 @@ function TrackBreakdownCard({ body }: { body: string }) {
         Architect · Track breakdown
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-        {blocks.map(({ label, steps }) => (
-          <div key={label}>
-            <p style={{
-              fontSize: '0.75rem', fontWeight: 700, fontFamily: 'monospace',
-              color: 'var(--accent)', marginBottom: '0.25rem',
-            }}>
-              {label}
-            </p>
-            <ol style={{ margin: 0, padding: '0 0 0 1.1rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-              {steps.map((s, i) => (
-                <li key={i} style={{
-                  fontSize: '0.775rem', color: 'var(--text-secondary)',
-                  lineHeight: 1.5,
-                  opacity: s.startsWith('…') ? 0.5 : 1,
-                  listStyle: s.startsWith('…') ? 'none' : 'decimal',
-                  marginLeft: s.startsWith('…') ? '-1rem' : 0,
-                }}>
-                  {s.replace(/^\d+\.\s*/, '')}
-                </li>
-              ))}
-            </ol>
-          </div>
-        ))}
+        {blocks.map(({ label, steps }) => {
+          const isOpen = expanded === label;
+          const preview = steps.slice(0, 3).map(summariseStep);
+          const overflow = steps.length - 3;
+          return (
+            <div key={label}>
+              <p style={{
+                fontSize: '0.75rem', fontWeight: 700, fontFamily: 'monospace',
+                color: 'var(--accent)', marginBottom: '0.25rem',
+              }}>
+                {label}
+              </p>
+              {/* Collapsed: show 3 summarised steps */}
+              {!isOpen && (
+                <>
+                  <ol style={{ margin: 0, padding: '0 0 0 1.1rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                    {preview.map((s, i) => (
+                      <li key={i} style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                        {s}
+                      </li>
+                    ))}
+                  </ol>
+                  {overflow > 0 && (
+                    <button
+                      onClick={() => setExpanded(label)}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        fontSize: '0.72rem', color: 'var(--accent)', padding: '0.2rem 0 0 1.1rem',
+                        fontFamily: 'inherit', opacity: 0.7,
+                      }}
+                    >
+                      +{overflow} more steps
+                    </button>
+                  )}
+                </>
+              )}
+              {/* Expanded: show all steps summarised */}
+              {isOpen && (
+                <>
+                  <ol style={{ margin: 0, padding: '0 0 0 1.1rem', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                    {steps.map((s, i) => (
+                      <li key={i} style={{
+                        fontSize: '0.775rem', color: 'var(--text-secondary)', lineHeight: 1.5,
+                        opacity: s.startsWith('…') ? 0.5 : 1,
+                        listStyle: s.startsWith('…') ? 'none' : 'decimal',
+                        marginLeft: s.startsWith('…') ? '-1rem' : 0,
+                      }}>
+                        {summariseStep(s)}
+                      </li>
+                    ))}
+                  </ol>
+                  <button
+                    onClick={() => setExpanded(null)}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      fontSize: '0.72rem', color: 'var(--text-secondary)', padding: '0.2rem 0 0 1.1rem',
+                      fontFamily: 'inherit', opacity: 0.6,
+                    }}
+                  >
+                    Show less
+                  </button>
+                </>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -523,7 +597,11 @@ function BuilderStepsCard({ type, trackLabel, body, index }: { type: AgentType; 
           {displayLabel}
         </span>
         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-          {isHealing ? '🔧 Healing' : 'Starting'} — {lines.length} steps
+          {isHealing ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              <ToolIcon name="patch_file" size={12} color="var(--text-secondary)" /> Healing
+            </span>
+          ) : 'Starting'} — {lines.length} steps
         </span>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.375rem', flexShrink: 0 }}>
           {prog && (
@@ -912,14 +990,20 @@ function ApprovalCard({
   payload,
   taskId,
   autoApprove,
+  resolvedState = null,
 }: {
   payload: ApprovalPayload;
   taskId: string;
   autoApprove: boolean;
+  resolvedState?: 'approved' | 'rejected' | null;
 }) {
-  const [decided, setDecided] = useState<'approved' | 'rejected' | null>(null);
+  // Local state only used for optimistic UI while the resolved message hasn't arrived yet
+  const [localDecided, setLocalDecided] = useState<'approved' | 'rejected' | null>(null);
   const [loading, setLoading] = useState(false);
   const ACCENT = '#f97316';
+
+  // Prefer stream-derived state over local optimistic state
+  const decided = resolvedState ?? localDecided;
 
   const sendSignal = useCallback(async (approved: boolean) => {
     if (decided || loading) return;
@@ -930,7 +1014,7 @@ function ApprovalCard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ workflow_id: payload.workflow_id, approved }),
       });
-      setDecided(approved ? 'approved' : 'rejected');
+      setLocalDecided(approved ? 'approved' : 'rejected');
     } catch {
       // leave in pending state so user can retry
     } finally {
@@ -1043,15 +1127,36 @@ function ClarificationCard({
   payload,
   taskId,
   autoApprove,
+  resolvedFromStream = false,
 }: {
   payload: ClarificationPayload;
   taskId: string;
   autoApprove: boolean;
+  resolvedFromStream?: boolean;
 }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [submitted, setSubmitted] = useState(false);
+  const [customInputs, setCustomInputs] = useState<Record<string, boolean>>({});
+  const [localSubmitted, setLocalSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const ACCENT = '#f97316';
+
+  const submitted = resolvedFromStream || localSubmitted;
+
+  /** Extract dropdown options from the question's (e.g. ...) hint */
+  function parseOptions(question: string): string[] {
+    const m = question.match(/\(e\.g\.?\s+([^)]+)\)/i);
+    if (!m) return [];
+    return m[1]
+      .split(/,\s*/)
+      .map(s => s.replace(/^(or\s+)/i, '').trim())
+      .filter(Boolean)
+      .slice(0, 6); // cap at 6 chips
+  }
+
+  /** Strip the (e.g. ...) hint from the question label */
+  function stripHint(question: string): string {
+    return question.replace(/\s*\(e\.g\.?[^)]+\)/gi, '').trim();
+  }
 
   const sendAnswers = useCallback(async (skip = false) => {
     if (submitted || loading) return;
@@ -1069,7 +1174,7 @@ function ClarificationCard({
           payload: answerPayload,
         }),
       });
-      setSubmitted(true);
+      setLocalSubmitted(true);
     } catch {
       // leave open so user can retry
     } finally {
@@ -1077,11 +1182,8 @@ function ClarificationCard({
     }
   }, [submitted, loading, taskId, payload, answers]);
 
-  // Auto-approve skips clarification immediately
   useEffect(() => {
-    if (autoApprove && !submitted && !loading) {
-      sendAnswers(true);
-    }
+    if (autoApprove && !submitted && !loading) sendAnswers(true);
   }, [autoApprove, submitted, loading, sendAnswers]);
 
   return (
@@ -1091,8 +1193,8 @@ function ClarificationCard({
       borderRadius: '12px',
       overflow: 'hidden',
       background: 'var(--surface)',
-      opacity: submitted ? 0.75 : 1,
-      transition: 'opacity 0.2s',
+      opacity: submitted ? 0.8 : 1,
+      transition: 'opacity 0.2s, border-color 0.2s',
     }}>
       {/* Header */}
       <div style={{
@@ -1101,7 +1203,11 @@ function ClarificationCard({
         background: submitted ? 'transparent' : `${ACCENT}12`,
         borderBottom: `1px solid ${submitted ? 'var(--border)' : `${ACCENT}30`}`,
       }}>
-        <span style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: submitted ? 'var(--text-secondary)' : ACCENT }}>
+        <span style={{
+          fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          color: submitted ? 'var(--text-secondary)' : ACCENT,
+        }}>
           Project Manager · Clarification
         </span>
         {submitted && (
@@ -1111,84 +1217,178 @@ function ClarificationCard({
         )}
       </div>
 
-      <div style={{ padding: '0.75rem 0.875rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-        {/* Context summary */}
-        {payload.context && (
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0, fontStyle: 'italic', opacity: 0.8 }}>
-            {payload.context}
-          </p>
-        )}
-
-        {/* Questions */}
-        {payload.questions.map((q, i) => (
-          <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-            <p style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', lineHeight: 1.4, margin: 0, fontWeight: 500 }}>
-              {i + 1}. {q}
+      {/* Submitted state — compact answer summary, or minimal if answers lost on reload */}
+      {submitted && (
+        <div style={{ padding: '0.625rem 0.875rem', display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+          {Object.keys(answers).length > 0 ? (
+            // We have local answers — show question + answer pairs
+            payload.questions.map((q, i) => {
+              const answer = answers[q];
+              return (
+                <div key={i} style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline' }}>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-secondary)', opacity: 0.5, flexShrink: 0, minWidth: '1rem' }}>
+                    {i + 1}.
+                  </span>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.4, flex: 1 }}>
+                    {stripHint(q)}
+                  </span>
+                  {answer && (
+                    <span style={{
+                      fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)',
+                      background: `${ACCENT}15`, border: `1px solid ${ACCENT}30`,
+                      borderRadius: '5px', padding: '0.05rem 0.4rem', flexShrink: 0,
+                    }}>
+                      {answer}
+                    </span>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            // Answers lost on reload — just show a neutral confirmation
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0, opacity: 0.6 }}>
+              {payload.questions.length} question{payload.questions.length !== 1 ? 's' : ''} answered — build is proceeding.
             </p>
-            {!submitted && (
-              <input
-                type="text"
-                placeholder="Your answer…"
-                value={answers[q] ?? ''}
-                onChange={e => setAnswers(prev => ({ ...prev, [q]: e.target.value }))}
-                onKeyDown={e => { if (e.key === 'Enter') sendAnswers(false); }}
-                style={{
-                  width: '100%', padding: '0.45rem 0.625rem',
-                  background: 'var(--surface-raised)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '7px',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.8125rem',
-                  fontFamily: 'inherit',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-              />
-            )}
-            {submitted && answers[q] && (
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, paddingLeft: '0.75rem', borderLeft: `2px solid ${ACCENT}40` }}>
-                {answers[q]}
+          )}
+        </div>
+      )}
+
+      {/* Pending state — questions with dropdown chips */}
+      {!submitted && (
+        <>
+          <div style={{ padding: '0.75rem 0.875rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {payload.context && (
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0, fontStyle: 'italic', opacity: 0.8 }}>
+                {payload.context}
               </p>
             )}
-          </div>
-        ))}
-      </div>
 
-      {/* Buttons */}
-      {!submitted && (
-        <div style={{ display: 'flex', gap: '0.5rem', padding: '0 0.875rem 0.75rem' }}>
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => sendAnswers(false)}
-            style={{
-              flex: 2, padding: '0.45rem 0', borderRadius: '8px',
-              background: ACCENT, border: 'none', color: 'white',
-              fontSize: '0.8125rem', fontWeight: 600,
-              cursor: loading ? 'wait' : 'pointer',
-              fontFamily: 'inherit', opacity: loading ? 0.6 : 1,
-              transition: 'opacity 0.12s',
-            }}
-          >
-            {loading ? '…' : 'Submit answers'}
-          </button>
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => sendAnswers(true)}
-            style={{
-              flex: 1, padding: '0.45rem 0', borderRadius: '8px',
-              background: 'transparent',
-              border: '1px solid var(--border)',
-              color: 'var(--text-secondary)',
-              fontSize: '0.8125rem', fontWeight: 400,
-              cursor: loading ? 'wait' : 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
-            Skip
-          </button>
-        </div>
+            {payload.questions.map((q, i) => {
+              const options = parseOptions(q);
+              const label = stripHint(q);
+              const selected = answers[q] ?? '';
+              const isCustom = customInputs[q] ?? false;
+
+              return (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <p style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', lineHeight: 1.4, margin: 0, fontWeight: 500 }}>
+                    {i + 1}. {label}
+                  </p>
+
+                  {options.length > 0 && !isCustom ? (
+                    /* Chip selector */
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem' }}>
+                      {options.map(opt => (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => setAnswers(prev => ({ ...prev, [q]: opt }))}
+                          style={{
+                            padding: '0.3rem 0.7rem',
+                            borderRadius: '999px',
+                            border: `1px solid ${selected === opt ? ACCENT : 'var(--border)'}`,
+                            background: selected === opt ? `${ACCENT}18` : 'var(--surface-raised)',
+                            color: selected === opt ? ACCENT : 'var(--text-secondary)',
+                            fontSize: '0.78rem', fontWeight: selected === opt ? 600 : 400,
+                            cursor: 'pointer', fontFamily: 'inherit',
+                            transition: 'all 0.1s',
+                          }}
+                        >
+                          {opt}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomInputs(prev => ({ ...prev, [q]: true }));
+                          setAnswers(prev => ({ ...prev, [q]: '' }));
+                        }}
+                        style={{
+                          padding: '0.3rem 0.7rem',
+                          borderRadius: '999px',
+                          border: '1px dashed var(--border)',
+                          background: 'transparent',
+                          color: 'var(--text-secondary)',
+                          fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit',
+                          opacity: 0.6,
+                        }}
+                      >
+                        Other…
+                      </button>
+                    </div>
+                  ) : (
+                    /* Free-text fallback */
+                    <div style={{ display: 'flex', gap: '0.375rem', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        autoFocus={isCustom}
+                        placeholder="Type your answer…"
+                        value={selected}
+                        onChange={e => setAnswers(prev => ({ ...prev, [q]: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') sendAnswers(false); }}
+                        style={{
+                          flex: 1, padding: '0.4rem 0.625rem',
+                          background: 'var(--surface-raised)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '7px',
+                          color: 'var(--text-primary)',
+                          fontSize: '0.8125rem', fontFamily: 'inherit', outline: 'none',
+                        }}
+                      />
+                      {options.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomInputs(prev => ({ ...prev, [q]: false }));
+                            setAnswers(prev => ({ ...prev, [q]: '' }));
+                          }}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            fontSize: '0.72rem', color: 'var(--text-secondary)', opacity: 0.6,
+                            fontFamily: 'inherit', padding: '0.2rem 0.3rem',
+                          }}
+                        >
+                          ← chips
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', padding: '0 0.875rem 0.75rem' }}>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => sendAnswers(false)}
+              style={{
+                flex: 2, padding: '0.45rem 0', borderRadius: '8px',
+                background: ACCENT, border: 'none', color: 'white',
+                fontSize: '0.8125rem', fontWeight: 600,
+                cursor: loading ? 'wait' : 'pointer',
+                fontFamily: 'inherit', opacity: loading ? 0.6 : 1,
+                transition: 'opacity 0.12s',
+              }}
+            >
+              {loading ? '…' : 'Submit answers'}
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => sendAnswers(true)}
+              style={{
+                flex: 1, padding: '0.45rem 0', borderRadius: '8px',
+                background: 'transparent', border: '1px solid var(--border)',
+                color: 'var(--text-secondary)', fontSize: '0.8125rem',
+                cursor: loading ? 'wait' : 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              Skip
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
@@ -1355,7 +1555,7 @@ function TextBubble({ text }: { text: string }) {
 
 // ── Message router ────────────────────────────────────────────────────────────
 
-function MessageRow({ message, taskId, autoApprove }: { message: TaskMessage; taskId: string; autoApprove: boolean }) {
+function MessageRow({ message, taskId, autoApprove, allMessages }: { message: TaskMessage; taskId: string; autoApprove: boolean; allMessages: TaskMessage[] }) {
   const c = message.content as unknown as MsgContent;
   if (!c) return null;
   const msgType = c.type;
@@ -1371,12 +1571,43 @@ function MessageRow({ message, taskId, autoApprove }: { message: TaskMessage; ta
 
     // HITL: approval checkpoints
     const approvalPayload = parseApprovalRequest(text);
-    if (approvalPayload) return <ApprovalCard payload={approvalPayload} taskId={taskId} autoApprove={autoApprove} />;
+    if (approvalPayload) {
+      // Derive resolved state from the message stream — immune to remount resets
+      const resolvedMsg = allMessages.find(m => {
+        const mc = m.content as unknown as MsgContent;
+        const mt = typeof mc?.content === 'string' ? mc.content : '';
+        const resolved = parseApprovalResolved(mt);
+        return resolved?.workflow_id === approvalPayload.workflow_id;
+      });
+      const resolvedPayload = resolvedMsg
+        ? parseApprovalResolved((resolvedMsg.content as unknown as MsgContent)?.content as string)
+        : null;
+      return <ApprovalCard payload={approvalPayload} taskId={taskId} autoApprove={autoApprove} resolvedState={resolvedPayload?.approved === true ? 'approved' : resolvedPayload?.approved === false ? 'rejected' : null} />;
+    }
     if (parseApprovalResolved(text)) return null;
 
     // HITL: PM clarification questions
     const clarifyPayload = parseClarificationRequest(text);
-    if (clarifyPayload) return <ClarificationCard payload={clarifyPayload} taskId={taskId} autoApprove={autoApprove} />;
+    if (clarifyPayload) {
+      // Derive resolved state from the message stream — immune to remount resets
+      const resolvedMsg = allMessages.find(m => {
+        const mc = m.content as unknown as MsgContent;
+        const mt = typeof mc?.content === 'string' ? mc.content : '';
+        if (!mt.startsWith(CLARIFICATION_RESOLVED_PREFIX)) return false;
+        try {
+          const r = JSON.parse(mt.slice(CLARIFICATION_RESOLVED_PREFIX.length));
+          return r.workflow_id === clarifyPayload.workflow_id;
+        } catch { return false; }
+      });
+      return (
+        <ClarificationCard
+          payload={clarifyPayload}
+          taskId={taskId}
+          autoApprove={autoApprove}
+          resolvedFromStream={resolvedMsg != null}
+        />
+      );
+    }
     if (text.startsWith(CLARIFICATION_RESOLVED_PREFIX)) return null;
 
     if (text.startsWith('## Swarm Factory Report')) return null;
@@ -1405,11 +1636,13 @@ export function MessageFeed({
   isRunning,
   taskId,
   autoApprove = false,
+  taskStatus = 'RUNNING',
 }: {
   messages: TaskMessage[];
   isRunning: boolean;
   taskId: string;
   autoApprove?: boolean;
+  taskStatus?: string;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const builderProgress = useMemo(() => computeBuilderProgress(messages), [messages]);
@@ -1430,12 +1663,14 @@ export function MessageFeed({
   return (
     <BuilderProgressCtx.Provider value={builderProgress}>
     <div>
-      {messages.map((msg) => <MessageRow key={msg.id} message={msg} taskId={taskId} autoApprove={autoApprove} />)}
+      {messages.map((msg) => <MessageRow key={msg.id} message={msg} taskId={taskId} autoApprove={autoApprove} allMessages={messages} />)}
       {isRunning && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingTop: '0.5rem' }}>
-          <PulsingDot />
-          <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Working...</span>
-        </div>
+        <>
+          <ThinkingIndicator messages={messages} taskStatus={taskStatus} />
+        </>
+      )}
+      {!isRunning && taskStatus !== 'COMPLETED' && taskStatus !== 'RUNNING' && (
+        <WorkflowTerminalBanner status={taskStatus} />
       )}
       <div ref={bottomRef} />
     </div>
@@ -1449,5 +1684,128 @@ function PulsingDot() {
       <style>{`@keyframes pulseDot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }`}</style>
       <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', animation: 'pulseDot 1.2s ease-in-out infinite', flexShrink: 0 }} />
     </>
+  );
+}
+
+// ── Workflow state banners ────────────────────────────────────────────────────
+
+function ThinkingIndicator({ messages, taskStatus }: { messages: TaskMessage[]; taskStatus: string }) {
+  const [elapsed, setElapsed] = useState(0);
+  const [sinceLastMsg, setSinceLastMsg] = useState(0);
+
+  // Timestamp of the last message (or now if none)
+  const lastMsgTime = useMemo(() => {
+    if (messages.length === 0) return Date.now();
+    const last = messages[messages.length - 1] as TaskMessage & { created_at?: string; createdAt?: string };
+    const ts = last.created_at ?? last.createdAt;
+    return ts ? new Date(ts).getTime() : Date.now();
+  }, [messages]);
+
+  // Session start time — when this component first mounted
+  const startRef = useRef(Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
+      setSinceLastMsg(Math.floor((Date.now() - lastMsgTime) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [lastMsgTime]);
+
+  const label = taskStatus === 'RUNNING' ? 'Working' : taskStatus;
+
+  // Show thinking dots when silent for >2s, elapsed timer always
+  const isThinking = sinceLastMsg >= 2;
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', paddingTop: '0.5rem', paddingBottom: '0.25rem' }}>
+      <PulsingDot />
+      <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+        {isThinking ? (
+          <ThinkingDots label={label} />
+        ) : (
+          label
+        )}
+      </span>
+      {elapsed > 0 && (
+        <span style={{
+          marginLeft: 'auto', fontSize: '0.7rem',
+          color: 'var(--text-secondary)', opacity: 0.4,
+          fontFamily: 'monospace', fontVariantNumeric: 'tabular-nums',
+        }}>
+          {elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function ThinkingDots({ label }: { label: string }) {
+  const [dots, setDots] = useState('');
+  useEffect(() => {
+    const id = setInterval(() => {
+      setDots(d => d.length >= 3 ? '' : d + '.');
+    }, 400);
+    return () => clearInterval(id);
+  }, []);
+  return <span>{label}{dots}</span>;
+}
+
+const TERMINAL_META: Record<string, { icon: string; label: string; color: string; detail: string }> = {
+  TERMINATED: {
+    icon: '⏹',
+    label: 'Workflow stopped',
+    color: 'var(--error)',
+    detail: 'This build was manually stopped. Files written before the stop are preserved on disk.',
+  },
+  CANCELED: {
+    icon: '✕',
+    label: 'Workflow canceled',
+    color: 'var(--text-secondary)',
+    detail: 'This build was canceled before it could complete.',
+  },
+  TIMED_OUT: {
+    icon: '⏱',
+    label: 'Workflow timed out',
+    color: 'var(--warning)',
+    detail: 'The build exceeded its time limit. Partial files may exist on disk.',
+  },
+  FAILED: {
+    icon: '✗',
+    label: 'Workflow failed',
+    color: 'var(--error)',
+    detail: 'The build encountered an unrecoverable error.',
+  },
+  DELETED: {
+    icon: '🗑',
+    label: 'Workflow deleted',
+    color: 'var(--text-secondary)',
+    detail: 'This workflow has been deleted.',
+  },
+};
+
+function WorkflowTerminalBanner({ status }: { status: string }) {
+  const meta = TERMINAL_META[status] ?? {
+    icon: '●',
+    label: status,
+    color: 'var(--text-secondary)',
+    detail: 'Workflow is no longer running.',
+  };
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: '0.625rem',
+      marginTop: '0.75rem',
+      padding: '0.625rem 0.875rem',
+      background: `color-mix(in srgb, ${meta.color} 8%, transparent)`,
+      border: `1px solid color-mix(in srgb, ${meta.color} 25%, transparent)`,
+      borderRadius: '8px',
+    }}>
+      <span style={{ fontSize: '0.9rem', flexShrink: 0, marginTop: '0.05rem' }}>{meta.icon}</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: meta.color }}>{meta.label}</span>
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{meta.detail}</span>
+      </div>
+    </div>
   );
 }

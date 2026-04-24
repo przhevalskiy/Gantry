@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { useTask } from '@/hooks/use-task';
+import { useTask, useOptimisticTerminate } from '@/hooks/use-task';
 import { saveReport } from '@/lib/report-store';
 import { useTaskMessages } from '@/hooks/use-task-messages';
 import { useSendFollowUp } from '@/hooks/use-send-followup';
@@ -323,7 +323,8 @@ function PreviewPane({
 }
 
 export function SwarmView({ taskId }: { taskId: string }) {
-  const { data: task, isLoading: taskLoading } = useTask(taskId);
+  const { data: task, isLoading: taskLoading, refetch: refetchTask } = useTask(taskId);
+  const optimisticTerminate = useOptimisticTerminate(taskId);
   const { data: messages, isLoading: msgsLoading } = useTaskMessages(taskId);
   const [followUp, setFollowUp] = useState('');
   const [autoApprove, setAutoApprove] = useState(false);
@@ -331,25 +332,32 @@ export function SwarmView({ taskId }: { taskId: string }) {
     if (typeof window === 'undefined') return 'explorer';
     return (localStorage.getItem('ks_left_tab') as 'explorer' | 'preview') ?? 'explorer';
   });
-  const [rightTab, setRightTab] = useState<'activity' | 'crew'>(() => {
+  const [rightTab, setRightTab] = useState<'activity' | 'crew' | 'traces'>(() => {
     if (typeof window === 'undefined') return 'activity';
-    return (localStorage.getItem('ks_right_tab') as 'activity' | 'crew') ?? 'activity';
+    return (localStorage.getItem('ks_right_tab') as 'activity' | 'crew' | 'traces') ?? 'activity';
   });
   const [manualUrl, setManualUrl] = useState('');
+  const [stopping, setStopping] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const followUpFileInputRef = useRef<HTMLInputElement>(null);
   const sendFollowUp = useSendFollowUp(taskId);
   const { files: followUpFiles, error: followUpFileError, addFiles: addFollowUpFiles, removeFile: removeFollowUpFile, clearAll: clearFollowUpFiles } = useFileAttachments();
 
   const status = task?.status ?? 'RUNNING';
-  const isDone = status === 'COMPLETED' || status === 'FAILED';
-  const isFailed = status === 'FAILED';
+  const TERMINAL_STATUSES = new Set(['COMPLETED', 'FAILED', 'TERMINATED', 'CANCELED', 'TIMED_OUT', 'DELETED']);
+  const isDone = TERMINAL_STATUSES.has(status);
+  const isFailed = status === 'FAILED' || status === 'TERMINATED' || status === 'TIMED_OUT';
   const goal = getTaskGoal(task);
   const repoPath = getRepoPath(task) || '';
   const writtenPaths = extractWrittenPaths(messages ?? []);
   const agentOnFile = extractAgentOnFiles(messages ?? [], repoPath);
   const { stages, finalReport, prUrl, tierMeta, isReplanning, coveragePct } = parsePipeline(messages, isDone, isFailed);
   const effectivelyDone = isDone || !!finalReport;
+
+  // Reset stopping spinner as soon as the task reaches any terminal state
+  useEffect(() => {
+    if (isDone && stopping) setStopping(false);
+  }, [isDone, stopping]);
 
   // Auto-detect dev server URL from messages
   const detectedUrl = (() => {
@@ -507,7 +515,7 @@ export function SwarmView({ taskId }: { taskId: string }) {
         {/* Tab content */}
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           {leftTab === 'explorer' ? (
-            <FileExplorer repoRoot={repoPath} writtenPaths={writtenPaths} agentOnFile={agentOnFile} isRunning={!effectivelyDone} />
+            <FileExplorer repoRoot={repoPath} writtenPaths={writtenPaths} agentOnFile={agentOnFile} isRunning={!effectivelyDone} taskStatus={status} />
           ) : (
             <PreviewPane url={activePreviewUrl} onUrlChange={setManualUrl} manualUrl={manualUrl} />
           )}
@@ -521,7 +529,7 @@ export function SwarmView({ taskId }: { taskId: string }) {
           display: 'flex', alignItems: 'stretch', flexShrink: 0,
           borderBottom: '1px solid var(--border)', background: 'var(--background)',
         }}>
-          {(['activity', 'crew'] as const).map(tab => (
+          {(['activity', 'crew', 'traces'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => { setRightTab(tab); localStorage.setItem('ks_right_tab', tab); }}
@@ -534,33 +542,10 @@ export function SwarmView({ taskId }: { taskId: string }) {
                 transition: 'color 0.1s',
               }}
             >
-              {tab === 'activity' ? 'Activity' : 'Crew'}
+              {tab === 'activity' ? 'Activity' : tab === 'crew' ? 'Crew' : 'Traces'}
             </button>
           ))}
           <div style={{ flex: 1 }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', paddingRight: '0.875rem' }}>
-            {!effectivelyDone && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Auto-approve</span>
-                <div
-                  onClick={() => setAutoApprove(p => !p)}
-                  style={{
-                    width: 28, height: 16, borderRadius: 999,
-                    background: autoApprove ? '#f97316' : 'var(--surface-raised)',
-                    border: '1px solid var(--border)',
-                    position: 'relative', cursor: 'pointer', transition: 'background 0.15s',
-                  }}
-                >
-                  <div style={{
-                    position: 'absolute', top: 2, width: 10, height: 10, borderRadius: '50%',
-                    left: autoApprove ? 14 : 2,
-                    background: autoApprove ? 'white' : 'var(--text-secondary)',
-                    transition: 'left 0.15s',
-                  }} />
-                </div>
-              </label>
-            )}
-          </div>
         </div>
 
         {/* Activity tab */}
@@ -572,12 +557,12 @@ export function SwarmView({ taskId }: { taskId: string }) {
                   <Spinner />
                 </div>
               ) : (
-                <MessageFeed messages={messages ?? []} isRunning={!effectivelyDone} taskId={taskId} autoApprove={autoApprove} />
+                <MessageFeed messages={messages ?? []} isRunning={!effectivelyDone} taskId={taskId} autoApprove={autoApprove} taskStatus={status} />
               )}
             </div>
 
-            {/* Follow-up input */}
-            <div style={{ borderTop: '1px solid var(--border)', flexShrink: 0, background: 'var(--background)' }}>
+            {/* Follow-up input — Kiro-style oval */}
+            <div style={{ padding: '0.625rem 0.75rem', flexShrink: 0, background: 'var(--background)' }}>
               <input
                 ref={followUpFileInputRef}
                 type="file"
@@ -585,97 +570,186 @@ export function SwarmView({ taskId }: { taskId: string }) {
                 style={{ display: 'none' }}
                 onChange={e => { if (e.target.files) { addFollowUpFiles(e.target.files); e.target.value = ''; } }}
               />
-              {/* File chips */}
-              {followUpFiles.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', padding: '0.5rem 0.75rem 0' }}>
-                  {followUpFiles.map((f, i) => (
-                    <div key={i} style={{
-                      display: 'flex', alignItems: 'center', gap: '0.25rem',
-                      background: 'var(--surface-raised)', border: '1px solid var(--border)',
-                      borderRadius: '5px', padding: '0.15rem 0.4rem',
-                      fontSize: '0.68rem', color: 'var(--text-secondary)', maxWidth: '160px',
-                    }}>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                      <button type="button" onClick={() => removeFollowUpFile(i)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-secondary)', lineHeight: 1, fontSize: '0.7rem' }}>✕</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {/* Error / success feedback */}
-              {(sendFollowUp.isError || followUpFileError) && (
-                <p style={{ fontSize: '0.68rem', color: 'var(--error)', padding: '0.25rem 0.75rem 0', margin: 0 }}>{followUpFileError || 'Failed to send'}</p>
-              )}
-              {sendFollowUp.isSuccess && (
-                <p style={{ fontSize: '0.68rem', color: 'var(--success)', padding: '0.25rem 0.75rem 0', margin: 0 }}>Sent ✓</p>
-              )}
-              {/* Input row — Claude Code style */}
-              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.25rem', padding: '0.5rem 0.625rem' }}>
-                {/* Attach icon — inside the row, left side */}
-                <button
-                  type="button"
-                  onClick={() => followUpFileInputRef.current?.click()}
-                  title="Attach files"
-                  style={{
-                    flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer',
-                    padding: '0.3rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: followUpFiles.length ? 'var(--accent)' : 'var(--text-secondary)',
-                    opacity: 0.6, borderRadius: '5px',
-                    marginBottom: '1px',
-                  }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.6'; }}
-                >
-                  <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-                  </svg>
-                </button>
 
-                {/* Textarea — borderless, grows naturally */}
-                <textarea
-                  ref={inputRef}
-                  value={followUp}
-                  onChange={e => setFollowUp(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitFollowUp(); } }}
-                  onDragOver={e => e.preventDefault()}
-                  onDrop={e => { e.preventDefault(); if (e.dataTransfer.files.length) addFollowUpFiles(e.dataTransfer.files); }}
-                  placeholder={effectivelyDone ? 'Send a follow-up to the foreman…' : 'Foreman is building — queue a follow-up…'}
-                  rows={1}
-                  style={{
-                    flex: 1, background: 'transparent', border: 'none', outline: 'none',
-                    resize: 'none', fontFamily: 'inherit', fontSize: '0.82rem',
-                    color: 'var(--text-primary)', lineHeight: '1.5',
-                    padding: '0.25rem 0',
-                    maxHeight: '120px', overflowY: 'auto',
-                  }}
-                />
+              <div style={{
+                border: `1.5px solid ${followUp.trim() ? 'var(--accent)' : 'var(--border)'}`,
+                borderRadius: '16px',
+                background: 'var(--surface)',
+                transition: 'border-color 0.15s',
+              }}>
+                {/* File chips */}
+                {followUpFiles.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', padding: '0.5rem 0.75rem 0' }}>
+                    {followUpFiles.map((f, i) => (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'center', gap: '0.25rem',
+                        background: 'var(--surface-raised)', border: '1px solid var(--border)',
+                        borderRadius: '5px', padding: '0.15rem 0.4rem',
+                        fontSize: '0.68rem', color: 'var(--text-secondary)', maxWidth: '160px',
+                      }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                        <button type="button" onClick={() => removeFollowUpFile(i)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--text-secondary)', lineHeight: 1, fontSize: '0.7rem' }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-                {/* Send — up-arrow circle button */}
-                <button
-                  onClick={submitFollowUp}
-                  disabled={!followUp.trim() || sendFollowUp.isPending}
-                  title="Send (Enter)"
-                  style={{
-                    flexShrink: 0, width: 28, height: 28, borderRadius: '50%', border: 'none',
-                    background: followUp.trim() ? 'var(--text-primary)' : 'var(--surface-raised)',
-                    color: followUp.trim() ? 'var(--background)' : 'var(--text-secondary)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: followUp.trim() ? 'pointer' : 'default',
-                    opacity: sendFollowUp.isPending ? 0.5 : 1,
-                    transition: 'background 0.15s, color 0.15s',
-                    marginBottom: '1px',
-                  }}
-                >
-                  {sendFollowUp.isPending ? (
-                    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" style={{ animation: 'spin 0.75s linear infinite' }}>
-                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                    </svg>
+                {/* Error / success feedback */}
+                {(sendFollowUp.isError || followUpFileError) && (
+                  <p style={{ fontSize: '0.68rem', color: 'var(--error)', padding: '0.25rem 0.75rem 0', margin: 0 }}>{followUpFileError || 'Failed to send'}</p>
+                )}
+                {sendFollowUp.isSuccess && (
+                  <p style={{ fontSize: '0.68rem', color: 'var(--success)', padding: '0.25rem 0.75rem 0', margin: 0 }}>Sent ✓</p>
+                )}
+
+                {/* Textarea row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.625rem 0.75rem 0.5rem' }}>
+                  <textarea
+                    ref={inputRef}
+                    value={followUp}
+                    onChange={e => setFollowUp(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitFollowUp(); } }}
+                    onDragOver={e => e.preventDefault()}
+                    onDrop={e => { e.preventDefault(); if (e.dataTransfer.files.length) addFollowUpFiles(e.dataTransfer.files); }}
+                    placeholder={effectivelyDone ? 'Send a follow-up to the foreman…' : 'Foreman is building — queue a follow-up…'}
+                    rows={1}
+                    style={{
+                      flex: 1, background: 'transparent', border: 'none', outline: 'none',
+                      resize: 'none', fontFamily: 'inherit', fontSize: '0.82rem',
+                      color: 'var(--text-primary)', lineHeight: '1.5',
+                      padding: 0,
+                      maxHeight: '120px', overflowY: 'auto',
+                    }}
+                  />
+
+                  {/* Send / Stop button — top-right of oval */}
+                  {status === 'RUNNING' && !isDone && !followUp.trim() ? (
+                    <button
+                      type="button"
+                      title="Stop task"
+                      disabled={stopping}
+                      onClick={async () => {
+                        setStopping(true);
+                        const res = await fetch(`/api/tasks/${taskId}/terminate`, { method: 'POST' });
+                        if (res.ok) {
+                          optimisticTerminate();
+                        } else {
+                          const body = await res.json().catch(() => ({}));
+                          const errMsg: string = body.error ?? res.statusText ?? '';
+                          if (errMsg.toLowerCase().includes('already completed') || errMsg.toLowerCase().includes('already finished')) {
+                            optimisticTerminate();
+                          } else {
+                            alert(`Stop failed: ${errMsg}`);
+                            setStopping(false);
+                          }
+                        }
+                      }}
+                      style={{
+                        flexShrink: 0, width: 30, height: 30, borderRadius: '50%', border: 'none',
+                        background: stopping ? 'var(--surface-raised)' : 'var(--error)',
+                        color: 'white',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: stopping ? 'default' : 'pointer',
+                        opacity: stopping ? 0.5 : 1,
+                        transition: 'background 0.15s, opacity 0.15s',
+                      }}
+                    >
+                      {stopping ? (
+                        <svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" style={{ animation: 'spin 0.75s linear infinite' }}>
+                          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                        </svg>
+                      ) : (
+                        <svg width={10} height={10} viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="4" y="4" width="16" height="16" rx="2"/>
+                        </svg>
+                      )}
+                    </button>
                   ) : (
-                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 19V5M5 12l7-7 7 7" />
-                    </svg>
+                    <button
+                      onClick={submitFollowUp}
+                      disabled={!followUp.trim() || sendFollowUp.isPending}
+                      title="Send (Enter)"
+                      style={{
+                        flexShrink: 0, width: 30, height: 30, borderRadius: '50%', border: 'none',
+                        background: followUp.trim() ? 'var(--accent)' : 'var(--surface-raised)',
+                        color: followUp.trim() ? 'white' : 'var(--text-secondary)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: followUp.trim() ? 'pointer' : 'default',
+                        opacity: sendFollowUp.isPending ? 0.5 : 1,
+                        transition: 'background 0.15s, color 0.15s',
+                      }}
+                    >
+                      {sendFollowUp.isPending ? (
+                        <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" style={{ animation: 'spin 0.75s linear infinite' }}>
+                          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                        </svg>
+                      ) : (
+                        <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M12 19V5M5 12l7-7 7 7" />
+                        </svg>
+                      )}
+                    </button>
                   )}
-                </button>
+                </div>
+
+                {/* Bottom toolbar — attach + auto-approve */}
+                <div style={{
+                  display: 'flex', alignItems: 'center',
+                  padding: '0.3rem 0.625rem 0.5rem',
+                  borderTop: '1px solid var(--border)',
+                  gap: '0.25rem',
+                  borderRadius: '0 0 14px 14px',
+                }}>
+                  {/* Attach */}
+                  <button
+                    type="button"
+                    onClick={() => followUpFileInputRef.current?.click()}
+                    title="Attach files"
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      padding: '0.25rem', display: 'flex', alignItems: 'center',
+                      color: followUpFiles.length ? 'var(--accent)' : 'var(--text-secondary)',
+                      opacity: 0.55, borderRadius: '5px',
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.55'; }}
+                  >
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                    </svg>
+                  </button>
+
+                  {/* Context usage indicator */}
+                  <ContextUsageIndicator messages={messages ?? []} />
+
+                  {/* Spacer */}
+                  <div style={{ flex: 1 }} />
+
+                  {/* Auto-approve toggle */}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', opacity: 0.7, userSelect: 'none' }}>
+                      Auto-approve
+                    </span>
+                    <div
+                      onClick={() => setAutoApprove(p => !p)}
+                      style={{
+                        width: 30, height: 17, borderRadius: 999,
+                        background: autoApprove ? 'var(--accent)' : 'var(--surface-raised)',
+                        border: '1px solid var(--border)',
+                        position: 'relative', cursor: 'pointer', transition: 'background 0.15s',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <div style={{
+                        position: 'absolute', top: 2, width: 11, height: 11, borderRadius: '50%',
+                        left: autoApprove ? 15 : 2,
+                        background: autoApprove ? 'white' : 'var(--text-secondary)',
+                        transition: 'left 0.15s',
+                      }} />
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
           </>
@@ -753,6 +827,11 @@ export function SwarmView({ taskId }: { taskId: string }) {
               </>
             )}
           </div>
+        )}
+
+        {/* Traces tab */}
+        {rightTab === 'traces' && (
+          <TracesPanel taskId={taskId} repoPath={repoPath} />
         )}
       </div>
 
@@ -977,7 +1056,7 @@ function PipelineTracker({ stages, messages }: { stages: PipelineStage[]; messag
 }
 
 function ReportCard({ report, coveragePct }: { report: string; coveragePct: number | null }) {
-  const covColor = coveragePct == null ? null
+  const covColor = coveragePct == null ? 'var(--text-secondary)'
     : coveragePct >= 80 ? 'var(--success)'
     : coveragePct >= 60 ? 'var(--warning)'
     : 'var(--error)';
@@ -1069,5 +1148,658 @@ function Spinner() {
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
     </svg>
+  );
+}
+
+// ── Traces Panel — Phase 5 (#14) ──────────────────────────────────────────────
+
+interface TraceRecord {
+  ts: string;
+  agent: string;
+  turn: number;
+  tool: string | null;
+  input: string;
+  result: string;
+  tokens: { input: number; output: number };
+  latency_ms: number;
+  reasoning: string;
+}
+
+const AGENT_TRACE_COLORS: Record<string, string> = {
+  pm:        '#a78bfa',
+  architect: '#60a5fa',
+  builder:   '#34d399',
+  inspector: '#fbbf24',
+  security:  '#f87171',
+  devops:    '#fb923c',
+  foreman:   '#94a3b8',
+};
+
+function agentColor(agent: string): string {
+  const key = agent.toLowerCase().split(/[\s_-]/)[0];
+  return AGENT_TRACE_COLORS[key] ?? '#94a3b8';
+}
+
+function TracesPanel({ taskId, repoPath }: { taskId: string; repoPath: string }) {
+  const [traces, setTraces] = useState<TraceRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!taskId) return;
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const params = new URLSearchParams({ task_id: taskId });
+        if (repoPath) params.set('repo_path', repoPath);
+        const res = await fetch(`/api/traces?${params}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data)) setTraces(data);
+      } catch {
+        // non-critical
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    // Poll every 5s while the task may still be running
+    const interval = setInterval(load, 5000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [taskId, repoPath]);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '2.5rem' }}>
+        <Spinner />
+      </div>
+    );
+  }
+
+  if (traces.length === 0) {
+    return (
+      <div style={{
+        flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', gap: '0.5rem', padding: '2rem',
+        color: 'var(--text-secondary)', fontSize: '0.8rem', opacity: 0.6,
+      }}>
+        <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
+        </svg>
+        <span>No traces yet</span>
+        <span style={{ fontSize: '0.72rem', textAlign: 'center', maxWidth: 200 }}>
+          Decision traces appear here as agents run
+        </span>
+      </div>
+    );
+  }
+
+  // Group by agent for summary stats
+  const agentStats = traces.reduce<Record<string, { turns: number; tokens: number }>>((acc, t) => {
+    const key = t.agent;
+    if (!acc[key]) acc[key] = { turns: 0, tokens: 0 };
+    acc[key].turns++;
+    acc[key].tokens += (t.tokens?.input ?? 0) + (t.tokens?.output ?? 0);
+    return acc;
+  }, {});
+
+  const totalTokens = traces.reduce((s, t) => s + (t.tokens?.input ?? 0) + (t.tokens?.output ?? 0), 0);
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 0.875rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+
+      {/* Summary bar */}
+      <div style={{
+        display: 'flex', flexWrap: 'wrap', gap: '0.375rem',
+        padding: '0.5rem 0.75rem',
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: '8px', fontSize: '0.72rem',
+      }}>
+        <span style={{ fontWeight: 700, color: 'var(--text-primary)', marginRight: '0.25rem' }}>
+          {traces.length} decisions
+        </span>
+        <span style={{ color: 'var(--text-secondary)' }}>·</span>
+        <span style={{ color: 'var(--text-secondary)' }}>{totalTokens.toLocaleString()} tokens</span>
+        {Object.entries(agentStats).map(([agent, stats]) => (
+          <span key={agent} style={{
+            padding: '0.1rem 0.4rem', borderRadius: '4px',
+            background: `${agentColor(agent)}20`,
+            border: `1px solid ${agentColor(agent)}40`,
+            color: agentColor(agent), fontWeight: 600,
+          }}>
+            {agent.split(/[\s_]/)[0]}: {stats.turns}t
+          </span>
+        ))}
+      </div>
+
+      {/* Trace rows */}
+      {traces.map((trace, idx) => {
+        const color = agentColor(trace.agent);
+        const isOpen = expanded === idx;
+        const time = new Date(trace.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        return (
+          <div
+            key={idx}
+            style={{
+              border: `1px solid ${isOpen ? color + '60' : 'var(--border)'}`,
+              borderLeft: `3px solid ${color}`,
+              borderRadius: '8px',
+              overflow: 'hidden',
+              transition: 'border-color 0.15s',
+            }}
+          >
+            {/* Header row */}
+            <button
+              onClick={() => setExpanded(isOpen ? null : idx)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem',
+                padding: '0.5rem 0.625rem',
+                background: isOpen ? `${color}10` : 'transparent',
+                border: 'none', cursor: 'pointer', textAlign: 'left',
+                transition: 'background 0.15s',
+              }}
+            >
+              {/* Agent badge */}
+              <span style={{
+                fontSize: '0.68rem', fontWeight: 700, padding: '0.1rem 0.35rem',
+                borderRadius: '4px', background: `${color}20`, color,
+                flexShrink: 0, fontFamily: 'monospace',
+              }}>
+                {trace.agent.split(/[\s_]/)[0].toUpperCase()}
+              </span>
+
+              {/* Turn */}
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', flexShrink: 0 }}>
+                t{trace.turn}
+              </span>
+
+              {/* Tool */}
+              {trace.tool && (
+                <span style={{
+                  fontSize: '0.72rem', fontFamily: 'monospace',
+                  color: 'var(--text-primary)', fontWeight: 500,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  flex: 1,
+                }}>
+                  {trace.tool}
+                </span>
+              )}
+
+              {/* Tokens */}
+              {(trace.tokens?.input || trace.tokens?.output) ? (
+                <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', flexShrink: 0 }}>
+                  {((trace.tokens.input + trace.tokens.output) / 1000).toFixed(1)}k
+                </span>
+              ) : null}
+
+              {/* Time */}
+              <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', flexShrink: 0 }}>
+                {time}
+              </span>
+
+              {/* Chevron */}
+              <svg
+                width={12} height={12} viewBox="0 0 24 24" fill="none"
+                stroke="var(--text-secondary)" strokeWidth={2.5} strokeLinecap="round"
+                style={{ flexShrink: 0, transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+
+            {/* Expanded detail */}
+            {isOpen && (
+              <div style={{
+                padding: '0.625rem 0.875rem',
+                borderTop: `1px solid ${color}30`,
+                background: `${color}06`,
+                display: 'flex', flexDirection: 'column', gap: '0.5rem',
+              }}>
+                {trace.reasoning && (
+                  <div>
+                    <p style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 0.2rem' }}>Reasoning</p>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-primary)', margin: 0, lineHeight: 1.5 }}>{trace.reasoning}</p>
+                  </div>
+                )}
+                {trace.input && (
+                  <div>
+                    <p style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 0.2rem' }}>Input</p>
+                    <pre style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.5 }}>{trace.input}</pre>
+                  </div>
+                )}
+                {trace.result && (
+                  <div>
+                    <p style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 0.2rem' }}>Result</p>
+                    <pre style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.5 }}>{trace.result}</pre>
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '1rem', fontSize: '0.68rem', color: 'var(--text-secondary)' }}>
+                  <span>↑ {trace.tokens?.input ?? 0} in</span>
+                  <span>↓ {trace.tokens?.output ?? 0} out</span>
+                  {trace.latency_ms > 0 && <span>⏱ {trace.latency_ms}ms</span>}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Context usage indicator ───────────────────────────────────────────────────
+// Estimates token usage from the message stream and shows a hover popover.
+// Token counts are approximated as chars/4 (standard heuristic).
+// Per-agent breakdown is derived from [AgentName] prefixes in message text.
+
+const CONTEXT_WINDOW = 200_000; // claude-sonnet-4 context window
+const CHARS_PER_TOKEN = 4;
+
+// Pricing per million tokens (USD) — Claude Sonnet 4 + Haiku 3.5
+const PRICING: Record<string, { input: number; output: number; label: string }> = {
+  sonnet: { input: 3.00,  output: 15.00, label: 'Sonnet' },
+  haiku:  { input: 0.25,  output: 1.25,  label: 'Haiku'  },
+  mistral:{ input: 2.00,  output: 6.00,  label: 'Mistral' },
+};
+
+// Hybrid routing: first 2 turns + last 2 turns per agent = Sonnet, rest = Haiku
+// We estimate ~20 turns per builder agent, ~8 per architect/inspector
+const AGENT_TURN_ESTIMATES: Record<string, number> = {
+  builder:   20,
+  architect: 8,
+  inspector: 10,
+  security:  8,
+  devops:    6,
+  pm:        6,
+  foreman:   2,
+};
+
+// System prompt overhead per agent turn (tokens not visible in message stream)
+// Includes: system prompt (~1.5k) + tool schemas (~1k) + context compression overhead
+const SYSTEM_OVERHEAD_PER_TURN: Record<string, number> = {
+  builder:   2500,  // large system prompt + all builder tools
+  architect: 2000,  // system prompt + architect tools
+  inspector: 2000,
+  security:  1800,
+  devops:    1800,
+  pm:        1500,
+  foreman:   500,
+};
+
+// Cost of one heal cycle: one builder pass (~20 turns) on Sonnet/Haiku hybrid
+const HEAL_CYCLE_COST_USD = 0.38;
+
+function estimateCost(
+  byAgent: AgentTokens[],
+  total: number,
+  healCycles: number,
+  builderCount: number,
+): {
+  sonnetCost: number;
+  haikuCost: number;
+  overheadCost: number;
+  healCost: number;
+  totalCost: number;
+  breakdown: { label: string; cost: number; model: string }[];
+} {
+  const INPUT_RATIO = 0.70;
+
+  let sonnetTokens = 0;
+  let haikuTokens = 0;
+  let overheadTokens = 0;
+  const breakdown: { label: string; cost: number; model: string }[] = [];
+
+  for (const { agent, tokens } of byAgent) {
+    const key = agent.toLowerCase();
+    const totalTurns = AGENT_TURN_ESTIMATES[key] ?? 10;
+    const sonnetTurnFraction = Math.min(1, 4 / totalTurns);
+    const agentSonnet = Math.round(tokens * sonnetTurnFraction);
+    const agentHaiku = tokens - agentSonnet;
+
+    sonnetTokens += agentSonnet;
+    haikuTokens += agentHaiku;
+
+    // Add system prompt overhead: overhead_per_turn × estimated_turns
+    const overhead = (SYSTEM_OVERHEAD_PER_TURN[key] ?? 1500) * totalTurns;
+    overheadTokens += overhead;
+
+    const sonnetCost = (agentSonnet * INPUT_RATIO / 1_000_000) * PRICING.sonnet.input
+      + (agentSonnet * (1 - INPUT_RATIO) / 1_000_000) * PRICING.sonnet.output;
+    const haikuCost = (agentHaiku * INPUT_RATIO / 1_000_000) * PRICING.haiku.input
+      + (agentHaiku * (1 - INPUT_RATIO) / 1_000_000) * PRICING.haiku.output;
+    const agentCost = sonnetCost + haikuCost;
+
+    if (agentCost > 0.0001) {
+      breakdown.push({ label: agent, cost: agentCost, model: sonnetTurnFraction > 0.5 ? 'Sonnet' : 'Hybrid' });
+    }
+  }
+
+  const sonnetCost = (sonnetTokens * INPUT_RATIO / 1_000_000) * PRICING.sonnet.input
+    + (sonnetTokens * (1 - INPUT_RATIO) / 1_000_000) * PRICING.sonnet.output;
+  const haikuCost = (haikuTokens * INPUT_RATIO / 1_000_000) * PRICING.haiku.input
+    + (haikuTokens * (1 - INPUT_RATIO) / 1_000_000) * PRICING.haiku.output;
+
+  // System prompt overhead cost (all Sonnet input — overhead is always input tokens)
+  const overheadCost = (overheadTokens / 1_000_000) * PRICING.sonnet.input;
+
+  // Heal cycle cost: each cycle = one builder pass per track
+  const healCost = healCycles * builderCount * HEAL_CYCLE_COST_USD;
+
+  return {
+    sonnetCost,
+    haikuCost,
+    overheadCost,
+    healCost,
+    totalCost: sonnetCost + haikuCost + overheadCost + healCost,
+    breakdown: breakdown.sort((a, b) => b.cost - a.cost),
+  };
+}
+
+function formatCost(usd: number): string {
+  if (usd < 0.001) return '<$0.001';
+  if (usd < 0.01) return `$${usd.toFixed(3)}`;
+  return `$${usd.toFixed(2)}`;
+}
+
+interface AgentTokens { agent: string; tokens: number; color: string }
+
+const AGENT_COLORS: Record<string, string> = {
+  foreman:   '#f97316',
+  pm:        '#8b5cf6',
+  architect: '#3b82f6',
+  builder:   '#10b981',
+  inspector: '#f59e0b',
+  security:  '#ef4444',
+  devops:    '#fb923c',
+};
+
+function agentTokenColor(agent: string): string {
+  return AGENT_COLORS[agent.toLowerCase()] ?? '#94a3b8';
+}
+
+function estimateTokens(messages: TaskMessage[]): {
+  total: number;
+  byAgent: AgentTokens[];
+  healCycles: number;
+  builderCount: number;
+} {
+  const agentMap = new Map<string, number>();
+  let total = 0;
+  let healCycles = 0;
+  const builderTracks = new Set<string>();
+
+  for (const msg of messages) {
+    const c = msg.content as { type?: string; content?: unknown } | null | undefined;
+    const text = (c?.type === 'text' || !c?.type) && typeof c?.content === 'string' ? c.content : '';
+    if (!text) continue;
+
+    const chars = text.length;
+    const tokens = Math.round(chars / CHARS_PER_TOKEN);
+    total += tokens;
+
+    // Extract agent name from [AgentName] prefix
+    const m = text.match(/^\[([A-Za-z]+)/);
+    const agent = m ? m[1].toLowerCase() : 'system';
+    agentMap.set(agent, (agentMap.get(agent) ?? 0) + tokens);
+
+    // Detect heal cycles from Foreman messages
+    if (/heal cycle \d+/i.test(text) || /dispatching builder \(heal/i.test(text)) {
+      const hm = text.match(/heal cycle (\d+)/i);
+      if (hm) healCycles = Math.max(healCycles, parseInt(hm[1], 10));
+      else healCycles = Math.max(healCycles, 1);
+    }
+
+    // Count distinct builder tracks
+    const bm = text.match(/^\[Builder(?:\s+\(([^)]+)\))?\]/i);
+    if (bm) builderTracks.add(bm[1] ?? 'main');
+  }
+
+  const byAgent: AgentTokens[] = Array.from(agentMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([agent, tokens]) => ({
+      agent: agent.charAt(0).toUpperCase() + agent.slice(1),
+      tokens,
+      color: agentTokenColor(agent),
+    }));
+
+  return { total, byAgent, healCycles, builderCount: Math.max(1, builderTracks.size) };
+}
+
+function ContextUsageIndicator({ messages, taskId, repoPath }: { messages: TaskMessage[]; taskId: string; repoPath: string }) {
+  const [open, setOpen] = useState(false);
+  const [popoverPos, setPopoverPos] = useState<{ bottom: number; left: number } | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  const { total, byAgent, healCycles, builderCount } = useMemo(() => estimateTokens(messages), [messages]);
+  const pct = Math.min(100, Math.round((total / CONTEXT_WINDOW) * 100));
+  const { sonnetCost, haikuCost, overheadCost, healCost, totalCost, breakdown } = useMemo(
+    () => estimateCost(byAgent, total, healCycles, builderCount),
+    [byAgent, total, healCycles, builderCount]
+  );
+
+  // Fetch real token counts from traces if available
+  const [realTokens, setRealTokens] = useState<{ input: number; output: number } | null>(null);
+  useEffect(() => {
+    if (!taskId) return;
+    const params = new URLSearchParams({ task_id: taskId });
+    if (repoPath) params.set('repo_path', repoPath);
+    fetch(`/api/traces?${params}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((data: Array<{ tokens?: { input: number; output: number } }> | null) => {
+        if (!Array.isArray(data) || data.length === 0) return;
+        const totalIn = data.reduce((s, t) => s + (t.tokens?.input ?? 0), 0);
+        const totalOut = data.reduce((s, t) => s + (t.tokens?.output ?? 0), 0);
+        if (totalIn + totalOut > 0) setRealTokens({ input: totalIn, output: totalOut });
+      })
+      .catch(() => {});
+  }, [taskId, repoPath, messages.length]);
+
+  const displayTotal = realTokens ? realTokens.input + realTokens.output : total;
+  const pctDisplay = Math.min(100, Math.round((displayTotal / CONTEXT_WINDOW) * 100));
+  const barColor = pct >= 80 ? 'var(--error)' : pct >= 50 ? 'var(--warning)' : 'var(--success)';
+
+  function openPopover() {
+    if (!btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    setPopoverPos({
+      bottom: window.innerHeight - rect.top + 8,
+      left: rect.left + rect.width / 2,
+    });
+    setOpen(true);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node) &&
+          btnRef.current && !btnRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  if (messages.length === 0) return null;
+
+  return (
+    <>
+      {/* Trigger button */}
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={() => open ? setOpen(false) : openPopover()}
+        title="Context usage"
+        style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          padding: '0.25rem 0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem',
+          borderRadius: '5px', opacity: open ? 1 : 0.55, flexShrink: 0,
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; }}
+        onMouseLeave={e => { if (!open) (e.currentTarget as HTMLButtonElement).style.opacity = '0.55'; }}
+      >
+        {/* Mini bar */}
+        <div style={{
+          width: 28, height: 4, borderRadius: 999,
+          background: 'var(--surface-raised)',
+          overflow: 'hidden',
+          border: '1px solid var(--border)',
+        }}>
+          <div style={{
+            width: `${pct}%`, height: '100%',
+            background: barColor,
+            borderRadius: 999,
+            transition: 'width 0.3s',
+          }} />
+        </div>
+        <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+          {pct}%
+        </span>
+      </button>
+
+      {/* Popover — fixed position so it escapes all stacking contexts */}
+      {open && popoverPos && (
+        <div
+          ref={ref}
+          style={{
+            position: 'fixed',
+            bottom: popoverPos.bottom,
+            left: popoverPos.left,
+            transform: 'translateX(-50%)',
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: '12px',
+            padding: '0.875rem 1rem',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+            zIndex: 9999,
+            minWidth: '220px',
+            display: 'flex', flexDirection: 'column', gap: '0.75rem',
+          }}
+        >
+          {/* Header */}
+          <div>
+            <p style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 0.125rem' }}>
+              Context usage
+            </p>
+            <p style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', margin: 0, opacity: 0.6 }}>
+              ~{total.toLocaleString()} / {(CONTEXT_WINDOW / 1000).toFixed(0)}k tokens estimated
+            </p>
+          </div>
+
+          {/* Progress bar */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            <div style={{
+              height: 6, borderRadius: 999,
+              background: 'var(--surface-raised)',
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                width: `${pct}%`, height: '100%',
+                background: barColor, borderRadius: 999,
+                transition: 'width 0.3s',
+              }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.68rem', color: barColor, fontWeight: 600 }}>{pct}% used</span>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)', opacity: 0.5 }}>
+                ~{Math.round((CONTEXT_WINDOW - total) / 1000)}k remaining
+              </span>
+            </div>
+          </div>
+
+          {/* Per-agent breakdown */}
+          {byAgent.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <p style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', opacity: 0.5, margin: 0 }}>
+                By agent
+              </p>
+              {byAgent.slice(0, 6).map(({ agent, tokens, color }) => (
+                <div key={agent} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-primary)', flex: 1 }}>{agent}</span>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+                    ~{tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : tokens}
+                  </span>
+                  <div style={{ width: 40, height: 3, borderRadius: 999, background: 'var(--surface-raised)', overflow: 'hidden' }}>
+                    <div style={{ width: `${Math.round((tokens / total) * 100)}%`, height: '100%', background: color, borderRadius: 999 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Cost estimate */}
+          {totalCost > 0 && (
+            <div style={{
+              borderTop: '1px solid var(--border)',
+              paddingTop: '0.625rem',
+              display: 'flex', flexDirection: 'column', gap: '0.35rem',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <p style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', opacity: 0.5, margin: 0 }}>
+                  Estimated cost
+                </p>
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
+                  {formatCost(totalCost)}
+                </span>
+              </div>
+              {/* Model split + overhead + heal cycles */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                {sonnetCost > 0.0001 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Sonnet (planning turns)</span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{formatCost(sonnetCost)}</span>
+                  </div>
+                )}
+                {haikuCost > 0.0001 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Haiku (execution turns)</span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{formatCost(haikuCost)}</span>
+                  </div>
+                )}
+                {overheadCost > 0.001 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>System prompts + tools</span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>{formatCost(overheadCost)}</span>
+                  </div>
+                )}
+                {healCycles > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--warning)' }}>
+                      {healCycles} heal cycle{healCycles !== 1 ? 's' : ''} × {builderCount} track{builderCount !== 1 ? 's' : ''}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--warning)', fontVariantNumeric: 'tabular-nums' }}>{formatCost(healCost)}</span>
+                  </div>
+                )}
+              </div>
+              {/* Per-agent cost bars */}
+              {breakdown.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', marginTop: '0.15rem' }}>
+                  {breakdown.slice(0, 5).map(({ label, cost, model }) => {
+                    const color = agentTokenColor(label.toLowerCase());
+                    return (
+                      <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', flex: 1 }}>{label}</span>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', opacity: 0.5 }}>{model}</span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>{formatCost(cost)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', opacity: 0.4, margin: 0 }}>
+            Includes system prompts, tool schemas{healCycles > 0 ? `, and ${healCycles} heal cycle${healCycles !== 1 ? 's' : ''}` : ''}. Prompt caching may reduce actual cost.
+          </p>
+        </div>
+      )}
+    </>
   );
 }
