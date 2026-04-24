@@ -492,7 +492,15 @@ class SwarmOrchestrator(BaseWorkflow):
 
         tracks = _extract_tracks(architect_plan, max_parallel_tracks=max_parallel_tracks)
         stack = ", ".join(architect_plan.get("tech_stack", [])[:4]) or "unknown stack"
-        log.info("architect_complete", tracks=len(tracks))
+        total_steps = sum(len(t.get("implementation_steps", [])) for t in tracks)
+        log.info("architect_complete", tracks=len(tracks), total_steps=total_steps)
+
+        # Guard: if every track has 0 steps the architect produced an empty plan.
+        # Treat it as a failed run — fall back to a single main track with the raw goal.
+        if total_steps == 0:
+            log.warning("architect_empty_plan_fallback", tracks=len(tracks))
+            tracks = [{"label": "main", "implementation_steps": [goal], "key_files": []}]
+            total_steps = 1
 
         await adk.messages.create(
             task_id=task_id,
@@ -501,7 +509,7 @@ class SwarmOrchestrator(BaseWorkflow):
                 content=(
                     f"[Architect] ✓ done — {len(tracks)} track(s) planned, "
                     f"stack: {stack}, "
-                    f"{sum(len(t.get('implementation_steps', [])) for t in tracks)} steps total"
+                    f"{total_steps} steps total"
                 ),
             ),
         )
@@ -540,7 +548,7 @@ class SwarmOrchestrator(BaseWorkflow):
         if tier >= 2:
             action = (
                 f"Architect plan ready: {len(tracks)} track(s), stack: {stack}, "
-                f"{sum(len(t.get('implementation_steps', [])) for t in tracks)} steps. "
+                f"{total_steps} steps. "
                 f"Approve to launch builders?"
             )
             approved = await self._hitl_checkpoint(
