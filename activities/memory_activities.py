@@ -135,6 +135,26 @@ async def memory_read_facts(repo_path: str, keys: list[str] | None = None) -> st
     return "\n".join(lines) if lines else "No active facts found (all may be stale)."
 
 
+# ── swarm_ aliases (backward compatibility) ───────────────────────────────────
+
+@activity.defn(name="swarm_memory_write")
+async def swarm_memory_write(
+    key: str,
+    value: str,
+    repo_path: str,
+    agent: str = "unknown",
+    confidence: float = 1.0,
+) -> str:
+    """Store a durable fact. Alias for memory_write_fact."""
+    return await memory_write_fact(repo_path=repo_path, key=key, value=value, agent=agent, confidence=confidence)
+
+
+@activity.defn(name="swarm_memory_read")
+async def swarm_memory_read(repo_path: str, keys: list[str] | None = None) -> str:
+    """Read facts stored by any agent. Alias for memory_read_facts."""
+    return await memory_read_facts(repo_path=repo_path, keys=keys)
+
+
 # ── Episodes ──────────────────────────────────────────────────────────────────
 
 @activity.defn(name="memory_append_episode")
