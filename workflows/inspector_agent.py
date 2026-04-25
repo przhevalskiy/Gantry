@@ -20,7 +20,7 @@ with workflow.unsafe.imports_passed_through():
 
 logger = structlog.get_logger(__name__)
 
-MAX_INSPECTOR_TURNS = 16
+MAX_INSPECTOR_TURNS = 20
 
 PLANNER_OPTIONS = {
     "start_to_close_timeout": timedelta(seconds=120),
@@ -92,20 +92,23 @@ class InspectorAgent:
             f"{regression_note}"
             f"{tdd_note}\n"
             "Instructions:\n"
-            f"1. Start with memory_read(repo_path='{repo_path}') to check for known issues from Architect/Builder.\n"
-            "2. Run the test suite (e.g. 'pytest --tb=short -q' or 'npm test -- --run').\n"
-            "3. Run the linter (e.g. 'ruff check .' or 'eslint src/').\n"
-            "4. Run type checking if applicable (e.g. 'mypy .' or 'tsc --noEmit').\n"
-            "5. If a test_spec was provided above, run run_coverage to verify coverage.\n"
-            "6. Optionally use run_application to verify the app actually starts and serves traffic.\n"
-            "7. Use list_ports to check port availability before run_application.\n"
-            "8. Use check_secrets if tests fail with auth or connection errors.\n"
-            "9. Use web_search to look up unfamiliar error messages.\n"
-            "10. Read failing files for context, then call report_inspection.\n"
-            "    - Populate heal_items with one entry per error: {file (absolute path), line, issue, fix, severity}.\n"
-            "    - Also populate heal_instructions as a summary for context.\n"
-            "    - heal_items are used first by the heal Builder — precise file+line+fix entries produce surgical edits.\n"
-            "    - For each test failure: read the failing file, find the exact line, write a targeted fix instruction."
+            f"1. Start with memory_read(repo_path='{repo_path}') to check for known issues.\n"
+            "2. Check if dependencies are installed BEFORE running tests:\n"
+            "   - For Node.js: check if node_modules/ exists. If NOT, call report_inspection with\n"
+            "     passed=True, tests_skipped=True,\n"
+            "     summary='⚠ Tests skipped — node_modules not installed. Reviewer must run npm install before testing.'\n"
+            "   - For Python: check if .venv/ exists. If NOT, call report_inspection with\n"
+            "     passed=True, tests_skipped=True,\n"
+            "     summary='⚠ Tests skipped — virtualenv not installed. Reviewer must run pip install before testing.'\n"
+            "   - NEVER try to install dependencies — that is not your job.\n"
+            "3. If dependencies exist, run the test suite (e.g. 'pytest --tb=short -q' or 'npm test -- --run').\n"
+            "4. Run the linter (e.g. 'ruff check .' or 'eslint src/ --max-warnings 0').\n"
+            "5. Run type checking if applicable (e.g. 'mypy .' or 'tsc --noEmit').\n"
+            "6. Read failing files for context, then call report_inspection.\n"
+            "   - Populate heal_items with one entry per error: {file (absolute path), line, issue, fix, severity}.\n"
+            "   - heal_items are used first by the heal Builder — precise file+line+fix entries produce surgical edits.\n"
+            "7. If you cannot determine pass/fail after 3 tool calls, call report_inspection with your best assessment.\n"
+            "   Do NOT burn all turns trying to get a perfect result — a partial report is better than max_turns."
         )
 
         context: list[dict] = []
@@ -171,9 +174,19 @@ class InspectorAgent:
 
             tool_result = await self._dispatch(tool_name, tool_input)
 
+            tool_result_str = str(tool_result)
+
+            # Warn early so the Inspector calls report_inspection before hitting the limit
+            turns_left = MAX_INSPECTOR_TURNS - turn - 1
+            if turns_left <= 3:
+                tool_result_str += (
+                    "\n\n⚠ WARNING: Only 3 turns remaining. Call report_inspection NOW with your "
+                    "current findings — do not run more checks. A partial report is better than hitting max turns."
+                )
+
             context = context + [{
                 "role": "user",
-                "content": [{"type": "tool_result", "tool_use_id": tool_use_id, "content": str(tool_result)}],
+                "content": [{"type": "tool_result", "tool_use_id": tool_use_id, "content": tool_result_str}],
             }]
 
         log.warning("inspector_max_turns")

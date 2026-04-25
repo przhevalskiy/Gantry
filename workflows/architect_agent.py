@@ -121,86 +121,75 @@ class ArchitectAgent:
             ]
             failure_block = "\n".join(failure_lines)
 
-        task_prompt = (
-            f"You are the Architect agent. Your goal:\n{goal}\n\n"
-            f"Repository root: {repo_path}\n"
-            f"IMPORTANT: ALL tool calls (list_directory, read_file) MUST use absolute paths "
-            f"starting with {repo_path}. NEVER use relative paths like '.' or 'src/'.\n"
-            f"{history_block}"
-            f"{failure_block}\n"
-            "Instructions:\n"
-            f"1. Start with query_index(repo_path='{repo_path}', query='') to check if a symbol index exists.\n"
-            f"   If not, list the root directory: list_directory(path='{repo_path}').\n"
-            "2. Read key config files (pyproject.toml, package.json, README, etc.) using absolute paths.\n"
-            "3. Read the main entry points and core modules relevant to the goal.\n"
-            "4. Identify the tech stack, key files, and dependencies.\n"
-            "   IMPORTANT: If the repo is EMPTY (no source files), this is a GREENFIELD build.\n"
-            "   For greenfield builds:\n"
-            "   - Infer the tech stack from the goal description and any PM notes in memory.\n"
-            "   - Call memory_read to check if the PM stored tech stack decisions.\n"
-            "   - Create a complete scaffold plan: project setup, core files, features, tests.\n"
-            "   - Do NOT produce 0 implementation steps — a greenfield build needs at minimum:\n"
-            "     scaffold, core feature implementation, basic tests.\n"
-            "5. Decompose the goal into parallel tracks:\n"
-            "   - Each track should touch distinct, non-overlapping files.\n"
-            "   - Use 1 track for simple tasks, 2-4 for larger ones.\n"
-            "   - Example tracks: 'backend', 'frontend', 'tests', 'infra', 'docs'.\n"
-            "   - WAVE RULES — critical for parallelism:\n"
-            "     * Only use depends_on when a track CANNOT START AT ALL without files from another track.\n"
-            "     * The ONLY valid reason for depends_on is: 'I need to import a file that doesn't exist yet.'\n"
-            "     * Shared config files (package.json, tsconfig, tailwind.config) are NOT a reason for depends_on\n"
-            "       — builders can write config files independently.\n"
-            "     * For greenfield apps: ONLY a 'scaffold' track (package.json, tsconfig, vite.config) should\n"
-            "       be wave 1. ALL other tracks (data-layer, components, pages, hooks, tests) run in wave 2\n"
-            "       SIMULTANEOUSLY — they do NOT depend on each other.\n"
-            "     * NEVER create more than 2 waves. If you find yourself making wave 3 or 4, merge those\n"
-            "       tracks into wave 2 instead.\n"
-            "     * Tracks WITHOUT depends_on run SIMULTANEOUSLY. Tracks WITH depends_on wait.\n"
-            "     * WRONG: pages depends_on components depends_on data-layer (3 waves)\n"
-            "     * RIGHT: scaffold (wave 1), then data-layer + components + pages all in wave 2\n"
-            "   - Write implementation_steps that specify HOW, not just WHAT. Include the edit strategy:\n"
-            "     * For changes touching ONE small location: 'In <file>, str_replace <function> to add X'\n"
-            "     * For changes touching MULTIPLE locations or large files (>100 lines):\n"
-            "       'Read <file> in full, then rewrite it with write_file adding X at each Y'\n"
-            "     Bad step: 'Add logging to builder_agent.py'\n"
-            "     Good step: 'Read workflows/builder_agent.py in full, then rewrite it with write_file,\n"
-            "       adding log.info(tool_name=tool_name, turn=turn, success=not failed) after each\n"
-            "       tool dispatch in the main loop'\n"
-            f"6. Call report_plan with repo_root='{repo_path}' and the tracks array when ready.\n\n"
-            "Additional tools available:\n"
-            "- query_index: look up symbol definitions by name (faster than search_files)\n"
-            "- search_files: find files by glob or content regex instead of listing directories\n"
-            "- check_secrets: verify required env vars are present before planning\n"
-            f"- memory_read: read PM notes and prior decisions. Always use repo_path='{repo_path}'.\n"
-            f"- memory_write: store key findings for Builder agents. Always use repo_path='{repo_path}'."
-        )
-
         context: list[dict] = []
-        files_read: set[str] = set()  # track files already read to detect re-read loops
-        exploration_turns = 0  # count non-plan turns to enforce early commit on greenfield
+        files_read: set[str] = set()
+        exploration_turns = 0
 
         from project.config import CLAUDE_SONNET_MODEL, CLAUDE_HAIKU_MODEL
 
-        def _architect_model(turn: int, tool_name: str | None = None) -> str:
-            """
-            Hybrid routing for the Architect.
-            - Exploration turns (list, read, search, memory): Haiku — fast and cheap
-            - Planning turn (report_plan decision): Sonnet — needs strong reasoning
-            - First turn: Sonnet — sets the overall strategy
-            """
-            if turn == 0:
-                return CLAUDE_SONNET_MODEL  # first turn: understand the goal fully
-            if tool_name == "report_plan":
-                return CLAUDE_SONNET_MODEL  # final plan: needs Sonnet quality
-            # After enough exploration, switch to Sonnet to force a good plan
-            if exploration_turns >= 5:
-                return CLAUDE_SONNET_MODEL
-            return CLAUDE_HAIKU_MODEL  # exploration: Haiku is fast enough
+        # ── Pre-load PM memory — inject BEFORE building the task prompt ───────
+        pm_memory_block = ""
+        try:
+            pm_memory_raw = await workflow.execute_activity(
+                "swarm_memory_read",
+                args=[repo_path, None],
+                start_to_close_timeout=timedelta(seconds=15),
+                retry_policy=RetryPolicy(maximum_attempts=3),  # retry in case of filesystem lag
+            )
+            if pm_memory_raw and pm_memory_raw.strip() not in (
+                "", "{}", "null", "No facts stored yet.", "Facts store is empty.",
+                "No matching facts found.", "Error reading facts (malformed JSON)."
+            ):
+                pm_memory_block = (
+                    f"\n\n━━━ PM DECISIONS (use these — do NOT call memory_read) ━━━\n"
+                    f"{pm_memory_raw}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                )
+                log.info("architect_pm_memory_loaded", length=len(pm_memory_raw))
+            else:
+                log.warning("architect_pm_memory_empty", raw=repr(pm_memory_raw[:100] if pm_memory_raw else ""))
+        except Exception as e:
+            log.warning("architect_pm_memory_failed", error=str(e))
+
+        # Rebuild task_prompt with PM memory injected at the top, before instructions
+        task_prompt = (
+            f"You are the Architect agent. Your goal:\n{goal}\n\n"
+            f"Repository root: {repo_path}\n"
+            f"IMPORTANT: ALL tool calls MUST use absolute paths starting with {repo_path}.\n"
+            f"{history_block}"
+            f"{failure_block}"
+            f"{pm_memory_block}\n"
+            "Instructions:\n"
+            + (
+                # Greenfield path — PM memory already injected above, go straight to planning
+                f"The repository is EMPTY (greenfield build). The PM decisions above contain the tech stack.\n"
+                f"1. Call report_plan immediately using the tech stack from the PM decisions above.\n"
+                f"   Do NOT call query_index, list_directory, or memory_read — the repo is empty and\n"
+                f"   the PM data is already provided above.\n"
+                f"2. Create 2-4 parallel tracks covering: scaffold, core features, tests.\n"
+                f"3. Each track needs 5-15 specific implementation_steps naming exact files.\n"
+                if pm_memory_block else
+                # Existing repo path — explore first
+                f"1. Start with query_index(repo_path='{repo_path}', query='') to check the symbol index.\n"
+                f"   If empty, list the root: list_directory(path='{repo_path}').\n"
+                f"2. Read 1-2 key config files (package.json, pyproject.toml) to confirm the stack.\n"
+                f"3. Call report_plan when ready.\n"
+            ) +
+            "Decompose into parallel tracks:\n"
+            "- Each track touches distinct, non-overlapping files.\n"
+            "- Use 2-4 tracks for larger builds.\n"
+            "- WAVE RULES: only use depends_on when a track CANNOT start without files from another.\n"
+            "  For greenfield: scaffold (wave 1), then all feature tracks simultaneously (wave 2).\n"
+            "  NEVER create more than 2 waves.\n"
+            "- implementation_steps must be specific: name the exact file and change.\n"
+            f"  Bad: 'Add logging'. Good: 'In workflows/builder_agent.py, add log.info after each dispatch.'\n"
+            f"\nCall report_plan with repo_root='{repo_path}' and the tracks array when ready.\n"
+        )
 
         for turn in range(MAX_ARCHITECT_TURNS):
             raw = await workflow.execute_activity(
                 "plan_architect_step",
-                args=[task_prompt, context, _architect_model(turn)],
+                args=[task_prompt, context, CLAUDE_SONNET_MODEL],
                 **PLANNER_OPTIONS,
             )
             context = raw["context"]
@@ -224,11 +213,14 @@ class ArchitectAgent:
                             "type": "tool_result",
                             "tool_use_id": tool_use_id,
                             "content": (
-                                "ERROR: implementation_steps is empty. "
-                                "Call report_plan again RIGHT NOW with concrete steps. "
-                                "Do NOT read more files. Write specific steps like: "
-                                "'In <file>, add <exact change> at <location>'. "
-                                f"Goal: {goal[:300]}"
+                                "ERROR: implementation_steps is empty. You MUST produce a real plan.\n"
+                                "The PM stored the tech stack in memory — use it to create concrete tracks.\n"
+                                "For a greenfield build, create at minimum:\n"
+                                "  - scaffold track: package.json, tsconfig, vite/next config, index.html\n"
+                                "  - feature tracks: one per major feature area\n"
+                                "Each track needs 3-8 specific implementation_steps naming exact files.\n"
+                                f"Goal: {goal[:300]}\n"
+                                "Call report_plan NOW with a complete multi-track plan."
                             ),
                         }],
                     }]
@@ -346,8 +338,16 @@ class ArchitectAgent:
 
             tool_result_str = str(tool_result)
 
+            # After memory_read, inject a directive to use the data immediately
+            if tool_name == "memory_read":
+                tool_result_str += (
+                    "\n\n⚡ You now have the PM's tech stack and user preferences above. "
+                    "Use this data to call report_plan immediately with a complete multi-track plan. "
+                    "Do NOT call any more tools. Build the plan from what you just read."
+                )
+
             # After 4 exploration turns, append a commit nudge to every result
-            if exploration_turns >= 4:
+            elif exploration_turns >= 4:
                 tool_result_str += (
                     "\n\n⚡ You have explored enough. Call report_plan NOW with your best plan. "
                     "Do not read more files or search further — commit to a decomposition."

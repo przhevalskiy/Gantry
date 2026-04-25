@@ -7,7 +7,7 @@ load_dotenv(override=False)
 ANTHROPIC_API_KEY: str = os.environ["ANTHROPIC_API_KEY"]
 CLAUDE_MODEL: str = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
 CLAUDE_SONNET_MODEL: str = os.getenv("CLAUDE_SONNET_MODEL", CLAUDE_MODEL)
-CLAUDE_HAIKU_MODEL: str = os.getenv("CLAUDE_HAIKU_MODEL", "claude-3-5-haiku-latest")
+CLAUDE_HAIKU_MODEL: str = os.getenv("CLAUDE_HAIKU_MODEL", "claude-haiku-4-5-20251001")
 MAX_AGENT_TURNS: int = int(os.getenv("MAX_AGENT_TURNS", "24"))
 MAX_CONTEXT_PAIRS: int = int(os.getenv("MAX_CONTEXT_PAIRS", "12"))  # keep last N tool call/result pairs
 
@@ -15,6 +15,10 @@ MAX_CONTEXT_PAIRS: int = int(os.getenv("MAX_CONTEXT_PAIRS", "12"))  # keep last 
 # Can be a classic PAT, fine-grained token, or OAuth token.
 # Per-task tokens passed via task params take precedence over this global default.
 GH_TOKEN: str = os.getenv("GH_TOKEN", os.getenv("GITHUB_TOKEN", ""))
+
+# Next.js UI base URL — used by the worker to call back to the API for project updates.
+# The API is the single authoritative writer for the project registry.
+GANTRY_UI_URL: str = os.getenv("GANTRY_UI_URL", "http://localhost:3000")
 
 # Mistral — alternative LLM provider. Set MISTRAL_API_KEY and pass a
 # mistral-* model name to any planner activity to use Mistral instead of Claude.
