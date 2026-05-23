@@ -37,6 +37,8 @@ header() { echo -e "\n${CYAN}━━━  $*  ━━━${NC}"; }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+API_DIR="$ROOT"
+
 kill_port() {
   local port=$1
   local pids
@@ -67,16 +69,18 @@ _stop_all() {
   header "Stopping"
   kill_port 3000
   kill_port 8000
+  kill_port 8001
   kill_port 8233
   # Kill worker processes that connect to Temporal (not port-bound, missed by kill_port)
   pkill -f "project.run_worker" 2>/dev/null || true
   pkill -f "agentex agents run" 2>/dev/null || true
+  pkill -f "api.main" 2>/dev/null || true
   ok "Done."
 }
 
 _show_status() {
   echo ""
-  for svc_port in "Agentex API:5003" "Temporal:7233" "Temporal UI:8080" "Agent ACP:8000" "gantry-ui:3000" "Redis:6379"; do
+  for svc_port in "Agentex API:5003" "Temporal:7233" "Temporal UI:8080" "Agent ACP:8000" "Gantry API:8001" "gantry-ui:3000" "Redis:6379"; do
     label="${svc_port%%:*}"; port="${svc_port##*:}"
     printf "  %-20s" "$label (:$port)"
     nc -z localhost "$port" 2>/dev/null && echo -e "${GREEN}running${NC}" || echo -e "${RED}stopped${NC}"
@@ -135,6 +139,7 @@ fi
 # ── Step 1: Kill stale local processes ───────────────────────────────────────
 header "Clearing ports"
 kill_port 8000
+kill_port 8001
 kill_port 8233
 kill_port 3000
 
@@ -177,7 +182,20 @@ echo "    PID $AGENT_PID — logs: tail -f /tmp/gantry-agent.log"
 wait_for_port 8000 "Agent ACP" 30
 ok "Agent running"
 
-# ── Step 4: gantry-ui ────────────────────────────────────────────────────────
+# ── Step 4: Gantry API ───────────────────────────────────────────────────────
+header "Starting Gantry API"
+
+.venv/bin/python -m uvicorn api.main:app \
+  --host 0.0.0.0 \
+  --port 8001 \
+  --log-level warning \
+  >/tmp/gantry-api.log 2>&1 &
+API_PID=$!
+echo "    PID $API_PID — logs: tail -f /tmp/gantry-api.log"
+wait_for_port 8001 "Gantry API" 20
+ok "API running"
+
+# ── Step 5: gantry-ui ────────────────────────────────────────────────────────
 header "Starting gantry-ui"
 
 if [ ! -d "$UI_DIR" ]; then
@@ -197,8 +215,11 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 echo -e "${GREEN}  Ready${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo "  http://localhost:3000           gantry-ui"
+echo "  http://localhost:8001           Gantry API"
+echo "  http://localhost:8001/docs      API docs (Swagger)"
 echo "  http://localhost:5003/swagger   Agentex API"
 echo "  http://localhost:8080           Temporal UI"
+echo "  tail -f /tmp/gantry-api.log"
 echo "  tail -f /tmp/gantry-agent.log"
 echo "  tail -f /tmp/gantry-ui.log"
 echo "  ./dev.sh --stop   to tear down"
