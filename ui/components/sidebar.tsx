@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { useAllTasks } from '@/hooks/use-all-tasks';
 
 function IconPanelLeftClose() {
   return (
@@ -50,6 +51,15 @@ function IconBook() {
   );
 }
 
+function IconCode() {
+  return (
+    <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="16 18 22 12 16 6"/>
+      <polyline points="8 6 2 12 8 18"/>
+    </svg>
+  );
+}
+
 function IconSettings() {
   return (
     <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -69,6 +79,71 @@ function IconAgents() {
   );
 }
 
+const STATUS_DOT: Record<string, string> = {
+  RUNNING:    '#3b82f6',
+  COMPLETED:  '#22c55e',
+  FAILED:     '#ef4444',
+  TERMINATED: '#6b7280',
+  CANCELED:   '#6b7280',
+  TIMED_OUT:  '#f59e0b',
+};
+
+function SidebarTaskList() {
+  const { data: tasks, isLoading } = useAllTasks();
+
+  const recent = (tasks ?? [])
+    .filter(t => t.status === 'RUNNING')
+    .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
+    .slice(0, 12);
+
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderTop: '1px solid var(--border)', marginTop: '0.5rem' }}>
+      <p style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)', opacity: 0.4, margin: '0.625rem 1.25rem 0.25rem' }}>
+        Active
+      </p>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '0 0.375rem 0.5rem' }}>
+        {isLoading && (
+          <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', padding: '0.25rem 0.75rem', opacity: 0.5 }}>Loading…</p>
+        )}
+        {!isLoading && recent.length === 0 && (
+          <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', padding: '0.25rem 0.75rem', opacity: 0.5 }}>No active tasks</p>
+        )}
+        {recent.map(t => {
+          const color = STATUS_DOT[t.status ?? ''] ?? '#6b7280';
+          const isRunning = t.status === 'RUNNING';
+          return (
+            <Link
+              key={t.id}
+              href={`/task/${t.id}`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                padding: '0.3rem 0.625rem', borderRadius: '6px',
+                textDecoration: 'none', background: 'transparent', transition: 'background 0.1s',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--surface-raised)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; }}
+            >
+              <span style={{
+                width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0,
+                animation: isRunning ? 'sidebar-pulse 1.4s ease-in-out infinite' : 'none',
+              }} />
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                {t.goal ?? t.id.slice(0, 12)}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+      <style>{`
+        @keyframes sidebar-pulse {
+          0%,100% { opacity: 1; }
+          50%      { opacity: 0.35; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 type NavItem = {
   icon: React.ReactNode;
   label: string;
@@ -79,6 +154,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: <IconPlus />,    label: 'New Build',  href: '/' },
   { icon: <IconGrid />,    label: 'Projects',   href: '/projects' },
   { icon: <IconAgents />,  label: 'Agents',     href: '/agents' },
+  { icon: <IconCode />,    label: 'API',        href: '/api-docs' },
   { icon: <IconBook />,    label: 'Docs',       href: '/docs' },
 ];
 
@@ -149,7 +225,7 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
       </div>
 
       {/* Nav items */}
-      <nav style={{ flex: 1, padding: collapsed ? '0 0.25rem' : '0 0.5rem', display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
+      <nav style={{ padding: collapsed ? '0 0.25rem' : '0 0.5rem', display: 'flex', flexDirection: 'column', gap: '0.125rem', flexShrink: 0 }}>
         {NAV_ITEMS.map(({ icon, label, href }) => {
           const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href);
           return (
@@ -190,6 +266,12 @@ export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
           );
         })}
       </nav>
+
+      {/* Task list — fills remaining space below nav */}
+      {!collapsed && <SidebarTaskList />}
+
+      {/* Spacer when collapsed so settings stays bottom */}
+      {collapsed && <div style={{ flex: 1 }} />}
 
       {/* Settings — bottom */}
       <div style={{ padding: collapsed ? '0.75rem 0.75rem' : '0.75rem', flexShrink: 0 }}>
