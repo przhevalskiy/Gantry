@@ -1,0 +1,126 @@
+# Monolift — production Agentex platform
+# Run from /opt/monolift/scale-agentex/agentex/
+# Usage: docker compose -f /opt/monolift/deploy/docker-compose.prod.yml up -d
+
+version: '3.8'
+
+services:
+  agentex-temporal-postgresql:
+    container_name: agentex-temporal-postgresql
+    image: postgres:12
+    environment:
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_USER: temporal
+      LOG_LEVEL: error
+    networks: [agentex-network]
+    volumes: [agentex-temporal-postgres-data:/var/lib/postgresql/data]
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  agentex-temporal:
+    container_name: agentex-temporal
+    image: temporalio/auto-setup:1.25.0
+    depends_on:
+      agentex-temporal-postgresql:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: agentex-temporal-postgresql
+      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development-sql.yaml
+      LOG_LEVEL: error
+    networks: [agentex-network]
+    ports: ["7233:7233"]
+    volumes:
+      - /opt/monolift/scale-agentex/agentex/temporal/dynamicconfig:/etc/temporal/config/dynamicconfig
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 7233 || exit 0"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  agentex-redis:
+    image: "redis:7.4.0-alpine"
+    networks: [agentex-network]
+    ports: ["6379:6379"]
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  agentex-postgres:
+    container_name: agentex-postgres
+    image: postgres:17
+    environment:
+      POSTGRES_USER: agentex
+      POSTGRES_PASSWORD: agentex
+      POSTGRES_DB: agentex
+    networks: [agentex-network]
+    ports: ["5432:5432"]
+    volumes: [agentex-postgres-data:/var/lib/postgresql/data]
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentex"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  agentex-mongodb:
+    container_name: agentex-mongodb
+    image: mongo:6.0
+    networks: [agentex-network]
+    ports: ["27017:27017"]
+    volumes: [agentex-mongodb-data:/data/db]
+    restart: always
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  agentex:
+    container_name: agentex
+    image: agentex:latest
+    build:
+      context: /opt/monolift/scale-agentex/agentex
+      dockerfile: Dockerfile
+    depends_on:
+      agentex-postgres:
+        condition: service_healthy
+      agentex-mongodb:
+        condition: service_healthy
+      agentex-temporal:
+        condition: service_healthy
+      agentex-redis:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+asyncpg://agentex:agentex@agentex-postgres:5432/agentex
+      TEMPORAL_ADDRESS: agentex-temporal:7233
+      REDIS_URL: redis://agentex-redis:6379
+      MONGODB_URI: mongodb://agentex-mongodb:27017
+      MONGODB_DATABASE_NAME: agentex
+    networks: [agentex-network]
+    ports: ["5003:5003"]
+    restart: always
+
+networks:
+  agentex-network:
+    driver: bridge
+
+volumes:
+  agentex-temporal-postgres-data:
+  agentex-postgres-data:
+  agentex-mongodb-data:

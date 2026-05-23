@@ -1,0 +1,19 @@
+[Unit]
+Description=Monolift Gantry Worker
+After=network.target docker.service gantry-api.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=monolift
+WorkingDirectory=/opt/monolift
+EnvironmentFile=/opt/monolift/.env
+ExecStart=/opt/monolift/.venv/bin/agentex agents run --manifest manifest.yaml
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=gantry-worker
+
+[Install]
+WantedBy=multi-user.target
