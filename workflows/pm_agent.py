@@ -20,6 +20,7 @@ from agentex.types.text_content import TextContent
 with workflow.unsafe.imports_passed_through():
     from project.pm_tools import PM_VALID_TOOL_NAMES
     from project.child_workflow import ClarificationWorkflow
+    from project.config import CLAUDE_SONNET_MODEL as _CLAUDE_SONNET_MODEL
 
 logger = structlog.get_logger(__name__)
 
@@ -91,8 +92,7 @@ class PMAgent:
         clarifications: dict = {}
         asked_clarification = False
 
-        from project.config import CLAUDE_SONNET_MODEL
-        _model = model or CLAUDE_SONNET_MODEL
+        _model = model or _CLAUDE_SONNET_MODEL
         for turn in range(MAX_PM_TURNS):
             raw = await workflow.execute_activity(
                 "plan_pm_step",

@@ -17,6 +17,7 @@ from agentex.types.text_content import TextContent
 
 with workflow.unsafe.imports_passed_through():
     from project.inspector_tools import INSPECTOR_VALID_TOOL_NAMES
+    from project.config import CLAUDE_SONNET_MODEL as _CLAUDE_SONNET_MODEL
 
 logger = structlog.get_logger(__name__)
 
@@ -145,8 +146,7 @@ class InspectorAgent:
 
         context: list[dict] = []
 
-        from project.config import CLAUDE_SONNET_MODEL
-        _model = model or CLAUDE_SONNET_MODEL
+        _model = model or _CLAUDE_SONNET_MODEL
         for turn in range(MAX_INSPECTOR_TURNS):
             raw = await workflow.execute_activity(
                 "plan_inspector_step",

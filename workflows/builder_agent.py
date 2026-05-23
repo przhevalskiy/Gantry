@@ -17,6 +17,7 @@ from agentex.types.text_content import TextContent
 
 with workflow.unsafe.imports_passed_through():
     from project.builder_tools import BUILDER_VALID_TOOL_NAMES
+    from project.config import CLAUDE_SONNET_MODEL as _CLAUDE_SONNET_MODEL, CLAUDE_HAIKU_MODEL as _CLAUDE_HAIKU_MODEL
 
 logger = structlog.get_logger(__name__)
 
@@ -187,12 +188,13 @@ class BuilderAgent:
             "- Use web_search / fetch_url when uncertain about a library's API or an error message.\n"
             "- Use git_diff before finish_build to verify all intended changes are present.\n"
             f"- Use memory_read(repo_path='{repo_root}') at the start to check Architect notes.\n"
-            f"- Call verify_build(repo_path='{repo_root}') after all files are written. Fix any failures before finishing.\n"
-            "- Call finish_build only after verify_build passes (or reports no tools detected)."
+            f"- Call verify_build(repo_path='{repo_root}') after all files are written. "
+            "  FIRST check dependencies exist: use list_directory to confirm .venv/ (Python) or node_modules/ (Node.js) is present. "
+            "  If neither exists, skip verify_build and call finish_build directly — linting without a runtime produces false errors.\n"
+            "- Call finish_build only after verify_build passes (or reports no tools detected, or was skipped due to missing runtime)."
         )
 
-        from project.config import CLAUDE_SONNET_MODEL, CLAUDE_HAIKU_MODEL
-        _model = model or CLAUDE_SONNET_MODEL
+        _model = model or _CLAUDE_SONNET_MODEL
         context: list[dict] = []
         edits: list[dict] = []
         verify_build_passed = False  # must be True before finish_build is accepted

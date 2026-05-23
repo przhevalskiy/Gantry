@@ -40,6 +40,7 @@ with workflow.unsafe.imports_passed_through():
     from project.planner import _extract_task_prompt
     from project.complexity import classify_tier, params_for_tier, TIER_LABELS
     from project.child_workflow import ApprovalWorkflow, ClarificationWorkflow
+    from project.config import CLAUDE_HAIKU_MODEL as _CLAUDE_HAIKU_MODEL, CLAUDE_SONNET_MODEL as _CLAUDE_SONNET_MODEL, GH_TOKEN as _GH_TOKEN
     from workflows.pm_agent import PMAgent
     from workflows.architect_agent import ArchitectAgent
     from workflows.builder_agent import BuilderAgent
@@ -70,8 +71,7 @@ def _branch_name(task_id: str, prefix: str = "swarm") -> str:
 
 def _model_for_tier(tier: int) -> str:
     """Route to Haiku for simple tasks, Sonnet for complex ones."""
-    from project.config import CLAUDE_HAIKU_MODEL, CLAUDE_SONNET_MODEL
-    return CLAUDE_HAIKU_MODEL if tier <= 1 else CLAUDE_SONNET_MODEL
+    return _CLAUDE_HAIKU_MODEL if tier <= 1 else _CLAUDE_SONNET_MODEL
 
 
 def _extract_tracks(architect_plan: dict, max_parallel_tracks: int = MAX_PARALLEL_TRACKS) -> list[dict]:
@@ -283,8 +283,7 @@ class SwarmOrchestrator(BaseWorkflow):
         github_token: str = params.params.get("github_token", "") if params.params else ""
         project_id: str = params.params.get("project_id", "") if params.params else ""
 
-        from project.config import GH_TOKEN
-        effective_token = github_token or GH_TOKEN
+        effective_token = github_token or _GH_TOKEN
 
         if github_url:
             await adk.messages.create(
@@ -797,6 +796,8 @@ class SwarmOrchestrator(BaseWorkflow):
         inspector_report: dict = {}
         reviewer_report: dict = {"verdict": "approve", "summary": "", "comments": []}
         heal_cycles = 0
+        reviewer_heal_cycles = 0
+        MAX_REVIEWER_HEAL_CYCLES = 1  # Reviewer retries don't consume Inspector budget
         _builder_model = _model_for_tier(tier)
         _inspector_model = _model_for_tier(tier)
 
@@ -979,6 +980,19 @@ class SwarmOrchestrator(BaseWorkflow):
                             })
                     except Exception:
                         pass
+
+                # Rebuild symbol index between waves so downstream builders can
+                # locate symbols and types written by the wave that just finished.
+                if wave_idx < len(track_waves) - 1:
+                    try:
+                        await workflow.execute_activity(
+                            "swarm_build_repo_index",
+                            args=[repo_path],
+                            start_to_close_timeout=timedelta(seconds=45),
+                            retry_policy=RetryPolicy(maximum_attempts=1),
+                        )
+                    except Exception:
+                        pass  # non-critical — next wave proceeds with stale index
 
             builder_jsons = tuple(all_builder_jsons)
             build_result = _merge_build_results(builder_jsons)
@@ -1166,7 +1180,7 @@ class SwarmOrchestrator(BaseWorkflow):
                         task_id=task_id,
                         content=TextContent(author="agent", content="[Foreman] Dispatching Reviewer — checking logic and contracts"),
                     )
-                    all_key_files_for_review = list({kf for t in tracks for kf in t.get("key_files", []) if kf})
+                    all_key_files_for_review = sorted({kf for t in tracks for kf in t.get("key_files", []) if kf})
                     reviewer_json: str = await workflow.execute_child_workflow(
                         ReviewerAgent.run,
                         args=[goal, repo_path, architect_plan, all_key_files_for_review, task_id],
@@ -1207,8 +1221,19 @@ class SwarmOrchestrator(BaseWorkflow):
                         ),
                     ),
                 )
+                if reviewer_heal_cycles >= MAX_REVIEWER_HEAL_CYCLES:
+                    log.warning("reviewer_heal_budget_exhausted", reviewer_heals=reviewer_heal_cycles)
+                    await adk.messages.create(
+                        task_id=task_id,
+                        content=TextContent(
+                            author="agent",
+                            content="[Foreman] Reviewer heal budget exhausted — proceeding to Security.",
+                        ),
+                    )
+                    break
                 heal_instructions = reviewer_heal
                 heal_cycles += 1
+                reviewer_heal_cycles += 1
                 tracks = [{"label": "reviewer-heal", "implementation_steps": heal_instructions, "key_files": all_key_files_for_review}]
                 continue
 
@@ -1450,7 +1475,11 @@ class SwarmOrchestrator(BaseWorkflow):
             content=TextContent(author="agent", content=f"[Foreman] Dispatching DevOps — branch: {branch}"),
         )
 
-        all_key_files = list({kf for t in tracks for kf in t.get("key_files", []) if kf})
+        # Union actual writes (from Builder edits) with Architect plan key_files.
+        # Edits are authoritative — key_files may be stale after heal/reviewer cycles.
+        _edited_paths = sorted({e.get("path", "") for e in build_result.get("edits", []) if e.get("path")})
+        _plan_key_files = sorted({kf for t in tracks for kf in t.get("key_files", []) if kf})
+        all_key_files = sorted(set(_edited_paths) | set(_plan_key_files))
         devops_json: str = await workflow.execute_child_workflow(
             DevOpsAgent.run,
             args=[goal, repo_path, branch, task_id, build_result.get("summary", ""), all_key_files or None],

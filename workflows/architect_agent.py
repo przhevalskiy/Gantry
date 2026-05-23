@@ -18,6 +18,7 @@ from agentex.types.text_content import TextContent
 
 with workflow.unsafe.imports_passed_through():
     from project.architect_tools import ARCHITECT_VALID_TOOL_NAMES
+    from project.config import CLAUDE_SONNET_MODEL as _CLAUDE_SONNET_MODEL, CLAUDE_HAIKU_MODEL as _CLAUDE_HAIKU_MODEL
 
 logger = structlog.get_logger(__name__)
 
@@ -125,8 +126,6 @@ class ArchitectAgent:
         files_read: set[str] = set()
         exploration_turns = 0
 
-        from project.config import CLAUDE_SONNET_MODEL, CLAUDE_HAIKU_MODEL
-
         # ── Pre-load PM memory — inject BEFORE building the task prompt ───────
         pm_memory_block = ""
         try:
@@ -189,7 +188,7 @@ class ArchitectAgent:
         for turn in range(MAX_ARCHITECT_TURNS):
             raw = await workflow.execute_activity(
                 "plan_architect_step",
-                args=[task_prompt, context, CLAUDE_SONNET_MODEL],
+                args=[task_prompt, context, _CLAUDE_SONNET_MODEL],
                 **PLANNER_OPTIONS,
             )
             context = raw["context"]
