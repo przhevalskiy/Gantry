@@ -391,6 +391,25 @@ class ArchitectAgent:
                 args=[tool_input.get("pattern", ""), tool_input.get("path", "."), tool_input.get("type", "name")],
                 **IO_OPTIONS,
             )
+        if tool_name == "web_search":
+            return await workflow.execute_activity(
+                "swarm_web_search",
+                args=[tool_input.get("query", ""), tool_input.get("num_results", 5)],
+                **IO_OPTIONS,
+            )
+        if tool_name == "fetch_url":
+            return await workflow.execute_activity(
+                "swarm_fetch_url",
+                args=[tool_input.get("url", ""), tool_input.get("max_chars", 8000)],
+                **IO_OPTIONS,
+            )
+        if tool_name == "run_command":
+            return await workflow.execute_activity(
+                "swarm_run_command",
+                args=[tool_input.get("command", ""), tool_input.get("cwd")],
+                start_to_close_timeout=timedelta(seconds=60),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
         if tool_name == "check_secrets":
             return await workflow.execute_activity(
                 "swarm_check_secrets",

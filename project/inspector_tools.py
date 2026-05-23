@@ -67,42 +67,32 @@ INSPECTOR_TOOLS: list[dict] = [
         },
     },
     {
-        "name": "web_search",
-        "description": (
-            "Search the web to diagnose an unfamiliar error message, look up a test framework's API, "
-            "or find known issues with a library version."
-        ),
+        "name": "list_directory",
+        "description": "List the contents of a directory. Use to locate test files before running them.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Search query."},
-                "num_results": {"type": "integer", "description": "Number of results (default: 5)."},
+                "path": {"type": "string", "description": "Absolute path to the directory."},
+                "max_depth": {"type": "integer", "description": "Max recursion depth (default 2).", "default": 2},
             },
-            "required": ["query"],
+            "required": ["path"],
         },
     },
     {
-        "name": "fetch_url",
-        "description": "Fetch a URL (e.g. a GitHub issue, changelog, or error page) and return its text.",
+        "name": "search_files",
+        "description": "Search for test files by name pattern or find failing code by content.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "url": {"type": "string", "description": "URL to fetch."},
-                "max_chars": {"type": "integer", "description": "Max characters to return (default: 8000)."},
+                "pattern": {"type": "string", "description": "Glob pattern or content regex."},
+                "path": {"type": "string", "description": "Root directory to search."},
+                "type": {
+                    "type": "string",
+                    "enum": ["name", "content"],
+                    "description": "'name' for filename glob, 'content' for text search.",
+                },
             },
-            "required": ["url"],
-        },
-    },
-    {
-        "name": "execute_sql",
-        "description": "Query the project database to verify data integrity, check migration results, or confirm schema.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "SQL to execute."},
-                "database_url": {"type": "string", "description": "DB URL (default: reads DATABASE_URL env var)."},
-            },
-            "required": ["query"],
+            "required": ["pattern", "path"],
         },
     },
     {

@@ -257,6 +257,18 @@ class PMAgent:
                 args=[tool_input.get("query", ""), tool_input.get("num_results", 5)],
                 **IO_OPTIONS,
             )
+        if tool_name == "fetch_url":
+            return await workflow.execute_activity(
+                "swarm_fetch_url",
+                args=[tool_input.get("url", ""), tool_input.get("max_chars", 8000)],
+                **IO_OPTIONS,
+            )
+        if tool_name == "memory_read":
+            return await workflow.execute_activity(
+                "swarm_memory_read",
+                args=[tool_input.get("repo_path", "."), tool_input.get("keys")],
+                **IO_OPTIONS,
+            )
         if tool_name == "memory_write":
             return await workflow.execute_activity(
                 "swarm_memory_write",

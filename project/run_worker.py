@@ -17,6 +17,7 @@ from workflows.pm_agent import PMAgent
 from workflows.architect_agent import ArchitectAgent
 from workflows.builder_agent import BuilderAgent
 from workflows.inspector_agent import InspectorAgent
+from workflows.reviewer_agent import ReviewerAgent
 from workflows.security_agent import SecurityAgent
 from workflows.devops_agent import DevOpsAgent
 from project.child_workflow import ApprovalWorkflow, ClarificationWorkflow
@@ -74,6 +75,7 @@ from activities.pm_planner_activity import plan_pm_step
 from activities.architect_planner_activity import plan_architect_step
 from activities.builder_planner_activity import plan_builder_step
 from activities.inspector_planner_activity import plan_inspector_step
+from activities.reviewer_planner_activity import plan_reviewer_step
 from activities.security_planner_activity import plan_security_step
 from activities.devops_planner_activity import plan_devops_step
 from activities.classify_tier_activity import classify_tier_llm
@@ -137,6 +139,7 @@ async def main():
         plan_architect_step,
         plan_builder_step,
         plan_inspector_step,
+        plan_reviewer_step,
         plan_security_step,
         plan_devops_step,
         classify_tier_llm,
@@ -163,6 +166,7 @@ async def main():
             ArchitectAgent,
             BuilderAgent,
             InspectorAgent,
+            ReviewerAgent,
             SecurityAgent,
             DevOpsAgent,
             ApprovalWorkflow,

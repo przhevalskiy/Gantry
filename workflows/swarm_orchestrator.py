@@ -44,6 +44,7 @@ with workflow.unsafe.imports_passed_through():
     from workflows.architect_agent import ArchitectAgent
     from workflows.builder_agent import BuilderAgent
     from workflows.inspector_agent import InspectorAgent
+    from workflows.reviewer_agent import ReviewerAgent
     from workflows.security_agent import SecurityAgent
     from workflows.devops_agent import DevOpsAgent
 
@@ -54,6 +55,7 @@ PM_TIMEOUT        = timedelta(hours=50)   # 48 h clarification window + buffer
 ARCHITECT_TIMEOUT = timedelta(minutes=10)
 BUILDER_TIMEOUT   = timedelta(minutes=30)
 INSPECTOR_TIMEOUT = timedelta(minutes=15)
+REVIEWER_TIMEOUT  = timedelta(minutes=8)
 SECURITY_TIMEOUT  = timedelta(minutes=10)
 DEVOPS_TIMEOUT    = timedelta(minutes=10)
 
@@ -773,6 +775,7 @@ class SwarmOrchestrator(BaseWorkflow):
         heal_instructions: list[str] = []
         build_result: dict = {}
         inspector_report: dict = {}
+        reviewer_report: dict = {"verdict": "approve", "summary": "", "comments": []}
         heal_cycles = 0
         _builder_model = _model_for_tier(tier)
         _inspector_model = _model_for_tier(tier)
@@ -1098,7 +1101,60 @@ class SwarmOrchestrator(BaseWorkflow):
                 if inspector_report.get("tests_skipped"):
                     existing = build_result.get("summary", "")
                     build_result["summary"] = (existing + f"\n\n{inspector_summary}").strip()
-                break
+
+                # ── Reviewer: logic + contract check ─────────────────────────
+                if lightweight_mode:
+                    reviewer_report = {"verdict": "approve", "summary": "Reviewer skipped in lightweight mode.", "comments": []}
+                else:
+                    await adk.messages.create(
+                        task_id=task_id,
+                        content=TextContent(author="agent", content="[Foreman] Dispatching Reviewer — checking logic and contracts"),
+                    )
+                    all_key_files_for_review = list({kf for t in tracks for kf in t.get("key_files", []) if kf})
+                    reviewer_json: str = await workflow.execute_child_workflow(
+                        ReviewerAgent.run,
+                        args=[goal, repo_path, architect_plan, all_key_files_for_review, task_id],
+                        id=f"{task_id}-r{iteration}-reviewer-c{cycle}",
+                        task_queue=task_queue,
+                        execution_timeout=REVIEWER_TIMEOUT,
+                    )
+                    try:
+                        reviewer_report = json.loads(reviewer_json)
+                    except (json.JSONDecodeError, ValueError):
+                        reviewer_report = {"verdict": "approve", "summary": reviewer_json, "comments": []}
+
+                if reviewer_report.get("verdict") == "approve":
+                    log.info("reviewer_approved", cycle=cycle)
+                    await adk.messages.create(
+                        task_id=task_id,
+                        content=TextContent(
+                            author="agent",
+                            content=f"[Reviewer] ✓ Approved — {reviewer_report.get('summary', '')}",
+                        ),
+                    )
+                    break
+
+                # Reviewer requested changes — convert comments to heal instructions
+                review_comments = reviewer_report.get("comments", [])
+                reviewer_heal = [
+                    f"{c.get('file', '')}:{c.get('line', '?')} [{c.get('severity', 'major')}] {c.get('issue', '')} — Fix: {c.get('suggestion', '')}"
+                    for c in review_comments
+                ] or [reviewer_report.get("summary", "Reviewer requested changes.")]
+                log.info("reviewer_requested_changes", cycle=cycle, items=len(reviewer_heal))
+                await adk.messages.create(
+                    task_id=task_id,
+                    content=TextContent(
+                        author="agent",
+                        content=(
+                            f"[Reviewer] ✗ Changes requested ({len(reviewer_heal)} issue(s)) — "
+                            + "; ".join(reviewer_heal[:2])
+                        ),
+                    ),
+                )
+                heal_instructions = reviewer_heal
+                heal_cycles += 1
+                tracks = [{"label": "reviewer-heal", "implementation_steps": heal_instructions, "key_files": all_key_files_for_review}]
+                continue
 
             # Merge structured heal_items (precise) with free-text heal_instructions
             heal_items = inspector_report.get("heal_items", [])
@@ -1285,6 +1341,7 @@ class SwarmOrchestrator(BaseWorkflow):
                 tracks=tracks,
                 build_result=build_result,
                 inspector_report=inspector_report,
+                reviewer_report=reviewer_report,
                 security_report=security_report,
                 devops_result=None,
                 heal_cycles=heal_cycles,
@@ -1324,6 +1381,7 @@ class SwarmOrchestrator(BaseWorkflow):
                     tracks=tracks,
                     build_result=build_result,
                     inspector_report=inspector_report,
+                    reviewer_report=reviewer_report,
                     security_report=security_report,
                     devops_result=None,
                     heal_cycles=heal_cycles,
@@ -1401,6 +1459,7 @@ class SwarmOrchestrator(BaseWorkflow):
             tracks=tracks,
             build_result=build_result,
             inspector_report=inspector_report,
+            reviewer_report=reviewer_report,
             security_report=security_report,
             devops_result=devops_result,
             heal_cycles=heal_cycles,
@@ -1454,6 +1513,7 @@ def _build_final_report(
     tracks: list[dict],
     build_result: dict,
     inspector_report: dict,
+    reviewer_report: dict,
     security_report: dict,
     devops_result: dict | None,
     heal_cycles: int,
@@ -1467,9 +1527,11 @@ def _build_final_report(
 
     status = "✓ Complete" if not blocked_by else f"⚠ Blocked by {blocked_by}"
     qa_status = "✓ Passed" if inspector_report.get("passed") else "✗ Failed"
+    rev_verdict = reviewer_report.get("verdict", "approve")
+    rev_status = "✓ Approved" if rev_verdict == "approve" else "✗ Changes requested"
     sec_status = "✓ Clean" if security_report.get("passed") else "✗ Issues found"
 
-    track_labels = [t.get("label", "?") for t in tracks if t.get("label") != "heal"]
+    track_labels = [t.get("label", "?") for t in tracks if t.get("label") not in ("heal", "reviewer-heal")]
     tracks_str = ", ".join(track_labels) if track_labels else "main"
 
     lines = [
@@ -1481,6 +1543,7 @@ def _build_final_report(
         f"- Architect: {len(tracks)} parallel track(s) — {tracks_str}",
         f"- Builders: {len(edits)} file(s) modified (heal cycles: {heal_cycles})",
         f"- Inspector: {qa_status}",
+        f"- Reviewer: {rev_status}",
         f"- Security: {sec_status} ({len(findings)} finding(s))",
     ]
 

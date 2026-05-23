@@ -49,6 +49,18 @@ PM_TOOLS: list[dict] = [
         },
     },
     {
+        "name": "fetch_url",
+        "description": "Fetch a URL and return its text. Use to read docs, changelogs, or API references found via web_search.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "URL to fetch."},
+                "max_chars": {"type": "integer", "description": "Max characters to return (default: 8000)."},
+            },
+            "required": ["url"],
+        },
+    },
+    {
         "name": "web_search",
         "description": "Search the web to understand an unfamiliar technology or clarify a domain concept before asking the user.",
         "input_schema": {
@@ -83,6 +95,25 @@ PM_TOOLS: list[dict] = [
                 },
             },
             "required": ["questions"],
+        },
+    },
+    {
+        "name": "memory_read",
+        "description": (
+            "Read facts stored by previous builds — tech stack decisions, user preferences, constraints. "
+            "Call early to avoid asking questions that were already answered."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "repo_path": {"type": "string", "description": "Absolute repo root path."},
+                "keys": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Specific keys to fetch. Omit for all.",
+                },
+            },
+            "required": ["repo_path"],
         },
     },
     {

@@ -106,6 +106,7 @@ const STAGE_SIGNALS: { stage: string; pattern: RegExp }[] = [
   { stage: 'architect', pattern: /\[Foreman\] Dispatching Architect/ },
   { stage: 'builder',   pattern: /\[Foreman\] (?:Dispatching Builder|Launching \d+ parallel builder)/ },
   { stage: 'inspector', pattern: /\[Foreman\] Dispatching Inspector/ },
+  { stage: 'reviewer',  pattern: /\[Foreman\] Dispatching Reviewer/ },
   { stage: 'security',  pattern: /\[Foreman\] Dispatching Security/ },
   { stage: 'devops',    pattern: /\[Foreman\] Dispatching DevOps/ },
 ];
@@ -120,7 +121,7 @@ export function parsePipeline(
   isDone: boolean,
   isFailed: boolean,
 ): ParsedPipeline {
-  const STAGE_KEYS = ['pm', 'architect', 'builder', 'inspector', 'security', 'devops'];
+  const STAGE_KEYS = ['pm', 'architect', 'builder', 'inspector', 'reviewer', 'security', 'devops'];
 
   let activeStage: string | null = null;
   let parallelTracks: string[] = [];

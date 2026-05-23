@@ -125,6 +125,49 @@ ARCHITECT_TOOLS: list[dict] = [
         },
     },
     {
+        "name": "web_search",
+        "description": (
+            "Search the web to look up an unfamiliar library, framework API, or third-party integration "
+            "before writing the implementation plan. Use this so the plan references real APIs, not guesses."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search query."},
+                "num_results": {"type": "integer", "description": "Number of results (default 5)."},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "fetch_url",
+        "description": "Fetch a URL and return its text. Use to read API docs or changelogs found via web_search.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "URL to fetch."},
+                "max_chars": {"type": "integer", "description": "Max characters to return (default: 8000)."},
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "run_command",
+        "description": (
+            "Run a read-only shell command to observe the current state of the repo — "
+            "e.g. check what routes are registered, what tests exist, or what the DB schema looks like. "
+            "Do NOT use to modify files or install packages."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "command": {"type": "string", "description": "Shell command to run."},
+                "cwd": {"type": "string", "description": "Working directory (default: repo root)."},
+            },
+            "required": ["command"],
+        },
+    },
+    {
         "name": "check_secrets",
         "description": (
             "Check whether required environment variables (API keys, tokens, DB URLs) are present "

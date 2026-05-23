@@ -5,16 +5,26 @@ import { AgentCard, type AgentDef } from './agent-card';
 const SWARM_AGENTS: AgentDef[] = [
   {
     step: 1,
-    role: 'PM',
-    tagline: 'Translates the goal into a scoped specification: clarifies ambiguities, identifies risks, and defines acceptance criteria before any code runs.',
-    why: 'Without a PM gate, builders hallucinate scope. One LLM call up front prevents wasted cycles downstream.',
-    tools: ['clarify', 'report_spec'],
+    role: 'Foreman',
+    tagline: 'The durable orchestrator. Scores complexity, dispatches each stage in sequence, manages the heal loop, and blocks the PR if security fails.',
+    why: 'The single source of truth for pipeline state. If the process dies mid-run, Temporal rehydrates the Foreman and it continues from the last checkpoint.',
+    tools: ['Temporal workflow'],
     mode: 'swarm',
     color: '#6366f1',
     spriteRole: 'foreman',
   },
   {
     step: 2,
+    role: 'PM',
+    tagline: 'Translates the goal into a scoped specification: clarifies ambiguities, identifies risks, and defines acceptance criteria before any code runs.',
+    why: 'Without a PM gate, builders hallucinate scope. One LLM call up front prevents wasted cycles downstream.',
+    tools: ['read_file', 'list_directory', 'clarify', 'report_spec'],
+    mode: 'swarm',
+    color: '#0ea5e9',
+    spriteRole: 'foreman',
+  },
+  {
+    step: 3,
     role: 'Architect',
     tagline: 'Reads the repo, maps dependencies and entry points, and produces a structured file-level implementation plan.',
     why: 'Builders should never guess at structure. The Architect reads first so each Builder writes with full context.',
@@ -24,7 +34,7 @@ const SWARM_AGENTS: AgentDef[] = [
     spriteRole: 'architect',
   },
   {
-    step: 3,
+    step: 4,
     role: 'Builder',
     tagline: 'Executes the Architect\'s plan — creating, patching, and deleting files. Multiple Builders run in parallel across tracks. Re-invoked with heal instructions if QA fails.',
     why: 'Code writing is isolated from planning and testing. Parallel tracks compress wall-clock time on multi-file changes.',
@@ -34,7 +44,7 @@ const SWARM_AGENTS: AgentDef[] = [
     spriteRole: 'builder',
   },
   {
-    step: 4,
+    step: 5,
     role: 'Inspector',
     tagline: 'Runs tests, lint, and type checks. If anything fails, produces concrete heal_instructions fed back to the Builder.',
     why: 'The self-healing loop. Up to N cycles of Builder → Inspector until all checks pass or the limit is hit.',
@@ -44,7 +54,17 @@ const SWARM_AGENTS: AgentDef[] = [
     spriteRole: 'inspector',
   },
   {
-    step: 5,
+    step: 6,
+    role: 'Reviewer',
+    tagline: 'Reads the diff and checks logic correctness, edge-case handling, and API contract compliance. If changes are needed, feeds back into the heal loop.',
+    why: 'Tests can pass and logic can still be wrong. The Reviewer is the only agent that asks: "does this actually do what was asked?"',
+    tools: ['git_diff', 'read_file', 'report_review'],
+    mode: 'swarm',
+    color: '#a855f7',
+    spriteRole: 'inspector',
+  },
+  {
+    step: 7,
     role: 'Security',
     tagline: 'Scans for committed secrets, vulnerable dependencies, and insecure patterns. Blocks the PR if critical or high findings exist.',
     why: 'A hard gate before any code reaches a PR. No critical finding goes unreviewed.',
@@ -54,7 +74,7 @@ const SWARM_AGENTS: AgentDef[] = [
     spriteRole: 'security',
   },
   {
-    step: 6,
+    step: 8,
     role: 'DevOps',
     tagline: 'Creates the branch, stages only the build\'s changed files, commits with a conventional message, pushes, and opens a pull request.',
     why: 'Git operations are deterministic and isolated. The swarm never touches main directly.',
@@ -65,7 +85,7 @@ const SWARM_AGENTS: AgentDef[] = [
   },
 ];
 
-const PIPELINE_SWARM = ['PM', 'Architect', 'Builders ×N', 'Inspector ↺', 'Security', 'DevOps'];
+const PIPELINE_SWARM = ['Foreman', 'PM', 'Architect', 'Builders ×N', 'Inspector ↺', 'Reviewer', 'Security', 'DevOps'];
 
 export function AgentDirectory() {
   return (

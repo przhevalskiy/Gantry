@@ -63,6 +63,38 @@ SECURITY_TOOLS: list[dict] = [
         },
     },
     {
+        "name": "git_diff",
+        "description": "Get the diff of changed files to focus the security scan on what actually changed, not the entire repo.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "paths": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Specific file paths to diff. Omit for all changed files.",
+                },
+                "cwd": {"type": "string", "description": "Repository root directory."},
+            },
+        },
+    },
+    {
+        "name": "search_files",
+        "description": "Search for files by name pattern or content. Use to find all files that import a suspicious package or use an insecure pattern.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "pattern": {"type": "string", "description": "Glob pattern or content regex."},
+                "path": {"type": "string", "description": "Root directory to search."},
+                "type": {
+                    "type": "string",
+                    "enum": ["name", "content"],
+                    "description": "'name' for filename glob, 'content' for text search.",
+                },
+            },
+            "required": ["pattern", "path"],
+        },
+    },
+    {
         "name": "report_audit",
         "description": (
             "Call this when the security audit is complete. "

@@ -154,4 +154,16 @@ class SecurityAgent:
                 args=[tool_input.get("command", ""), tool_input.get("cwd")],
                 **CMD_OPTIONS,
             )
+        if tool_name == "git_diff":
+            return await workflow.execute_activity(
+                "swarm_git_diff",
+                args=[tool_input.get("cwd"), False, tool_input.get("paths")],
+                **IO_OPTIONS,
+            )
+        if tool_name == "search_files":
+            return await workflow.execute_activity(
+                "swarm_search_filesystem",
+                args=[tool_input.get("pattern", ""), tool_input.get("path", "."), tool_input.get("type", "name")],
+                **IO_OPTIONS,
+            )
         return f"Error: tool '{tool_name}' not dispatched."

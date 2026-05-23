@@ -5,6 +5,18 @@ Writes, modifies, and deletes files in the local repo.
 
 BUILDER_TOOLS: list[dict] = [
     {
+        "name": "list_directory",
+        "description": "List the contents of a directory to confirm the project layout before writing files.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Absolute path to the directory."},
+                "max_depth": {"type": "integer", "description": "Max recursion depth (default 2).", "default": 2},
+            },
+            "required": ["path"],
+        },
+    },
+    {
         "name": "read_file",
         "description": "Read the current contents of a file before modifying it.",
         "input_schema": {

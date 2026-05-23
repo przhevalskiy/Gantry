@@ -137,6 +137,22 @@ DEVOPS_TOOLS: list[dict] = [
         },
     },
     {
+        "name": "memory_write",
+        "description": (
+            "Store a durable fact for future builds — e.g. the PR URL, branch name, or deployment URL. "
+            "Use scoped keys, e.g. 'devops.last_pr_url', 'devops.last_branch'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "key": {"type": "string", "description": "Scoped fact key."},
+                "value": {"type": "string", "description": "Value to store."},
+                "repo_path": {"type": "string", "description": "Absolute repo root path."},
+            },
+            "required": ["key", "value", "repo_path"],
+        },
+    },
+    {
         "name": "report_devops",
         "description": "Call this when all git operations are complete.",
         "input_schema": {

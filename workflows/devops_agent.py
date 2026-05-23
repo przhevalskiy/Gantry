@@ -222,4 +222,10 @@ class DevOpsAgent:
                 args=[tool_input.get("repo_path", "."), tool_input.get("keys")],
                 **IO_OPTIONS,
             )
+        if tool_name == "memory_write":
+            return await workflow.execute_activity(
+                "swarm_memory_write",
+                args=[tool_input.get("key", ""), tool_input.get("value", ""), tool_input.get("repo_path", "."), "devops"],
+                **IO_OPTIONS,
+            )
         return f"Error: tool '{tool_name}' not dispatched."

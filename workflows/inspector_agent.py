@@ -212,6 +212,18 @@ class InspectorAgent:
         return json.dumps({"passed": False, "summary": "Inspector hit max turns.", "heal_instructions": []})
 
     async def _dispatch(self, tool_name: str, tool_input: dict) -> str:
+        if tool_name == "list_directory":
+            return await workflow.execute_activity(
+                "swarm_list_directory",
+                args=[tool_input.get("path", "."), tool_input.get("max_depth", 2)],
+                **IO_OPTIONS,
+            )
+        if tool_name == "search_files":
+            return await workflow.execute_activity(
+                "swarm_search_filesystem",
+                args=[tool_input.get("pattern", ""), tool_input.get("path", "."), tool_input.get("type", "name")],
+                **IO_OPTIONS,
+            )
         if tool_name == "read_file":
             return await workflow.execute_activity(
                 "swarm_read_file", args=[tool_input.get("path", "")], **IO_OPTIONS
@@ -238,24 +250,6 @@ class InspectorAgent:
             return await workflow.execute_activity(
                 "swarm_check_secrets",
                 args=[tool_input.get("names", [])],
-                **IO_OPTIONS,
-            )
-        if tool_name == "web_search":
-            return await workflow.execute_activity(
-                "swarm_web_search",
-                args=[tool_input.get("query", ""), tool_input.get("num_results", 5)],
-                **IO_OPTIONS,
-            )
-        if tool_name == "fetch_url":
-            return await workflow.execute_activity(
-                "swarm_fetch_url",
-                args=[tool_input.get("url", ""), tool_input.get("max_chars", 8000)],
-                **IO_OPTIONS,
-            )
-        if tool_name == "execute_sql":
-            return await workflow.execute_activity(
-                "swarm_execute_sql",
-                args=[tool_input.get("query", ""), tool_input.get("database_url"), tool_input.get("cwd")],
                 **IO_OPTIONS,
             )
         if tool_name == "list_ports":

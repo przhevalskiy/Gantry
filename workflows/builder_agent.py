@@ -456,6 +456,12 @@ class BuilderAgent:
         })
 
     async def _dispatch(self, tool_name: str, tool_input: dict) -> str:
+        if tool_name == "list_directory":
+            return await workflow.execute_activity(
+                "swarm_list_directory",
+                args=[tool_input.get("path", "."), tool_input.get("max_depth", 2)],
+                **IO_OPTIONS,
+            )
         if tool_name == "read_file":
             return await workflow.execute_activity(
                 "swarm_read_file", args=[tool_input.get("path", "")], **IO_OPTIONS
