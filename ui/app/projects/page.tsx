@@ -2,9 +2,10 @@
 
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { listProjects, deleteProject, type Project } from '@/lib/project-repository';
-import { getReportsByProject, deleteReportsByProject, type SavedReport } from '@/lib/report-store';
-import { useTaskStatuses } from '@/hooks/use-task-statuses';
+import { deleteReportsByProject, getReport } from '@/lib/report-store';
+import { useAllTasks, type LiveTask } from '@/hooks/use-all-tasks';
 import { useProjectStore } from '@/lib/project-store';
 
 const ACCENT = '#f97316';
@@ -22,79 +23,48 @@ type TaskStatus = 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELED' | string;
 
 type ProjectCard = {
   project: Project;
-  reports: SavedReport[];
+  tasks: LiveTask[];
   activeCount: number;
   lastActivity: string | null;
-  latestSummary: string | null;
-  nextStep: string | null;
+  latestGoal: string | null;
 };
 
-function extractNextStep(summary: string | null): string | null {
-  if (!summary) return null;
-  const healMatch = summary.match(/Remaining QA Issues\n(- .+)/);
-  if (healMatch) return healMatch[1].replace(/^- /, '');
-  const secMatch = summary.match(/Security Findings.*\n(- .+)/);
-  if (secMatch) return secMatch[1].replace(/^- \[.*?\] /, '');
-  if (summary.includes('✓ Complete')) return 'Build complete — ready for follow-up.';
-  if (summary.includes('⚠ Blocked')) return 'Resolve blocking issue before proceeding.';
-  return null;
-}
-
-// Derive status from live Agentex data + local report store messages
+// Status derived directly from Agentex task objects.
+// HITL sub-states still work for tasks whose last message was cached in localStorage.
 function resolveStatus(
-  reports: SavedReport[],
-  liveStatuses: Map<string, string>,
+  tasks: LiveTask[],
 ): { label: string; color: string; pulsing: boolean } {
-  // Find all currently RUNNING tasks for this project
-  const runningReports = reports.filter(r => liveStatuses.get(r.taskId) === 'RUNNING');
+  const runningTasks = tasks.filter(t => t.status === 'RUNNING');
 
-  if (runningReports.length > 0) {
-    // Check the latest message content stored in the report for HITL/wait signals
-    const latestRunning = runningReports[0];
-    const content = latestRunning.lastMessageContent ?? '';
-
-    // PM clarification — asking questions before planning
-    if (content.includes('__clarification_request__')) {
-      return { label: 'Needs your input', color: '#8b5cf6', pulsing: true };
+  if (runningTasks.length > 0) {
+    for (const rt of runningTasks) {
+      const content = getReport(rt.id)?.lastMessageContent ?? '';
+      if (content.includes('__clarification_request__'))
+        return { label: 'Needs your input', color: '#8b5cf6', pulsing: true };
+      if (content.includes('"checkpoint":"architect_plan"') || content.includes('"checkpoint": "architect_plan"'))
+        return { label: 'Plan review needed', color: '#3b82f6', pulsing: true };
+      if (content.includes('"checkpoint":"max_heals"') || content.includes('"checkpoint": "max_heals"'))
+        return { label: 'Action required', color: '#ef4444', pulsing: true };
+      if (content.includes('"checkpoint":"devops"') || content.includes('"checkpoint": "devops"'))
+        return { label: 'PR approval needed', color: '#06b6d4', pulsing: true };
+      if (content.includes('Waiting for follow-up'))
+        return { label: 'Awaiting follow-up', color: '#f59e0b', pulsing: true };
     }
-    // Architect plan review
-    if (content.includes('"checkpoint":"architect_plan"') || content.includes('"checkpoint": "architect_plan"')) {
-      return { label: 'Plan review needed', color: '#3b82f6', pulsing: true };
-    }
-    // Heal exhaustion — proceed or abort
-    if (content.includes('"checkpoint":"max_heals"') || content.includes('"checkpoint": "max_heals"')) {
-      return { label: 'Action required', color: '#ef4444', pulsing: true };
-    }
-    // DevOps / PR approval
-    if (content.includes('"checkpoint":"devops"') || content.includes('"checkpoint": "devops"')) {
-      return { label: 'PR approval needed', color: '#06b6d4', pulsing: true };
-    }
-    // Follow-up wait loop
-    if (content.includes('Waiting for follow-up')) {
-      return { label: 'Awaiting follow-up', color: '#f59e0b', pulsing: true };
-    }
-    // Actively building
     return {
-      label: `${runningReports.length} agent${runningReports.length > 1 ? 's' : ''} building`,
+      label: `${runningTasks.length} agent${runningTasks.length > 1 ? 's' : ''} building`,
       color: ACCENT,
       pulsing: true,
     };
   }
 
-  if (reports.length === 0) return { label: 'No builds yet', color: 'var(--text-secondary)', pulsing: false };
+  if (tasks.length === 0) return { label: 'No builds yet', color: 'var(--text-secondary)', pulsing: false };
 
-  const latest = reports[0];
-  const latestLive = liveStatuses.get(latest.taskId);
-
-  if (latestLive === 'FAILED' || latest.summary?.includes('Failed')) {
-    return { label: 'Failed', color: '#ef4444', pulsing: false };
-  }
-  if (latest.summary?.includes('✓ Complete') || latestLive === 'COMPLETED') {
-    return { label: 'Complete', color: '#22c55e', pulsing: false };
-  }
-  if (latest.summary?.includes('⚠ Blocked')) {
-    return { label: 'Blocked', color: '#ef4444', pulsing: false };
-  }
+  const latest = tasks[0];
+  if (latest.status === 'FAILED')    return { label: 'Failed',    color: '#ef4444', pulsing: false };
+  if (latest.status === 'COMPLETED') return { label: 'Complete',  color: '#22c55e', pulsing: false };
+  if (latest.status === 'TERMINATED' || latest.status === 'CANCELED')
+    return { label: 'Stopped', color: '#6b7280', pulsing: false };
+  if (latest.status === 'TIMED_OUT') return { label: 'Timed out', color: '#f59e0b', pulsing: false };
   return { label: 'Idle', color: 'var(--text-secondary)', pulsing: false };
 }
 
@@ -188,41 +158,58 @@ function CardMenu({ onActivate, onCopy, onDelete, copied }: {
   );
 }
 
+// ── Status dot for task rows ──────────────────────────────────────────────────
+
+const TASK_STATUS_STYLE: Record<string, { label: string; color: string; pulse: boolean }> = {
+  RUNNING:    { label: 'Running',   color: '#3b82f6', pulse: true  },
+  COMPLETED:  { label: 'Done',      color: '#22c55e', pulse: false },
+  FAILED:     { label: 'Failed',    color: '#ef4444', pulse: false },
+  TERMINATED: { label: 'Stopped',   color: '#6b7280', pulse: false },
+  CANCELED:   { label: 'Cancelled', color: '#6b7280', pulse: false },
+  TIMED_OUT:  { label: 'Timed out', color: '#f59e0b', pulse: false },
+};
+
+function TaskStatusDot({ status }: { status: string }) {
+  const s = TASK_STATUS_STYLE[status] ?? { label: status, color: '#6b7280', pulse: false };
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
+      <span style={{
+        width: 6, height: 6, borderRadius: '50%', background: s.color, flexShrink: 0,
+        animation: s.pulse ? 'taskRowPulse 1.4s ease-in-out infinite' : 'none',
+      }} />
+      <span style={{ fontSize: '0.7rem', color: s.color, fontWeight: 500, minWidth: '3rem' }}>{s.label}</span>
+    </span>
+  );
+}
+
 // ── Project card ──────────────────────────────────────────────────────────────
 
 function ProjectCard({
   card,
-  liveStatuses,
-  onClick,
   onDelete,
   onActivate,
   isActive = false,
   viewMode = 'grid',
 }: {
   card: ProjectCard;
-  liveStatuses: Map<string, string>;
-  onClick: () => void;
   onDelete: () => void;
   onActivate: () => void;
   isActive?: boolean;
   viewMode?: ViewMode;
 }) {
-  const { project, reports } = card;
-  const { label, color, pulsing } = resolveStatus(reports, liveStatuses);
-  const latestQuery = reports[0]?.query ?? null;
-  const nextStep = card.nextStep;
+  const { project, tasks } = card;
+  const { label, color, pulsing } = resolveStatus(tasks);
   const lastDate = card.lastActivity ? new Date(card.lastActivity) : null;
   const relativeTime = lastDate ? formatRelative(lastDate) : null;
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
+  const visibleTasks = tasks.slice(0, 5);
 
   React.useEffect(() => {
     if (!menuOpen) return;
     const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -230,182 +217,108 @@ function ProjectCard({
 
   function handleCopyLink() {
     setMenuOpen(false);
-    const latest = reports[0];
-    const url = latest
-      ? `${window.location.origin}/task/${latest.taskId}`
-      : window.location.origin;
+    const latest = tasks[0];
+    const url = latest ? `${window.location.origin}/task/${latest.id}` : window.location.origin;
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
-  // Use a div as the card container so the menu can sit outside the clickable area
   return (
-    <div
-      style={{
-        position: 'relative',
-        background: 'var(--surface)',
-        border: `1px solid ${isActive ? ACCENT + '60' : 'var(--border)'}`,
-        borderRadius: viewMode === 'list' ? '10px' : '14px',
-        transition: 'border-color 0.15s, box-shadow 0.15s',
-        cursor: 'pointer',
-        boxShadow: isActive ? `0 0 0 1px ${ACCENT}30` : 'none',
-      }}
-      onMouseEnter={e => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = ACCENT + '80';
-        (e.currentTarget as HTMLDivElement).style.boxShadow = `0 4px 20px ${ACCENT}12`;
-      }}
-      onMouseLeave={e => {
-        (e.currentTarget as HTMLDivElement).style.borderColor = isActive ? ACCENT + '60' : 'var(--border)';
-        (e.currentTarget as HTMLDivElement).style.boxShadow = isActive ? `0 0 0 1px ${ACCENT}30` : 'none';
-      }}
-    >
+    <div style={{
+      position: 'relative',
+      background: 'var(--surface)',
+      border: `1px solid ${isActive ? ACCENT + '60' : 'var(--border)'}`,
+      borderRadius: viewMode === 'list' ? '10px' : '14px',
+      transition: 'border-color 0.15s, box-shadow 0.15s',
+      boxShadow: isActive ? `0 0 0 1px ${ACCENT}30` : 'none',
+    }}>
+      <style>{`@keyframes taskRowPulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }`}</style>
 
-
-      {/* Clickable card body */}
+      {/* Header — click to activate this project */}
       <div
-        onClick={onClick}
+        onClick={onActivate}
         style={{
-          padding: viewMode === 'list' ? '0.75rem 1rem' : '1.25rem',
+          padding: viewMode === 'list' ? '0.75rem 1rem' : '1rem 1.25rem 0.75rem',
           display: 'flex',
-          flexDirection: viewMode === 'list' ? 'row' : 'column',
-          alignItems: viewMode === 'list' ? 'center' : undefined,
-          gap: viewMode === 'list' ? '1rem' : '0.875rem',
+          alignItems: 'center',
+          gap: viewMode === 'list' ? '1rem' : '0.625rem',
+          cursor: 'pointer',
         }}
+        onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--surface-raised)'; (e.currentTarget as HTMLDivElement).style.borderRadius = viewMode === 'list' ? '10px' : '14px 14px 0 0'; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
       >
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flex: viewMode === 'list' ? '0 0 220px' : undefined }}>
-            <span style={{ color: 'var(--text-secondary)', display: 'flex', opacity: 0.6 }}><IconFolder /></span>
-            <div>
-              <p style={{ fontSize: viewMode === 'list' ? '0.875rem' : '0.9375rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0, lineHeight: 1.2 }}>
-                {card.project.name}
-                {isActive && <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', fontWeight: 700, color: ACCENT, background: `${ACCENT}18`, border: `1px solid ${ACCENT}40`, borderRadius: '4px', padding: '0.05rem 0.3rem', verticalAlign: 'middle' }}>active</span>}
-              </p>
-              {viewMode !== 'list' && (
-                <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0', opacity: 0.6 }}>
-                  {card.project.slug}
+        <span style={{ color: 'var(--text-secondary)', display: 'flex', opacity: 0.6, flexShrink: 0 }}><IconFolder /></span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: viewMode === 'list' ? '0.875rem' : '0.9375rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0, lineHeight: 1.2 }}>
+            {project.name}
+            {isActive && <span style={{ marginLeft: '0.4rem', fontSize: '0.65rem', fontWeight: 700, color: ACCENT, background: `${ACCENT}18`, border: `1px solid ${ACCENT}40`, borderRadius: '4px', padding: '0.05rem 0.3rem', verticalAlign: 'middle' }}>active</span>}
+          </p>
+          {viewMode !== 'list' && (
+            <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', margin: '0.1rem 0 0', opacity: 0.5 }}>{project.slug}</p>
+          )}
+        </div>
+
+        {/* Status */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexShrink: 0, flex: viewMode === 'list' ? '0 0 160px' : undefined }}>
+          <PulsingDot color={color} pulsing={pulsing} />
+          <span style={{ fontSize: '0.75rem', color, fontWeight: 500 }}>{label}</span>
+        </div>
+
+        {viewMode === 'list' && (
+          <>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', opacity: 0.4, flexShrink: 0 }}>{relativeTime}</span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', opacity: 0.4, flexShrink: 0 }}>{tasks.length} build{tasks.length !== 1 ? 's' : ''}</span>
+          </>
+        )}
+
+        {/* ⋯ menu */}
+        <div ref={menuRef} style={{ position: 'relative', flexShrink: 0, marginLeft: viewMode === 'list' ? 'auto' : undefined }} onClick={e => e.stopPropagation()}>
+          <button onClick={() => setMenuOpen(o => !o)} title="Project actions" style={{ background: menuOpen ? 'var(--surface-raised)' : 'transparent', border: `1px solid ${menuOpen ? 'var(--border)' : 'transparent'}`, borderRadius: '6px', padding: '0.15rem 0.45rem', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '1.1rem', lineHeight: 1.4, fontFamily: 'inherit', display: 'flex', alignItems: 'center', transition: 'background 0.1s, border-color 0.1s' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-raised)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)'; }}
+            onMouseLeave={e => { if (!menuOpen) { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'transparent'; } }}
+          >⋯</button>
+          {menuOpen && <CardMenu onActivate={() => { setMenuOpen(false); onActivate(); }} onCopy={handleCopyLink} onDelete={() => { setMenuOpen(false); onDelete(); }} copied={copied} />}
+        </div>
+      </div>
+
+      {/* Task list — grid mode only */}
+      {viewMode !== 'list' && (
+        <div style={{ borderTop: '1px solid var(--border)', padding: '0.25rem 0 0.5rem' }}>
+          {tasks.length === 0 ? (
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', opacity: 0.4, padding: '0.5rem 1.25rem' }}>No builds yet</p>
+          ) : (
+            <>
+              {visibleTasks.map(t => {
+                const age = t.created_at ? (() => {
+                  const diff = Date.now() - new Date(t.created_at).getTime();
+                  const m = Math.floor(diff / 60000);
+                  if (m < 1) return 'just now';
+                  if (m < 60) return `${m}m ago`;
+                  return `${Math.floor(m / 60)}h ago`;
+                })() : null;
+                return (
+                  <Link key={t.id} href={`/task/${t.id}`} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 1.25rem', textDecoration: 'none', background: 'transparent', transition: 'background 0.1s' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'var(--surface-raised)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.background = 'transparent'; }}
+                  >
+                    <TaskStatusDot status={t.status ?? 'UNKNOWN'} />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: '0.8rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {t.goal ?? t.id}
+                    </span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', opacity: 0.45, flexShrink: 0 }}>{age}</span>
+                  </Link>
+                );
+              })}
+              {tasks.length > 5 && (
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', opacity: 0.4, padding: '0.25rem 1.25rem 0', margin: 0 }}>
+                  +{tasks.length - 5} more
                 </p>
               )}
-            </div>
-          </div>
-          {/* ⋯ menu — only shown in grid mode inline; in list mode it's at the end */}
-          {viewMode !== 'list' && (
-            <div
-              ref={menuRef}
-              style={{ position: 'relative', flexShrink: 0 }}
-              onClick={e => e.stopPropagation()}
-            >
-              <button
-                onClick={() => setMenuOpen(o => !o)}
-                title="Project actions"
-                style={{
-                  background: menuOpen ? 'var(--surface-raised)' : 'transparent',
-                  border: `1px solid ${menuOpen ? 'var(--border)' : 'transparent'}`,
-                  borderRadius: '6px', padding: '0.15rem 0.45rem',
-                  cursor: 'pointer', color: 'var(--text-secondary)',
-                  fontSize: '1.1rem', lineHeight: 1.4, fontFamily: 'inherit',
-                  display: 'flex', alignItems: 'center',
-                  transition: 'background 0.1s, border-color 0.1s',
-                }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface-raised)';
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)';
-                }}
-                onMouseLeave={e => {
-                  if (!menuOpen) {
-                    (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'transparent';
-                  }
-                }}
-              >
-                ⋯
-              </button>
-
-              {menuOpen && <CardMenu onActivate={() => { setMenuOpen(false); onActivate(); }} onCopy={handleCopyLink} onDelete={() => { setMenuOpen(false); onDelete(); }} copied={copied} />}
-            </div>
+            </>
           )}
         </div>
-
-        {/* Status row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: viewMode === 'list' ? '0 0 160px' : undefined }}>
-          <PulsingDot color={color} pulsing={pulsing} />
-          <span style={{ fontSize: '0.78rem', color, fontWeight: 500 }}>{label}</span>
-          {viewMode !== 'list' && relativeTime && (
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginLeft: 'auto', opacity: 0.5 }}>
-              {relativeTime}
-            </span>
-          )}
-        </div>
-
-        {/* Latest task */}
-        {latestQuery && viewMode !== 'list' && (
-          <div style={{ background: 'var(--surface-raised)', borderRadius: '8px', padding: '0.5rem 0.625rem' }}>
-            <p style={{ fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', margin: '0 0 0.2rem', opacity: 0.5 }}>
-              Last build
-            </p>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-primary)', margin: 0, lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-              {latestQuery}
-            </p>
-          </div>
-        )}
-
-        {/* Latest task — list mode compact */}
-        {latestQuery && viewMode === 'list' && (
-          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {latestQuery}
-          </p>
-        )}
-
-        {/* Crew recommendation */}
-        {nextStep && viewMode !== 'list' && (
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
-            <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: ACCENT, flexShrink: 0, marginTop: '0.05rem' }}>
-              Crew
-            </span>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
-              {nextStep}
-            </p>
-          </div>
-        )}
-
-        {/* Build count + time */}
-        <div style={{ display: 'flex', alignItems: 'center', marginTop: viewMode === 'list' ? 0 : 'auto', flexShrink: 0 }}>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', opacity: 0.5 }}>
-            {reports.length} build{reports.length !== 1 ? 's' : ''}
-          </span>
-          {viewMode === 'list' && relativeTime && (
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginLeft: '0.75rem', opacity: 0.4 }}>
-              {relativeTime}
-            </span>
-          )}
-        </div>
-
-        {/* List mode ⋯ menu */}
-        {viewMode === 'list' && (
-          <div
-            ref={menuRef}
-            style={{ position: 'relative', flexShrink: 0, marginLeft: 'auto' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setMenuOpen(o => !o)}
-              title="Project actions"
-              style={{
-                background: menuOpen ? 'var(--surface-raised)' : 'transparent',
-                border: `1px solid ${menuOpen ? 'var(--border)' : 'transparent'}`,
-                borderRadius: '6px', padding: '0.15rem 0.45rem',
-                cursor: 'pointer', color: 'var(--text-secondary)',
-                fontSize: '1.1rem', lineHeight: 1.4, fontFamily: 'inherit',
-                display: 'flex', alignItems: 'center',
-              }}
-            >
-              ⋯
-            </button>
-            {menuOpen && <CardMenu onActivate={() => { setMenuOpen(false); onActivate(); }} onCopy={handleCopyLink} onDelete={() => { setMenuOpen(false); onDelete(); }} copied={copied} />}
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
@@ -530,20 +443,16 @@ function FilterDropdown({
 
 function ProjectGrid({
   cards,
-  statusMap,
   viewMode,
   groupBy,
   activeProjectId,
-  onNavigate,
   onActivate,
   onDelete,
 }: {
   cards: ProjectCard[];
-  statusMap: Map<string, string>;
   viewMode: ViewMode;
   groupBy: 'all' | 'status';
   activeProjectId: string | null;
-  onNavigate: (card: ProjectCard) => void;
   onActivate: (card: ProjectCard) => void;
   onDelete: (card: ProjectCard) => void;
 }) {
@@ -556,7 +465,7 @@ function ProjectGrid({
     const groups: Record<string, ProjectCard[]> = {};
     const ORDER = ['Building', 'Action required', 'Complete', 'Failed', 'Idle', 'Other'];
     for (const card of cards) {
-      const { label } = resolveStatus(card.reports, statusMap);
+      const { label } = resolveStatus(card.tasks);
       const l = label.toLowerCase();
       const group = l.includes('building') || l.includes('review') || l.includes('approval') || l.includes('input') ? 'Building'
         : l.includes('action') || l.includes('blocked') ? 'Action required'
@@ -576,9 +485,9 @@ function ProjectGrid({
             </p>
             <div style={gridStyle}>
               {groups[group].map(card => (
-                <ProjectCard key={card.project.id} card={card} liveStatuses={statusMap}
+                <ProjectCard key={card.project.id} card={card}
                   isActive={card.project.id === activeProjectId} viewMode={viewMode}
-                  onClick={() => onNavigate(card)} onActivate={() => onActivate(card)} onDelete={() => onDelete(card)} />
+                  onActivate={() => onActivate(card)} onDelete={() => onDelete(card)} />
               ))}
             </div>
           </div>
@@ -590,9 +499,9 @@ function ProjectGrid({
   return (
     <div style={gridStyle}>
       {cards.map(card => (
-        <ProjectCard key={card.project.id} card={card} liveStatuses={statusMap}
+        <ProjectCard key={card.project.id} card={card}
           isActive={card.project.id === activeProjectId} viewMode={viewMode}
-          onClick={() => onNavigate(card)} onActivate={() => onActivate(card)} onDelete={() => onDelete(card)} />
+          onActivate={() => onActivate(card)} onDelete={() => onDelete(card)} />
       ))}
     </div>
   );
@@ -602,11 +511,12 @@ function ProjectGrid({
 
 export default function ProjectsPage() {
   const router = useRouter();
-  const [cards, setCards] = useState<ProjectCard[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<ProjectCard | null>(null);
   const { activeProjectId, setActiveProjectId } = useProjectStore();
+  const { data: allTasks, isLoading: tasksLoading } = useAllTasks();
 
   // ── Filter + view state ───────────────────────────────────────────────────
   const [search, setSearch] = useState('');
@@ -629,60 +539,45 @@ export default function ProjectsPage() {
     return () => document.removeEventListener('mousedown', h);
   }, [groupMenuOpen]);
 
-  const loadCards = useCallback(async () => {
-    try {
-      const projects = await listProjects();
-      const built: ProjectCard[] = projects.map(project => {
-        const reports = getReportsByProject(project.id);
-        const activeCount = 0;
-        const lastActivity = reports[0]?.createdAt ?? project.created_at;
-        const latestSummary = reports.find(r => r.summary)?.summary ?? null;
-        const nextStep = extractNextStep(latestSummary);
-        return { project, reports, activeCount, lastActivity, latestSummary, nextStep };
-      });
-      setCards(built);
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    listProjects()
+      .then(p => setProjects(p))
+      .finally(() => setProjectsLoading(false));
   }, []);
 
-  useEffect(() => { loadCards(); }, [loadCards]);
+  const cards = useMemo<ProjectCard[]>(() => {
+    return projects.map(project => {
+      const tasks = (allTasks ?? [])
+        .filter(t => t.project_id === project.id)
+        .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime());
+      return {
+        project,
+        tasks,
+        activeCount: tasks.filter(t => t.status === 'RUNNING').length,
+        lastActivity: tasks[0]?.created_at ?? project.created_at ?? null,
+        latestGoal: tasks[0]?.goal ?? null,
+      };
+    });
+  }, [projects, allTasks]);
 
   const handleDelete = useCallback(async (card: ProjectCard) => {
     setDeletingId(card.project.id);
     setConfirmDelete(null);
     try {
-      const taskIds = card.reports.map(r => r.taskId).filter(Boolean);
+      const taskIds = card.tasks.map(t => t.id);
       await deleteProject(card.project.id, taskIds);
-      // Clear localStorage reports for this project
       deleteReportsByProject(card.project.id);
-      // Deselect if this was the active project
-      if (activeProjectId === card.project.id) {
-        setActiveProjectId(null);
-      }
-      // Reload cards
-      await loadCards();
+      if (activeProjectId === card.project.id) setActiveProjectId(null);
+      const updated = await listProjects();
+      setProjects(updated);
     } catch (e) {
       console.error('Delete failed:', e);
     } finally {
       setDeletingId(null);
     }
-  }, [activeProjectId, setActiveProjectId, loadCards]);
+  }, [activeProjectId, setActiveProjectId]);
 
-  // Collect all task IDs across all projects for live status polling
-  const allTaskIds = useMemo(
-    () => cards.flatMap(c => c.reports.map(r => r.taskId)).filter(Boolean),
-    [cards]
-  );
-
-  const { data: liveStatuses } = useTaskStatuses(allTaskIds);
-
-  // Build a map of taskId → status for O(1) lookup in cards
-  const statusMap = useMemo(() => {
-    const m = new Map<string, string>();
-    (liveStatuses ?? []).forEach(s => m.set(s.taskId, s.status));
-    return m;
-  }, [liveStatuses]);
+  const loading = projectsLoading && tasksLoading;
 
   // ── Filtered + searched cards ─────────────────────────────────────────────
   const filteredCards = useMemo(() => {
@@ -692,13 +587,13 @@ export default function ProjectsPage() {
         const q = search.toLowerCase();
         const nameMatch = card.project.name.toLowerCase().includes(q);
         const slugMatch = card.project.slug.toLowerCase().includes(q);
-        const queryMatch = card.reports.some(r => r.query?.toLowerCase().includes(q));
+        const queryMatch = card.tasks.some(t => t.goal?.toLowerCase().includes(q));
         if (!nameMatch && !slugMatch && !queryMatch) return false;
       }
 
       // Status filter
       if (statusFilter !== 'any') {
-        const { label } = resolveStatus(card.reports, statusMap);
+        const { label } = resolveStatus(card.tasks);
         const l = label.toLowerCase();
         if (statusFilter === 'building' && !l.includes('building') && !l.includes('review') && !l.includes('approval') && !l.includes('input')) return false;
         if (statusFilter === 'complete' && !l.includes('complete')) return false;
@@ -712,12 +607,12 @@ export default function ProjectsPage() {
       if (accessFilter === 'inactive' && card.project.id === activeProjectId) return false;
 
       // Build type filter
-      if (buildTypeFilter === 'single' && card.reports.length !== 1) return false;
-      if (buildTypeFilter === 'multi' && card.reports.length <= 1) return false;
+      if (buildTypeFilter === 'single' && card.tasks.length !== 1) return false;
+      if (buildTypeFilter === 'multi' && card.tasks.length <= 1) return false;
 
       return true;
     });
-  }, [cards, search, statusFilter, accessFilter, buildTypeFilter, statusMap, activeProjectId]);
+  }, [cards, search, statusFilter, accessFilter, buildTypeFilter, activeProjectId]);
 
   if (loading) {
     return (
@@ -767,7 +662,7 @@ export default function ProjectsPage() {
                 Delete "{confirmDelete.project.name}"?
               </p>
               <p style={{ fontSize: '0.8375rem', color: 'var(--text-secondary)', margin: '0.5rem 0 0', lineHeight: 1.5 }}>
-                This will permanently delete the project, all {confirmDelete.reports.length} build record{confirmDelete.reports.length !== 1 ? 's' : ''}, the repo directory, and terminate any running Temporal workflows. This cannot be undone.
+                This will permanently delete the project, all {confirmDelete.tasks.length} build record{confirmDelete.tasks.length !== 1 ? 's' : ''}, the repo directory, and terminate any running Temporal workflows. This cannot be undone.
               </p>
             </div>
             <div style={{ display: 'flex', gap: '0.625rem', justifyContent: 'flex-end' }}>
@@ -982,6 +877,7 @@ export default function ProjectsPage() {
         </div>
       </div>
 
+
       {/* Result count */}
       {(activeFiltersCount > 0 || search) && (
         <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', opacity: 0.6, marginBottom: '1rem' }}>
@@ -998,15 +894,9 @@ export default function ProjectsPage() {
       ) : (
         <ProjectGrid
           cards={filteredCards}
-          statusMap={statusMap}
           viewMode={viewMode}
           groupBy={groupBy}
           activeProjectId={activeProjectId}
-          onNavigate={(card) => {
-            const latest = card.reports[0];
-            if (latest) router.push(`/task/${latest.taskId}`);
-            else router.push('/');
-          }}
           onActivate={(card) => setActiveProjectId(card.project.id)}
           onDelete={(card) => setConfirmDelete(card)}
         />
