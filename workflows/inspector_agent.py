@@ -52,9 +52,10 @@ class InspectorAgent:
         model: str | None = None,
         test_spec: list[str] | None = None,
         qa_commands: dict | None = None,
+        baseline_failing_tests: list[str] | None = None,
     ) -> str:
         log = logger.bind(parent_task_id=parent_task_id)
-        log.info("inspector_started", pre_existing_tests=len(pre_existing_tests or []), has_test_spec=bool(test_spec))
+        log.info("inspector_started", pre_existing_tests=len(pre_existing_tests or []), has_test_spec=bool(test_spec), baseline_failures=len(baseline_failing_tests or []))
 
         await adk.messages.create(
             task_id=parent_task_id,
@@ -70,6 +71,17 @@ class InspectorAgent:
             regression_note = (
                 f"\n\nPre-existing test files (regression check — these MUST still pass):\n{tests_str}\n"
                 "If any of these tests now fail, that is a regression — list it as a HIGH priority heal instruction."
+            )
+
+        baseline_note = ""
+        if baseline_failing_tests:
+            baseline_str = "\n".join(f"  - {t}" for t in baseline_failing_tests[:20])
+            baseline_note = (
+                f"\n\nBASELINE FAILURES (recorded BEFORE this build ran — not caused by the Builder):\n{baseline_str}\n"
+                "IMPORTANT: These tests were already failing on the repo before any code was written. "
+                "Do NOT count them as failures from this build. "
+                "Do NOT add them to heal_items or heal_instructions. "
+                "If they appear in your test output, mark them as 'pre-existing' in your summary and ignore them when deciding passed=True/False."
             )
 
         tdd_note = ""
@@ -108,6 +120,7 @@ class InspectorAgent:
             f"You are the Inspector agent. Your goal:\n{goal}\n\n"
             f"Repository root: {repo_path}\n"
             f"{regression_note}"
+            f"{baseline_note}"
             f"{tdd_note}\n"
             "Instructions:\n"
             "1. Check if dependencies are installed BEFORE running tests:\n"

@@ -221,6 +221,26 @@ def _merge_build_results(builder_jsons: tuple[str, ...]) -> dict:
     }
 
 
+def _parse_failing_tests(output: str) -> list[str]:
+    """
+    Extract failing test IDs from a test runner's stdout.
+
+    Handles pytest ("FAILED tests/foo.py::test_bar") and
+    Jest/Vitest ("✕ test name" / "FAIL src/foo.test.ts").
+    Returns at most 50 IDs to avoid oversized payloads.
+    """
+    ids: list[str] = []
+    # pytest: "FAILED path/to/test.py::test_name [...]"
+    ids.extend(re.findall(r"^FAILED\s+(\S+)", output, re.MULTILINE))
+    # jest/vitest: "FAIL src/foo.test.ts"
+    ids.extend(re.findall(r"^FAIL\s+(\S+\.(?:test|spec)\.\w+)", output, re.MULTILINE))
+    # jest inline: "  ✕ some test description (42 ms)"
+    ids.extend(re.findall(r"^\s+[✕✗×]\s+(.+?)\s*\(\d+", output, re.MULTILINE))
+    seen: set[str] = set()
+    unique = [x for x in ids if x not in seen and not seen.add(x)]  # type: ignore[func-returns-value]
+    return unique[:50]
+
+
 @workflow.defn(name="swarm-factory")
 class SwarmOrchestrator(BaseWorkflow):
     """
@@ -788,6 +808,42 @@ class SwarmOrchestrator(BaseWorkflow):
         # QA commands from Architect — passed directly to Inspector so it never has to discover them
         qa_commands: dict = architect_plan.get("qa_commands") or {}
 
+        # ── Baseline test run: capture pre-existing failures before builders start ──
+        # Runs the configured test suite on the unmodified repo. Any tests that
+        # fail here are not this build's fault — the Inspector will ignore them.
+        baseline_failing_tests: list[str] = []
+        _baseline_cmd = qa_commands.get("test") if qa_commands else None
+        if _baseline_cmd and not lightweight_mode:
+            await adk.messages.create(
+                task_id=task_id,
+                content=TextContent(
+                    author="agent",
+                    content="[Foreman] Running baseline tests to record pre-existing failures...",
+                ),
+            )
+            try:
+                _baseline_out: str = await workflow.execute_activity(
+                    "swarm_run_command",
+                    args=[_baseline_cmd, repo_path],
+                    start_to_close_timeout=timedelta(seconds=120),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                )
+                baseline_failing_tests = _parse_failing_tests(_baseline_out)
+                if baseline_failing_tests:
+                    log.info("baseline_failures_recorded", count=len(baseline_failing_tests))
+                    await adk.messages.create(
+                        task_id=task_id,
+                        content=TextContent(
+                            author="agent",
+                            content=(
+                                f"[Foreman] Baseline: {len(baseline_failing_tests)} pre-existing "
+                                f"failure(s) recorded — Inspector will not count these against the build."
+                            ),
+                        ),
+                    )
+            except Exception:
+                pass  # non-critical — Inspector runs without baseline if this times out
+
         for cycle in range(max_heal + 1):
             cycle_label = f"heal cycle {cycle}" if cycle > 0 else "initial build"
 
@@ -1075,7 +1131,7 @@ class SwarmOrchestrator(BaseWorkflow):
 
             inspector_json: str = await workflow.execute_child_workflow(
                 InspectorAgent.run,
-                args=[goal, repo_path, task_id, pre_existing_tests or None, _inspector_model, all_test_specs or None, qa_commands or None],
+                args=[goal, repo_path, task_id, pre_existing_tests or None, _inspector_model, all_test_specs or None, qa_commands or None, baseline_failing_tests or None],
                 id=f"{task_id}-r{iteration}-inspector-{cycle}",
                 task_queue=task_queue,
                 execution_timeout=INSPECTOR_TIMEOUT,
