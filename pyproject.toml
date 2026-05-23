@@ -21,6 +21,8 @@ dependencies = [
     "pydantic>=2.7.0",
     "python-dotenv>=1.0.0",
     "structlog>=24.0.0",
+    "fastapi>=0.111.0",
+    "uvicorn>=0.30.0",
 ]
 
 [project.optional-dependencies]
@@ -36,3 +38,5 @@ packages = ["project", "activities", "workflows"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+testpaths = ["tests"]
+norecursedirs = ["scale-agentex", ".venv", "sdk", "deploy", "ui", "node_modules"]

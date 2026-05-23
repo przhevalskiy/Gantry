@@ -20,6 +20,10 @@ build/
 # Screenshots
 gantry_screenshots/
 
+# Runtime data
+.gantry/
+API_PLAN.md
+
 # IDE
 .idea/
 .vscode/
