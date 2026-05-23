@@ -4,14 +4,16 @@ import { useState } from 'react';
 import { AgentDirectory } from '@/components/agents/agent-directory';
 import { LiveMonitor } from '@/components/agents/live-monitor';
 import { ConfigPanel } from '@/components/agents/config-panel';
+import { ApiKeysPanel } from '@/components/agents/api-keys-panel';
 import { useAgentConfigStore } from '@/lib/agent-config-store';
 
-type Tab = 'directory' | 'live' | 'settings';
+type Tab = 'directory' | 'live' | 'settings' | 'api';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'directory', label: 'Directory' },
   { id: 'live', label: 'Live' },
   { id: 'settings', label: 'Settings' },
+  { id: 'api', label: 'API' },
 ];
 
 export default function AgentsPage() {
@@ -81,6 +83,7 @@ export default function AgentsPage() {
       {tab === 'directory' && <AgentDirectory />}
       {tab === 'live' && <LiveMonitor />}
       {tab === 'settings' && <ConfigPanel />}
+      {tab === 'api' && <ApiKeysPanel />}
     </div>
   );
 }
