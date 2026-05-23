@@ -5,7 +5,7 @@
 
 export type SwarmRole =
   | 'foreman' | 'pm' | 'architect' | 'builder'
-  | 'inspector' | 'security' | 'devops'
+  | 'inspector' | 'reviewer' | 'security' | 'devops'
   | 'scout' | 'analyst' | 'verifier' | 'critic';
 
 const ROLE_TO_AVATAR: Record<SwarmRole, number> = {
@@ -14,6 +14,7 @@ const ROLE_TO_AVATAR: Record<SwarmRole, number> = {
   architect: 7,  // goggles
   builder:   10, // braided girl
   inspector: 18, // plain young man
+  reviewer:  19, // girl glasses (row 4 col 4)
   security:  22, // long-hair woman
   devops:    25, // curly hair
   scout:     13, // plain man (row 3 col 3)

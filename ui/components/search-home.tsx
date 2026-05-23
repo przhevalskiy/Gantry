@@ -359,6 +359,7 @@ export function SearchHome() {
             { n: 7,  label: 'Architect',  color: '#3b82f6' }, // blue
             { n: 10, label: 'Builder',    color: '#10b981' }, // emerald
             { n: 18, label: 'Inspector',  color: '#f59e0b' }, // amber
+            { n: 19, label: 'Reviewer',   color: '#a855f7' }, // purple
             { n: 22, label: 'Security',   color: '#ef4444' }, // red
             { n: 25, label: 'DevOps',     color: '#06b6d4' }, // cyan
           ].map(({ n, label, color }, i) => (
