@@ -87,7 +87,7 @@ logger = make_logger(__name__)
 
 async def main():
     env = EnvironmentVariables.refresh()
-    task_queue = env.WORKFLOW_TASK_QUEUE or os.getenv("WORKFLOW_TASK_QUEUE", "web_scout_queue")
+    task_queue = env.WORKFLOW_TASK_QUEUE or os.getenv("WORKFLOW_TASK_QUEUE", "gantry_queue")
 
     custom_activities = [
         swarm_list_directory,

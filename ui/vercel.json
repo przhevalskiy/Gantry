@@ -2,5 +2,10 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "env": {
+    "NEXT_PUBLIC_AGENTEX_API_BASE_URL": "https://platform.gantry.dev",
+    "NEXT_PUBLIC_GANTRY_URL": "https://api.gantry.dev",
+    "NEXT_PUBLIC_AGENT_NAME": "swarm-factory"
+  }
 }

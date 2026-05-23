@@ -1,14 +1,14 @@
 [Unit]
-Description=Monolift Gantry API
+Description=Gantry API Server
 After=network.target docker.service
 Requires=docker.service
 
 [Service]
 Type=simple
-User=monolift
-WorkingDirectory=/opt/monolift
-EnvironmentFile=/opt/monolift/.env
-ExecStart=/opt/monolift/.venv/bin/python -m uvicorn api.main:app --host 127.0.0.1 --port 8001 --log-level info
+User=gantry
+WorkingDirectory=/opt/gantry
+EnvironmentFile=/opt/gantry/.env
+ExecStart=/opt/gantry/.venv/bin/python -m uvicorn api.main:app --host 127.0.0.1 --port 8001 --log-level info
 Restart=always
 RestartSec=5
 StandardOutput=journal

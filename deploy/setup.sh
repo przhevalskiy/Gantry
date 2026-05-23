@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# Monolift — Hetzner CX22 bootstrap script
+# Gantry — Hetzner CX22 bootstrap script
 # Run as root on a fresh Ubuntu 22.04 server:
-#   curl -fsSL https://raw.githubusercontent.com/YOUR_ORG/monolift/main/deploy/setup.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/przhevalskiy/Gantry/main/deploy/setup.sh | bash
 # Or: scp deploy/setup.sh root@<ip>:~ && ssh root@<ip> bash setup.sh
 set -euo pipefail
 
-MONOLIFT_USER=monolift
-MONOLIFT_HOME=/opt/monolift
-REPO_URL="${REPO_URL:-https://github.com/YOUR_ORG/monolift.git}"
-DOMAIN_API="${DOMAIN_API:-api.monolift.dev}"
-DOMAIN_PLATFORM="${DOMAIN_PLATFORM:-platform.monolift.dev}"
-EMAIL_CERTBOT="${EMAIL_CERTBOT:-ops@monolift.dev}"
+GANTRY_USER=gantry
+GANTRY_HOME=/opt/gantry
+REPO_URL="${REPO_URL:-https://github.com/przhevalskiy/Gantry.git}"
+DOMAIN_API="${DOMAIN_API:-api.gantry.dev}"
+DOMAIN_PLATFORM="${DOMAIN_PLATFORM:-platform.gantry.dev}"
+EMAIL_CERTBOT="${EMAIL_CERTBOT:-ops@gantry.dev}"
 
 log() { echo -e "\n\033[1;34m==>\033[0m $*"; }
 
-# ── System packages ────────────────────────────────────────────────────────────
+# ── System packages ────────────────────────────────────��───────────────────────
 log "Updating system packages"
 apt-get update -qq
 apt-get upgrade -y -qq
@@ -50,64 +50,77 @@ if ! command -v uv &>/dev/null; then
     ln -sf "$HOME/.local/bin/uv" /usr/local/bin/uv
 fi
 
-# ── monolift system user ───────────────────────────────────────────────────────
-log "Creating system user: $MONOLIFT_USER"
-if ! id "$MONOLIFT_USER" &>/dev/null; then
-    useradd --system --shell /bin/bash --home "$MONOLIFT_HOME" \
-        --create-home "$MONOLIFT_USER"
+# ── GitHub CLI (gh) ────────────────────────────────────────────────────────────
+log "Installing GitHub CLI"
+if ! command -v gh &>/dev/null; then
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+        | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+    chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
+        https://cli.github.com/packages stable main" \
+        > /etc/apt/sources.list.d/github-cli.list
+    apt-get update -qq
+    apt-get install -y -qq gh
 fi
-usermod -aG docker "$MONOLIFT_USER"
+
+# ── Gantry system user ─────────────────────────────────────────────────────────
+log "Creating system user: $GANTRY_USER"
+if ! id "$GANTRY_USER" &>/dev/null; then
+    useradd --system --shell /bin/bash --home "$GANTRY_HOME" \
+        --create-home "$GANTRY_USER"
+fi
+usermod -aG docker "$GANTRY_USER"
 
 # ── Clone repo ────────────────────────────────────────────────────────────────
-log "Cloning repository to $MONOLIFT_HOME"
-if [ ! -d "$MONOLIFT_HOME/.git" ]; then
-    git clone "$REPO_URL" "$MONOLIFT_HOME"
-    chown -R "$MONOLIFT_USER:$MONOLIFT_USER" "$MONOLIFT_HOME"
+log "Cloning repository to $GANTRY_HOME"
+if [ ! -d "$GANTRY_HOME/.git" ]; then
+    git clone "$REPO_URL" "$GANTRY_HOME"
+    chown -R "$GANTRY_USER:$GANTRY_USER" "$GANTRY_HOME"
 else
     log "Repo already present — pulling latest"
-    sudo -u "$MONOLIFT_USER" git -C "$MONOLIFT_HOME" pull
+    sudo -u "$GANTRY_USER" git -C "$GANTRY_HOME" pull
 fi
 
 # ── Clone Agentex (Scale AI middleware) ───────────────────────────────────────
 log "Cloning Agentex platform"
-AGENTEX_DIR="$MONOLIFT_HOME/scale-agentex/agentex"
+AGENTEX_DIR="$GANTRY_HOME/scale-agentex/agentex"
 if [ ! -d "$AGENTEX_DIR" ]; then
-    sudo -u "$MONOLIFT_USER" mkdir -p "$MONOLIFT_HOME/scale-agentex"
-    sudo -u "$MONOLIFT_USER" git clone \
+    sudo -u "$GANTRY_USER" mkdir -p "$GANTRY_HOME/scale-agentex"
+    sudo -u "$GANTRY_USER" git clone \
         https://github.com/scaleapi/agentex.git "$AGENTEX_DIR"
 fi
 
-# ── Python virtualenv ─────────────────────────────────────────────────────────
-log "Creating Python virtualenv at $MONOLIFT_HOME/.venv"
-sudo -u "$MONOLIFT_USER" bash -c "
-    cd $MONOLIFT_HOME
+# ── Python virtualenv ─────────────────────────────────────────��───────────────
+log "Creating Python virtualenv at $GANTRY_HOME/.venv"
+sudo -u "$GANTRY_USER" bash -c "
+    cd $GANTRY_HOME
     uv venv .venv --python python3.12
     source .venv/bin/activate
     uv pip install -e '.[api]' --quiet
     uv pip install -e '$AGENTEX_DIR' --quiet
 "
 
-# ── Gantry directories ────────────────────────────────────────────────────────
+# ── Gantry data directories ───────────────────────────────────────────────────
 log "Creating Gantry data directories"
-sudo -u "$MONOLIFT_USER" mkdir -p "$MONOLIFT_HOME/.gantry"
+sudo -u "$GANTRY_USER" mkdir -p "$GANTRY_HOME/.gantry"
 
 # ── .env file check ───────────────────────────────────────────────────────────
-if [ ! -f "$MONOLIFT_HOME/.env" ]; then
+if [ ! -f "$GANTRY_HOME/.env" ]; then
     log "WARNING: No .env found — copying example template"
-    cp "$MONOLIFT_HOME/.env.production.example" "$MONOLIFT_HOME/.env"
-    chown "$MONOLIFT_USER:$MONOLIFT_USER" "$MONOLIFT_HOME/.env"
-    chmod 600 "$MONOLIFT_HOME/.env"
+    cp "$GANTRY_HOME/.env.production.example" "$GANTRY_HOME/.env"
+    chown "$GANTRY_USER:$GANTRY_USER" "$GANTRY_HOME/.env"
+    chmod 600 "$GANTRY_HOME/.env"
     echo ""
     echo "  !!! ACTION REQUIRED !!!"
-    echo "  Edit $MONOLIFT_HOME/.env and fill in all required values"
+    echo "  Edit $GANTRY_HOME/.env and fill in all required values"
     echo "  Then run: systemctl restart gantry-api gantry-worker"
     echo ""
 fi
 
 # ── Systemd services ──────────────────────────────────────────────────────────
 log "Installing systemd services"
-cp "$MONOLIFT_HOME/deploy/gantry-api.service" /etc/systemd/system/
-cp "$MONOLIFT_HOME/deploy/gantry-worker.service" /etc/systemd/system/
+cp "$GANTRY_HOME/deploy/gantry-api.service" /etc/systemd/system/
+cp "$GANTRY_HOME/deploy/gantry-worker.service" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable gantry-api gantry-worker
 
@@ -125,12 +138,12 @@ system.forceSearchAttributesCacheRefreshOnRead:
     constraints: {}
 EOF
 fi
-chown -R "$MONOLIFT_USER:$MONOLIFT_USER" "$AGENTEX_DIR/temporal"
+chown -R "$GANTRY_USER:$GANTRY_USER" "$AGENTEX_DIR/temporal"
 
 # ── Docker Compose (Agentex stack) ────────────────────────────────────────────
 log "Starting Agentex Docker stack"
-sudo -u "$MONOLIFT_USER" docker compose \
-    -f "$MONOLIFT_HOME/deploy/docker-compose.prod.yml" \
+sudo -u "$GANTRY_USER" docker compose \
+    -f "$GANTRY_HOME/deploy/docker-compose.prod.yml" \
     up -d --build
 
 log "Waiting for Agentex to be healthy (up to 120s)..."
@@ -144,8 +157,12 @@ done
 
 # ── Nginx ─────────────────────────────────────────────────────────────────────
 log "Configuring Nginx"
-cp "$MONOLIFT_HOME/deploy/nginx.conf" /etc/nginx/sites-available/monolift
-ln -sf /etc/nginx/sites-available/monolift /etc/nginx/sites-enabled/monolift
+# Substitute domain names into nginx config
+sed \
+    -e "s/api\.gantry\.dev/$DOMAIN_API/g" \
+    -e "s/platform\.gantry\.dev/$DOMAIN_PLATFORM/g" \
+    "$GANTRY_HOME/deploy/nginx.conf" > /etc/nginx/sites-available/gantry
+ln -sf /etc/nginx/sites-available/gantry /etc/nginx/sites-enabled/gantry
 rm -f /etc/nginx/sites-enabled/default
 nginx -t
 systemctl enable --now nginx
@@ -179,4 +196,4 @@ echo ""
 echo "  https://$DOMAIN_API/health"
 echo "  https://$DOMAIN_API/docs"
 echo ""
-log "Done. Remember to fill in /opt/monolift/.env if not already done."
+log "Done. Remember to fill in $GANTRY_HOME/.env if not already done."

@@ -24,7 +24,7 @@ agent:
     enabled: true
     workflows:
       - name: swarm-factory
-        queue_name: web_scout_queue
+        queue_name: gantry_queue
         description: "Durable Software Engineering Factory — Architect → Builder → Inspector → Security → DevOps"
 
 deployment:

@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const agentexAPIBaseURL =
     process.env.NEXT_PUBLIC_AGENTEX_API_BASE_URL ?? 'http://localhost:5003';
-  const agentName = process.env.NEXT_PUBLIC_AGENT_NAME ?? 'web-scout';
+  const agentName = process.env.NEXT_PUBLIC_AGENT_NAME ?? 'swarm-factory';
 
   return (
     <html lang="en" className={GeistSans.className}>

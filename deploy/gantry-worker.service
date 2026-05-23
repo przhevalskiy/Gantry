@@ -1,14 +1,14 @@
 [Unit]
-Description=Monolift Gantry Worker
+Description=Gantry Temporal Worker
 After=network.target docker.service gantry-api.service
 Requires=docker.service
 
 [Service]
 Type=simple
-User=monolift
-WorkingDirectory=/opt/monolift
-EnvironmentFile=/opt/monolift/.env
-ExecStart=/opt/monolift/.venv/bin/agentex agents run --manifest manifest.yaml
+User=gantry
+WorkingDirectory=/opt/gantry
+EnvironmentFile=/opt/gantry/.env
+ExecStart=/opt/gantry/.venv/bin/agentex agents run --manifest manifest.yaml
 Restart=always
 RestartSec=10
 StandardOutput=journal

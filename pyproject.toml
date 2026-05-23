@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "web-scout"
+name = "gantry"
 version = "0.1.0"
-description = "Agentic browser agent — prompt in, web actions out"
+description = "Durable parallel AI engineering factory — goal to PR via swarm agents"
 requires-python = ">=3.12"
 
 dependencies = [
@@ -26,6 +26,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+api = [
+    "fastapi>=0.111.0",
+    "uvicorn>=0.30.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",

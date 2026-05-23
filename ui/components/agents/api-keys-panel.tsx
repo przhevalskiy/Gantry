@@ -292,7 +292,7 @@ export function ApiKeysPanel() {
         }}>
           <SectionLabel>Usage</SectionLabel>
           <MonoText>
-            {'curl -H "Authorization: Bearer <key>" https://api.monolift.dev/v1/tasks'}
+            {`curl -H "Authorization: Bearer <key>" ${process.env.NEXT_PUBLIC_GANTRY_URL ?? 'https://api.gantry.dev'}/v1/tasks`}
           </MonoText>
         </div>
       )}
