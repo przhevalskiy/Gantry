@@ -229,6 +229,28 @@ ARCHITECT_TOOLS: list[dict] = [
                     },
                     "minItems": 1,
                 },
+                "qa_commands": {
+                    "type": "object",
+                    "description": (
+                        "Exact shell commands the Inspector should run to verify the build. "
+                        "Derive these from pyproject.toml, package.json, Makefile, or project conventions. "
+                        "Omit a field if that check is not applicable for this repo."
+                    ),
+                    "properties": {
+                        "test": {
+                            "type": "string",
+                            "description": "Command to run the test suite, e.g. 'pytest tests/ --tb=short -q' or 'npm test -- --run'.",
+                        },
+                        "lint": {
+                            "type": "string",
+                            "description": "Command to run the linter, e.g. 'ruff check .' or 'eslint src/'.",
+                        },
+                        "type_check": {
+                            "type": "string",
+                            "description": "Command to run type checking, e.g. 'mypy api/' or 'npx tsc --noEmit'.",
+                        },
+                    },
+                },
                 "notes": {"type": "string", "description": "Additional context for the team."},
             },
             "required": ["repo_root", "tracks"],

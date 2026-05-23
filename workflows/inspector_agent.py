@@ -51,6 +51,7 @@ class InspectorAgent:
         pre_existing_tests: list[str] | None = None,
         model: str | None = None,
         test_spec: list[str] | None = None,
+        qa_commands: dict | None = None,
     ) -> str:
         log = logger.bind(parent_task_id=parent_task_id)
         log.info("inspector_started", pre_existing_tests=len(pre_existing_tests or []), has_test_spec=bool(test_spec))
@@ -86,14 +87,30 @@ class InspectorAgent:
                 "'Increase test coverage for <file> — currently at X%'."
             )
 
+        # Build QA instructions — use exact commands from Architect when available
+        _qa = qa_commands or {}
+        _test_cmd  = _qa.get("test")
+        _lint_cmd  = _qa.get("lint")
+        _type_cmd  = _qa.get("type_check")
+
+        if _test_cmd or _lint_cmd or _type_cmd:
+            _step_test = f"3. Run the test suite: `{_test_cmd}`" if _test_cmd else "3. No test command provided — skip tests and set tests_skipped=True."
+            _step_lint = f"4. Run the linter: `{_lint_cmd}`" if _lint_cmd else "4. No lint command provided — skip lint."
+            _step_type = f"5. Run type checking: `{_type_cmd}`" if _type_cmd else "5. No type-check command provided — skip type check."
+            _discovery_note = ""
+        else:
+            _step_test = "3. Discover and run the test suite (e.g. 'pytest tests/ --tb=short -q' or 'npm test -- --run'). Check pyproject.toml or package.json for the configured test command."
+            _step_lint = "4. Run the linter (e.g. 'ruff check .' or 'eslint src/')."
+            _step_type = "5. Run type checking if applicable (e.g. 'mypy .' or 'npx tsc --noEmit')."
+            _discovery_note = "   Look at pyproject.toml, package.json, or Makefile to determine the correct commands. Only scan the project root — do NOT recurse into vendored or submodule directories.\n"
+
         task_prompt = (
             f"You are the Inspector agent. Your goal:\n{goal}\n\n"
             f"Repository root: {repo_path}\n"
             f"{regression_note}"
             f"{tdd_note}\n"
             "Instructions:\n"
-            f"1. Start with memory_read(repo_path='{repo_path}') to check for known issues.\n"
-            "2. Check if dependencies are installed BEFORE running tests:\n"
+            "1. Check if dependencies are installed BEFORE running tests:\n"
             "   - For Node.js: check if node_modules/ exists. If NOT, call report_inspection with\n"
             "     passed=True, tests_skipped=True,\n"
             "     summary='⚠ Tests skipped — node_modules not installed. Reviewer must run npm install before testing.'\n"
@@ -101,9 +118,11 @@ class InspectorAgent:
             "     passed=True, tests_skipped=True,\n"
             "     summary='⚠ Tests skipped — virtualenv not installed. Reviewer must run pip install before testing.'\n"
             "   - NEVER try to install dependencies — that is not your job.\n"
-            "3. If dependencies exist, run the test suite (e.g. 'pytest --tb=short -q' or 'npm test -- --run').\n"
-            "4. Run the linter (e.g. 'ruff check .' or 'eslint src/ --max-warnings 0').\n"
-            "5. Run type checking if applicable (e.g. 'mypy .' or 'tsc --noEmit').\n"
+            "2. Run all checks from the repo root directory.\n"
+            f"{_discovery_note}"
+            f"{_step_test}\n"
+            f"{_step_lint}\n"
+            f"{_step_type}\n"
             "6. Read failing files for context, then call report_inspection.\n"
             "   - Populate heal_items with one entry per error: {file (absolute path), line, issue, fix, severity}.\n"
             "   - heal_items are used first by the heal Builder — precise file+line+fix entries produce surgical edits.\n"
