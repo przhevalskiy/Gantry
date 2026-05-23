@@ -128,6 +128,56 @@ def _order_tracks_by_deps(tracks: list[dict]) -> list[list[dict]]:
     return waves
 
 
+def _normalise_path(p: str) -> str:
+    """Strip leading ./ and / for stable file-path comparison across tracks."""
+    p = p.strip()
+    while p.startswith("./") or p.startswith("/"):
+        p = p[2:] if p.startswith("./") else p[1:]
+    return p.lower()
+
+
+def _resolve_track_conflicts(tracks: list[dict]) -> tuple[list[dict], list[str]]:
+    """
+    Detect key_file collisions between tracks that run in the same wave (parallel).
+
+    For each collision the file is kept in whichever track claims it first when
+    the wave's tracks are sorted alphabetically by label — deterministic, no LLM
+    call required.  Returns (updated_tracks, human-readable warning strings).
+    """
+    waves = _order_tracks_by_deps(tracks)
+    label_to_idx = {t.get("label", f"track-{i}"): i for i, t in enumerate(tracks)}
+    new_key_files: dict[int, list[str]] = {i: list(t.get("key_files", [])) for i, t in enumerate(tracks)}
+    warnings: list[str] = []
+
+    for wave in waves:
+        if len(wave) < 2:
+            continue
+        wave_sorted = sorted(wave, key=lambda t: t.get("label", ""))
+        claimed: dict[str, str] = {}  # normalised path → owner label
+
+        for track in wave_sorted:
+            label = track.get("label", "")
+            idx = label_to_idx[label]
+            keep: list[str] = []
+            for path in new_key_files[idx]:
+                norm = _normalise_path(path)
+                if not norm:
+                    keep.append(path)
+                    continue
+                if norm not in claimed:
+                    claimed[norm] = label
+                    keep.append(path)
+                else:
+                    warnings.append(
+                        f"'{path}' claimed by both '{label}' and '{claimed[norm]}' "
+                        f"(parallel wave) — ownership kept by '{claimed[norm]}'"
+                    )
+            new_key_files[idx] = keep
+
+    updated = [{**t, "key_files": new_key_files[i]} for i, t in enumerate(tracks)]
+    return updated, warnings
+
+
 def _extract_tracks(architect_plan: dict, max_parallel_tracks: int = MAX_PARALLEL_TRACKS) -> list[dict]:
     """Extract all tracks from an architect plan (flat list, order preserved)."""
     tracks = architect_plan.get("tracks", [])
@@ -263,15 +313,18 @@ class SwarmOrchestrator(BaseWorkflow):
 
         else:
             # Local project — ensure git is initialised so DevOps can commit + push.
-            # The empty commit gives git a HEAD so branch creation works before any files exist.
+            # Only init + seed a HEAD commit if the repo has no commits yet.
+            # Never run git commit on the current branch of an existing repo.
             await workflow.execute_activity(
                 "swarm_run_command",
                 args=[
                     (
+                        'git rev-parse HEAD > /dev/null 2>&1 || ('
                         'git init && '
                         'git config user.email "swarm@gantry.local" && '
                         'git config user.name "Gantry Swarm" && '
                         'git commit --allow-empty -m "chore: initialise repository"'
+                        ')'
                     ),
                     repo_path,
                 ],
@@ -622,6 +675,22 @@ class SwarmOrchestrator(BaseWorkflow):
             tracks = split_tracks
             total_steps = sum(len(t.get("implementation_steps", [])) for t in tracks)
 
+        # ── Pre-flight: resolve key_file collisions between parallel tracks ──────
+        tracks, conflict_warnings = _resolve_track_conflicts(tracks)
+        if conflict_warnings:
+            warn_lines = "\n".join(f"  • {w}" for w in conflict_warnings)
+            await adk.messages.create(
+                task_id=task_id,
+                content=TextContent(
+                    author="agent",
+                    content=(
+                        f"[Foreman] ⚠ {len(conflict_warnings)} file conflict(s) auto-resolved — "
+                        f"parallel tracks claimed the same files; ownership reassigned:\n{warn_lines}"
+                    ),
+                ),
+            )
+            log.warning("track_file_conflicts_resolved", count=len(conflict_warnings))
+
         await adk.messages.create(
             task_id=task_id,
             content=TextContent(
@@ -666,9 +735,13 @@ class SwarmOrchestrator(BaseWorkflow):
 
         # ── HITL checkpoint 1: architect plan review (Standard / Full Crew) ─────
         if tier >= 2:
+            conflict_note = (
+                f" ⚠ {len(conflict_warnings)} file conflict(s) auto-resolved."
+                if conflict_warnings else ""
+            )
             action = (
                 f"Architect plan ready: {len(tracks)} track(s), stack: {stack}, "
-                f"{total_steps} steps. "
+                f"{total_steps} steps.{conflict_note} "
                 f"Approve to launch builders?"
             )
             approved = await self._hitl_checkpoint(
@@ -708,6 +781,9 @@ class SwarmOrchestrator(BaseWorkflow):
         all_test_specs: list[str] = []
         for t in tracks:
             all_test_specs.extend(t.get("test_spec", []))
+
+        # QA commands from Architect — passed directly to Inspector so it never has to discover them
+        qa_commands: dict = architect_plan.get("qa_commands") or {}
 
         for cycle in range(max_heal + 1):
             cycle_label = f"heal cycle {cycle}" if cycle > 0 else "initial build"
@@ -996,7 +1072,7 @@ class SwarmOrchestrator(BaseWorkflow):
 
             inspector_json: str = await workflow.execute_child_workflow(
                 InspectorAgent.run,
-                args=[goal, repo_path, task_id, pre_existing_tests or None, _inspector_model, all_test_specs or None],
+                args=[goal, repo_path, task_id, pre_existing_tests or None, _inspector_model, all_test_specs or None, qa_commands or None],
                 id=f"{task_id}-r{iteration}-inspector-{cycle}",
                 task_queue=task_queue,
                 execution_timeout=INSPECTOR_TIMEOUT,
@@ -1260,9 +1336,10 @@ class SwarmOrchestrator(BaseWorkflow):
             content=TextContent(author="agent", content=f"[Foreman] Dispatching DevOps — branch: {branch}"),
         )
 
+        all_key_files = list({kf for t in tracks for kf in t.get("key_files", []) if kf})
         devops_json: str = await workflow.execute_child_workflow(
             DevOpsAgent.run,
-            args=[goal, repo_path, branch, task_id, build_result.get("summary", "")],
+            args=[goal, repo_path, branch, task_id, build_result.get("summary", ""), all_key_files or None],
             id=f"{task_id}-r{iteration}-devops",
             task_queue=task_queue,
             execution_timeout=DEVOPS_TIMEOUT,

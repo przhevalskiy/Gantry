@@ -46,6 +46,7 @@ class DevOpsAgent:
         branch_name: str,
         parent_task_id: str,
         build_summary: str = "",
+        changed_files: list[str] | None = None,
     ) -> str:
         log = logger.bind(parent_task_id=parent_task_id, branch=branch_name)
         log.info("devops_started")
@@ -58,6 +59,20 @@ class DevOpsAgent:
             ),
         )
 
+        if changed_files:
+            _files_str = "\n".join(f"  - {f}" for f in changed_files[:40])
+            _stage_instruction = (
+                f"3. Stage ONLY the files created/modified by this build:\n{_files_str}\n"
+                "   Call git_add with exactly those paths. "
+                "   Do NOT use paths=['.'] — that would accidentally commit unrelated files.\n"
+                "   If git_status shows additional relevant files not in the list above, add them too.\n"
+            )
+        else:
+            _stage_instruction = (
+                "3. Run git_status, then stage ONLY the files that differ from HEAD.\n"
+                "   Do NOT use paths=['.'] blindly — inspect git_status output first and add only changed files.\n"
+            )
+
         task_prompt = (
             f"You are the DevOps agent. Your goal:\n{goal}\n\n"
             f"Repository root: {repo_path}\n"
@@ -66,7 +81,7 @@ class DevOpsAgent:
             "Instructions:\n"
             "1. Run git_status to see what changed.\n"
             "2. Create the branch with git_create_branch.\n"
-            "3. Stage all changes with git_add (use paths=['.']).\n"
+            f"{_stage_instruction}"
             "4. Commit with a descriptive conventional commit message.\n"
             "5. Push the branch with git_push.\n"
             "6. Optionally create a pull request with create_pull_request.\n"
