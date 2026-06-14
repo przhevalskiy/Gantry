@@ -10,6 +10,7 @@ import { MessageFeed } from '@/components/message-feed';
 import { FileExplorer } from '@/components/file-explorer';
 import { useFileAttachments, buildAttachmentBlock } from '@/hooks/use-file-attachments';
 import { useTaskSource } from '@/hooks/use-task-source';
+import { useProjects } from '@/lib/use-projects';
 import type { Task } from 'agentex/resources';
 
 import {
@@ -60,12 +61,32 @@ export function SwarmView({ taskId }: { taskId: string }) {
   const isDone = TERMINAL_STATUSES.has(status);
   const isFailed = status === 'FAILED' || status === 'TERMINATED' || status === 'TIMED_OUT';
   const goal = getTaskGoal(task as Task | undefined);
-  const repoPath = getRepoPath(task as Task | undefined) || '';
+  const repoPathFromTask = getRepoPath(task as Task | undefined);
+  const taskProjectId = (task?.params as Record<string, unknown> | null | undefined)?.project_id as string | undefined;
+  const { projects } = useProjects();
+  const repoPathFromRegistry = projects.find(p => p.id === taskProjectId)?.repo_path ?? '';
+  const repoPath = repoPathFromTask || repoPathFromRegistry;
   const writtenPaths = extractWrittenPaths(messages ?? []);
   const agentOnFile = extractAgentOnFiles(messages ?? [], repoPath);
   const { stages, finalReport, prUrl, tierMeta, isReplanning, coveragePct } = parsePipeline(messages, isDone, isFailed);
   const taskSource = useTaskSource(taskId);
   const effectivelyDone = isDone || !!finalReport;
+
+  // Look up build record when task completes to get branch for GitHub file API
+  const [buildBranch, setBuildBranch] = useState<string | null>(null);
+  useEffect(() => {
+    if (!effectivelyDone) return;
+    fetch(`/api/builds?taskId=${encodeURIComponent(taskId)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { build?: { branch?: string } } | null) => {
+        if (data?.build?.branch) setBuildBranch(data.build.branch);
+      })
+      .catch(() => {});
+  }, [effectivelyDone, taskId]);
+
+  const taskProject = projects.find(p => p.id === taskProjectId);
+  const githubOwner = taskProject?.github_owner ?? undefined;
+  const githubRepo = taskProject?.github_repo ?? undefined;
 
   useEffect(() => {
     if (isDone && stopping) setStopping(false);
@@ -249,7 +270,17 @@ export function SwarmView({ taskId }: { taskId: string }) {
 
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           {leftTab === 'explorer' ? (
-            <FileExplorer repoRoot={repoPath} writtenPaths={writtenPaths} agentOnFile={agentOnFile} isRunning={!effectivelyDone} taskStatus={status} />
+            <FileExplorer
+              repoRoot={repoPath}
+              writtenPaths={writtenPaths}
+              agentOnFile={agentOnFile}
+              isRunning={!effectivelyDone}
+              taskStatus={status}
+              taskId={taskId}
+              buildBranch={buildBranch ?? undefined}
+              githubOwner={githubOwner}
+              githubRepo={githubRepo}
+            />
           ) : (
             <PreviewPane url={activePreviewUrl} onUrlChange={setManualUrl} manualUrl={manualUrl} />
           )}
