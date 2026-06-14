@@ -16,7 +16,7 @@ from agentex.lib import adk
 from agentex.types.text_content import TextContent
 
 with workflow.unsafe.imports_passed_through():
-    from project.security_tools import SECURITY_VALID_TOOL_NAMES
+    from project.tools.security import SECURITY_VALID_TOOL_NAMES
 
 logger = structlog.get_logger(__name__)
 

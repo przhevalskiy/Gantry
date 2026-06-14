@@ -17,7 +17,7 @@ from agentex.lib import adk
 from agentex.types.text_content import TextContent
 
 with workflow.unsafe.imports_passed_through():
-    from project.architect_tools import ARCHITECT_VALID_TOOL_NAMES
+    from project.tools.architect import ARCHITECT_VALID_TOOL_NAMES
     from project.config import CLAUDE_SONNET_MODEL as _CLAUDE_SONNET_MODEL, CLAUDE_HAIKU_MODEL as _CLAUDE_HAIKU_MODEL
 
 logger = structlog.get_logger(__name__)

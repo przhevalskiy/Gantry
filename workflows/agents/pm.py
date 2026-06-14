@@ -18,8 +18,8 @@ from agentex.lib import adk
 from agentex.types.text_content import TextContent
 
 with workflow.unsafe.imports_passed_through():
-    from project.pm_tools import PM_VALID_TOOL_NAMES
-    from project.child_workflow import ClarificationWorkflow
+    from project.tools.pm import PM_VALID_TOOL_NAMES
+    from workflows.child_workflow import ClarificationWorkflow
     from project.config import CLAUDE_SONNET_MODEL as _CLAUDE_SONNET_MODEL
 
 logger = structlog.get_logger(__name__)

@@ -36,18 +36,29 @@ from agentex.lib.core.temporal.types.workflow import SignalName
 from agentex.lib.environment_variables import EnvironmentVariables
 from agentex.types.text_content import TextContent
 
+from workflows.swarm.track_manager import (
+    _extract_tracks,
+    _order_tracks_by_deps,
+    _resolve_track_conflicts,
+    _track_plan,
+    _merge_build_results,
+)
+from workflows.swarm.healing import _parse_failing_tests
+from workflows.swarm.state import build_manifest
+from workflows.swarm.reporting import _build_final_report, format_quality_comment
+
 with workflow.unsafe.imports_passed_through():
     from project.planner import _extract_task_prompt
-    from project.complexity import classify_tier, params_for_tier, TIER_LABELS
-    from project.child_workflow import ApprovalWorkflow, ClarificationWorkflow
+    from project.schema.complexity import classify_tier, params_for_tier, TIER_LABELS
+    from workflows.child_workflow import ApprovalWorkflow, ClarificationWorkflow
     from project.config import CLAUDE_HAIKU_MODEL as _CLAUDE_HAIKU_MODEL, CLAUDE_SONNET_MODEL as _CLAUDE_SONNET_MODEL, GH_TOKEN as _GH_TOKEN
-    from workflows.pm_agent import PMAgent
-    from workflows.architect_agent import ArchitectAgent
-    from workflows.builder_agent import BuilderAgent
-    from workflows.inspector_agent import InspectorAgent
-    from workflows.reviewer_agent import ReviewerAgent
-    from workflows.security_agent import SecurityAgent
-    from workflows.devops_agent import DevOpsAgent
+    from workflows.agents.pm import PMAgent
+    from workflows.agents.architect import ArchitectAgent
+    from workflows.agents.builder import BuilderAgent
+    from workflows.agents.inspector import InspectorAgent
+    from workflows.agents.reviewer import ReviewerAgent
+    from workflows.agents.security import SecurityAgent
+    from workflows.agents.devops import DevOpsAgent
 
 environment_variables = EnvironmentVariables.refresh()
 logger = structlog.get_logger(__name__)
@@ -72,173 +83,6 @@ def _branch_name(task_id: str, prefix: str = "swarm") -> str:
 def _model_for_tier(tier: int) -> str:
     """Route to Haiku for simple tasks, Sonnet for complex ones."""
     return _CLAUDE_HAIKU_MODEL if tier <= 1 else _CLAUDE_SONNET_MODEL
-
-
-def _extract_tracks(architect_plan: dict, max_parallel_tracks: int = MAX_PARALLEL_TRACKS) -> list[dict]:
-    """
-    Extract parallel tracks from an architect plan.
-    Falls back to a single 'main' track using the flat implementation_steps list
-    if the Architect didn't produce structured tracks.
-    """
-    tracks = architect_plan.get("tracks", [])
-    if tracks:
-        return tracks[:max_parallel_tracks]
-    # Backward compat: flat implementation_steps → single track
-    steps = architect_plan.get("implementation_steps", [])
-    return [{"label": "main", "implementation_steps": steps, "key_files": architect_plan.get("key_files", [])}]
-
-
-def _order_tracks_by_deps(tracks: list[dict]) -> list[list[dict]]:
-    """
-    Topological sort of tracks by depends_on field.
-    Returns a list of waves — each wave is a list of tracks that can run in parallel.
-    Tracks with no dependencies are in wave 0. Tracks that depend on wave 0 are in wave 1, etc.
-    Circular dependencies are broken by ignoring the offending edge (logged as a warning).
-
-    Example:
-      backend (no deps) → wave 0
-      frontend (depends_on=['backend']) → wave 1
-      tests (depends_on=['backend', 'frontend']) → wave 2
-    """
-    label_to_track = {t.get("label", f"track-{i}"): t for i, t in enumerate(tracks)}
-    all_labels = set(label_to_track)
-
-    # Build adjacency: label → set of labels it depends on (filtered to known labels)
-    deps: dict[str, set[str]] = {}
-    for label, track in label_to_track.items():
-        raw_deps = set(track.get("depends_on", []))
-        deps[label] = raw_deps & all_labels  # ignore deps on unknown tracks
-
-    waves: list[list[dict]] = []
-    remaining = set(all_labels)
-    completed: set[str] = set()
-
-    while remaining:
-        # Find all tracks whose dependencies are all completed
-        wave_labels = {
-            label for label in remaining
-            if deps[label].issubset(completed)
-        }
-        if not wave_labels:
-            # Circular dependency — break by taking all remaining tracks
-            wave_labels = remaining
-        wave = [label_to_track[label] for label in sorted(wave_labels)]
-        waves.append(wave)
-        completed |= wave_labels
-        remaining -= wave_labels
-
-    return waves
-
-
-def _normalise_path(p: str) -> str:
-    """Strip leading ./ and / for stable file-path comparison across tracks."""
-    p = p.strip()
-    while p.startswith("./") or p.startswith("/"):
-        p = p[2:] if p.startswith("./") else p[1:]
-    return p.lower()
-
-
-def _resolve_track_conflicts(tracks: list[dict]) -> tuple[list[dict], list[str]]:
-    """
-    Detect key_file collisions between tracks that run in the same wave (parallel).
-
-    For each collision the file is kept in whichever track claims it first when
-    the wave's tracks are sorted alphabetically by label — deterministic, no LLM
-    call required.  Returns (updated_tracks, human-readable warning strings).
-    """
-    waves = _order_tracks_by_deps(tracks)
-    label_to_idx = {t.get("label", f"track-{i}"): i for i, t in enumerate(tracks)}
-    new_key_files: dict[int, list[str]] = {i: list(t.get("key_files", [])) for i, t in enumerate(tracks)}
-    warnings: list[str] = []
-
-    for wave in waves:
-        if len(wave) < 2:
-            continue
-        wave_sorted = sorted(wave, key=lambda t: t.get("label", ""))
-        claimed: dict[str, str] = {}  # normalised path → owner label
-
-        for track in wave_sorted:
-            label = track.get("label", "")
-            idx = label_to_idx[label]
-            keep: list[str] = []
-            for path in new_key_files[idx]:
-                norm = _normalise_path(path)
-                if not norm:
-                    keep.append(path)
-                    continue
-                if norm not in claimed:
-                    claimed[norm] = label
-                    keep.append(path)
-                else:
-                    warnings.append(
-                        f"'{path}' claimed by both '{label}' and '{claimed[norm]}' "
-                        f"(parallel wave) — ownership kept by '{claimed[norm]}'"
-                    )
-            new_key_files[idx] = keep
-
-    updated = [{**t, "key_files": new_key_files[i]} for i, t in enumerate(tracks)]
-    return updated, warnings
-
-
-def _extract_tracks(architect_plan: dict, max_parallel_tracks: int = MAX_PARALLEL_TRACKS) -> list[dict]:
-    """Extract all tracks from an architect plan (flat list, order preserved)."""
-    tracks = architect_plan.get("tracks", [])
-    if tracks:
-        # Allow up to max_parallel_tracks * 2 total tracks when using wave execution
-        return tracks[:max_parallel_tracks * 2]
-    steps = architect_plan.get("implementation_steps", [])
-    return [{"label": "main", "implementation_steps": steps, "key_files": architect_plan.get("key_files", [])}]
-
-
-def _track_plan(architect_plan: dict, track: dict) -> dict:
-    """Build a per-track plan dict for the Builder."""
-    return {
-        **architect_plan,
-        "implementation_steps": track.get("implementation_steps", []),
-        "key_files": track.get("key_files", architect_plan.get("key_files", [])),
-    }
-
-
-def _merge_build_results(builder_jsons: tuple[str, ...]) -> dict:
-    """Merge edits and success flags from parallel Builder results."""
-    all_edits: list[dict] = []
-    summaries: list[str] = []
-    success = True
-    for bj in builder_jsons:
-        try:
-            bd = json.loads(bj)
-        except (json.JSONDecodeError, ValueError):
-            bd = {"success": False, "edits": [], "summary": str(bj)}
-        if not bd.get("success"):
-            success = False
-        all_edits.extend(bd.get("edits", []))
-        if bd.get("summary"):
-            summaries.append(bd["summary"])
-    return {
-        "success": success,
-        "edits": all_edits,
-        "summary": " | ".join(summaries) if summaries else "Build complete.",
-    }
-
-
-def _parse_failing_tests(output: str) -> list[str]:
-    """
-    Extract failing test IDs from a test runner's stdout.
-
-    Handles pytest ("FAILED tests/foo.py::test_bar") and
-    Jest/Vitest ("✕ test name" / "FAIL src/foo.test.ts").
-    Returns at most 50 IDs to avoid oversized payloads.
-    """
-    ids: list[str] = []
-    # pytest: "FAILED path/to/test.py::test_name [...]"
-    ids.extend(re.findall(r"^FAILED\s+(\S+)", output, re.MULTILINE))
-    # jest/vitest: "FAIL src/foo.test.ts"
-    ids.extend(re.findall(r"^FAIL\s+(\S+\.(?:test|spec)\.\w+)", output, re.MULTILINE))
-    # jest inline: "  ✕ some test description (42 ms)"
-    ids.extend(re.findall(r"^\s+[✕✗×]\s+(.+?)\s*\(\d+", output, re.MULTILINE))
-    seen: set[str] = set()
-    unique = [x for x in ids if x not in seen and not seen.add(x)]  # type: ignore[func-returns-value]
-    return unique[:50]
 
 
 @workflow.defn(name="swarm-factory")
@@ -740,19 +584,7 @@ class SwarmOrchestrator(BaseWorkflow):
         # sibling tracks' file ownership and exports, preventing collision and enabling
         # correct imports. Stored on self so it's durable in Temporal event history
         # and works correctly across distributed workers (no filesystem dependency).
-        self._manifest = {
-            "version": 1,
-            "tracks": [
-                {
-                    "label": t.get("label", "unknown"),
-                    "key_files": t.get("key_files", []),
-                    "exports": t.get("exports", []),
-                    "goal_summary": (t.get("implementation_steps") or [""])[0][:120],
-                }
-                for t in tracks
-            ],
-            "completed_edits": [],
-        }
+        self._manifest = build_manifest(tracks)
 
         # ── HITL checkpoint 1: architect plan review (Standard / Full Crew) ─────
         if tier >= 2:
@@ -1059,19 +891,10 @@ class SwarmOrchestrator(BaseWorkflow):
                     architect_plan = replan
                     tracks = _extract_tracks(architect_plan, max_parallel_tracks=max_parallel_tracks)
                     # Rebuild manifest for the revised track set
-                    self._manifest = {
-                        "version": 1,
-                        "tracks": [
-                            {
-                                "label": t.get("label", "unknown"),
-                                "key_files": t.get("key_files", []),
-                                "exports": t.get("exports", []),
-                                "goal_summary": (t.get("implementation_steps") or [""])[0][:120],
-                            }
-                            for t in tracks
-                        ],
-                        "completed_edits": self._manifest.get("completed_edits", []),
-                    }
+                    self._manifest = build_manifest(
+                        tracks,
+                        completed_edits=self._manifest.get("completed_edits", []),
+                    )
                     log.info("architect_replan_accepted", new_tracks=len(tracks))
                     await adk.messages.create(
                         task_id=task_id,
@@ -1299,19 +1122,10 @@ class SwarmOrchestrator(BaseWorkflow):
                     replan2["repo_root"] = repo_path
                     architect_plan = replan2
                     tracks = _extract_tracks(architect_plan, max_parallel_tracks=max_parallel_tracks)
-                    self._manifest = {
-                        "version": 1,
-                        "tracks": [
-                            {
-                                "label": t.get("label", "unknown"),
-                                "key_files": t.get("key_files", []),
-                                "exports": t.get("exports", []),
-                                "goal_summary": (t.get("implementation_steps") or [""])[0][:120],
-                            }
-                            for t in tracks
-                        ],
-                        "completed_edits": self._manifest.get("completed_edits", []),
-                    }
+                    self._manifest = build_manifest(
+                        tracks,
+                        completed_edits=self._manifest.get("completed_edits", []),
+                    )
                     # Reset heal budget for the re-decomposed plan
                     heal_instructions = []
                     heal_cycles_before_replan = heal_cycles
@@ -1480,9 +1294,69 @@ class SwarmOrchestrator(BaseWorkflow):
         _edited_paths = sorted({e.get("path", "") for e in build_result.get("edits", []) if e.get("path")})
         _plan_key_files = sorted({kf for t in tracks for kf in t.get("key_files", []) if kf})
         all_key_files = sorted(set(_edited_paths) | set(_plan_key_files))
+
+        # ── Build report: assemble structured audit trail for PR description ──
+        _prior_episode_count: int = 0
+        _active_facts: str = ""
+        try:
+            _prior_episode_count = await workflow.execute_activity(
+                "memory_count_episodes",
+                args=[repo_path],
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        except Exception:
+            pass
+        try:
+            _active_facts = await workflow.execute_activity(
+                "memory_read_facts",
+                args=[repo_path, None],
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        except Exception:
+            pass
+
+        _build_report: dict = {
+            "goal": goal,
+            "build_number": _prior_episode_count + 1,
+            "prior_episode_count": _prior_episode_count,
+            "tier": tier,
+            "tier_label": TIER_LABELS.get(tier, str(tier)),
+            "tracks": [
+                {
+                    "label": t.get("label", ""),
+                    "description": t.get("description", ""),
+                }
+                for t in tracks
+                if t.get("label") not in ("heal", "reviewer-heal")
+            ],
+            "tech_stack": architect_plan.get("tech_stack", []),
+            "files_modified": len(_edited_paths),
+            "heal_cycles": heal_cycles,
+            "inspector": {
+                "passed": inspector_report.get("passed", False),
+                "issues_fixed": heal_cycles,
+            },
+            "reviewer": {
+                "verdict": reviewer_report.get("verdict", "approve"),
+                "notes": reviewer_report.get("notes", ""),
+            },
+            "security": {
+                "passed": security_report.get("passed", True),
+                "finding_count": len(security_report.get("findings", [])),
+                "critical_count": len([
+                    f for f in security_report.get("findings", [])
+                    if f.get("severity") in ("critical", "high")
+                ]),
+            },
+            "active_facts": _active_facts,
+            "explicit_exclusions": architect_plan.get("out_of_scope", []),
+        }
+
         devops_json: str = await workflow.execute_child_workflow(
             DevOpsAgent.run,
-            args=[goal, repo_path, branch, task_id, build_result.get("summary", ""), all_key_files or None],
+            args=[goal, repo_path, branch, task_id, build_result.get("summary", ""), all_key_files or None, _build_report],
             id=f"{task_id}-r{iteration}-devops",
             task_queue=task_queue,
             execution_timeout=DEVOPS_TIMEOUT,
@@ -1538,6 +1412,46 @@ class SwarmOrchestrator(BaseWorkflow):
         except Exception:
             pass  # non-critical
 
+        # ── GitHub comment: quality score breakdown posted to the PR ──────────
+        if pr_url and quality_score.get("score") is not None:
+            try:
+                await workflow.execute_activity(
+                    "swarm_post_github_comment",
+                    args=[
+                        pr_url,
+                        format_quality_comment(
+                            quality_score,
+                            build_number=_build_report.get("build_number", "?"),
+                            prior_episode_count=_build_report.get("prior_episode_count", 0),
+                        ),
+                        repo_path,
+                    ],
+                    start_to_close_timeout=timedelta(seconds=30),
+                    retry_policy=RetryPolicy(maximum_attempts=2),
+                )
+            except Exception:
+                pass  # non-critical
+
+        # ── Persist build record to Postgres (non-critical) ───────────────────
+        if project_id:
+            try:
+                await workflow.execute_activity(
+                    "db_upsert_build",
+                    args=[
+                        task_id,
+                        project_id,
+                        "system",  # user_id threaded in Phase 2
+                        devops_result.get("branch", branch) if devops_result else branch,
+                        pr_url,
+                        quality_score.get("score") if quality_score else None,
+                        "COMPLETED",
+                    ],
+                    start_to_close_timeout=timedelta(seconds=15),
+                    retry_policy=RetryPolicy(maximum_attempts=2),
+                )
+            except Exception:
+                pass  # non-critical
+
         # ── Final report ──────────────────────────────────────────────────────
         final = _build_final_report(
             goal=goal,
@@ -1560,7 +1474,7 @@ class SwarmOrchestrator(BaseWorkflow):
 
         # ── Episodic memory: record this build for future agent context ────────
         try:
-            from project.complexity import TIER_LABELS
+            from project.schema.complexity import TIER_LABELS
             episode = {
                 "goal": goal[:300],
                 "tier": tier,
@@ -1590,67 +1504,4 @@ class SwarmOrchestrator(BaseWorkflow):
 
         return final
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _build_final_report(
-    goal: str,
-    tracks: list[dict],
-    build_result: dict,
-    inspector_report: dict,
-    reviewer_report: dict,
-    security_report: dict,
-    devops_result: dict | None,
-    heal_cycles: int,
-    blocked_by: str | None = None,
-    quality_score: dict | None = None,
-) -> str:
-    edits = build_result.get("edits", [])
-    findings = security_report.get("findings", [])
-    pr_url = devops_result.get("pr_url", "") if devops_result else ""
-    branch = devops_result.get("branch", "") if devops_result else ""
-
-    status = "✓ Complete" if not blocked_by else f"⚠ Blocked by {blocked_by}"
-    qa_status = "✓ Passed" if inspector_report.get("passed") else "✗ Failed"
-    rev_verdict = reviewer_report.get("verdict", "approve")
-    rev_status = "✓ Approved" if rev_verdict == "approve" else "✗ Changes requested"
-    sec_status = "✓ Clean" if security_report.get("passed") else "✗ Issues found"
-
-    track_labels = [t.get("label", "?") for t in tracks if t.get("label") not in ("heal", "reviewer-heal")]
-    tracks_str = ", ".join(track_labels) if track_labels else "main"
-
-    lines = [
-        "## Swarm Factory Report",
-        f"**Status:** {status}",
-        f"**Goal:** {goal[:200]}",
-        "",
-        "### Results",
-        f"- Architect: {len(tracks)} parallel track(s) — {tracks_str}",
-        f"- Builders: {len(edits)} file(s) modified (heal cycles: {heal_cycles})",
-        f"- Inspector: {qa_status}",
-        f"- Reviewer: {rev_status}",
-        f"- Security: {sec_status} ({len(findings)} finding(s))",
-    ]
-
-    if quality_score and quality_score.get("score") is not None:
-        score = quality_score["score"]
-        lines.append(f"- Quality: {score}/10 — {quality_score.get('reasoning', '')}")
-
-    if pr_url:
-        lines.append(f"- DevOps: PR opened → {pr_url}")
-    elif branch:
-        lines.append(f"- DevOps: Branch '{branch}' pushed")
-
-    if not inspector_report.get("passed"):
-        issues = inspector_report.get("heal_instructions", [])[:3]
-        if issues:
-            lines += ["", "### Remaining QA Issues"] + [f"- {i}" for i in issues]
-
-    if not security_report.get("passed"):
-        critical = [f for f in findings if f.get("severity") in ("critical", "high")][:3]
-        if critical:
-            lines += ["", "### Security Findings (blocking)"] + [
-                f"- [{f.get('severity')}] {f.get('description', '')}" for f in critical
-            ]
-
-    return "\n".join(lines)
+        return final
