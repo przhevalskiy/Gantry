@@ -19,3 +19,9 @@ WEBHOOK_SECRET_PATH: Path = GANTRY_HOME / "webhook_secret"
 
 GITHUB_WEBHOOK_SECRET: str = os.getenv("GITHUB_WEBHOOK_SECRET", "")
 GH_TOKEN: str = os.getenv("GH_TOKEN", os.getenv("GITHUB_TOKEN", ""))
+
+# Postgres — required for multi-user production; optional in local dev
+DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+
+# Clerk — required for auth in production
+CLERK_SECRET_KEY: str = os.getenv("CLERK_SECRET_KEY", "")

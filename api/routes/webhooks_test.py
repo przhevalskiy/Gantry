@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from api.deps import require_api_key
-from api import webhooks
+from api.services import webhooks
 
 router = APIRouter(prefix="/v1/webhooks", tags=["Webhooks"])
 

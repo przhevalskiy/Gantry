@@ -79,3 +79,14 @@ async def update_project(project_id: str, body: UpdateProjectRequest, _key: dict
     if body.github_url is not None:
         payload["github_url"] = body.github_url
     return await _proxy_patch(payload)
+
+
+@router.get("/{project_id}/memory")
+async def get_project_memory(project_id: str, _key: dict = Depends(require_api_key)):
+    """Return the durable memory (facts + recent episodes) for a project."""
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(f"{_UI_PROJECTS}/{project_id}/memory")
+        if resp.status_code == 404:
+            raise HTTPException(status_code=404, detail="project not found")
+        resp.raise_for_status()
+        return resp.json()

@@ -15,7 +15,8 @@ import httpx
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Request
 
-from api import agentex_client, github_client
+from api.clients import agentex as agentex_client
+from api.clients import github as github_client
 from api.config import GITHUB_WEBHOOK_SECRET, GANTRY_UI_URL
 from api.store import tasks as task_store
 

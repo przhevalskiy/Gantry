@@ -4,7 +4,9 @@ import re
 
 import structlog
 
-from api import agentex_client, github_client, webhooks
+from api.clients import agentex as agentex_client
+from api.clients import github as github_client
+from api.services import webhooks
 from api.store import tasks as task_store
 
 log = structlog.get_logger(__name__)

@@ -5,7 +5,8 @@ import asyncio
 import httpx
 import structlog
 
-from api import agentex_client, temporal_client
+from api.clients import agentex as agentex_client
+from api.clients import temporal as temporal_client
 from api.config import GANTRY_UI_URL
 from api.deps import require_api_key
 from api.store import tasks as task_store
