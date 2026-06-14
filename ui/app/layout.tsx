@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { GeistSans } from 'geist/font/sans';
+import { ClerkProvider } from '@clerk/nextjs';
 import './globals.css';
 import { Providers } from '@/components/providers';
 import { AppShell } from '@/components/app-shell';
@@ -15,14 +16,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const agentName = process.env.NEXT_PUBLIC_AGENT_NAME ?? 'swarm-factory';
 
   return (
-    <html lang="en" className={GeistSans.className}>
-      <body>
-        <Providers agentexAPIBaseURL={agentexAPIBaseURL} agentName={agentName}>
-          <AppShell>
-            {children}
-          </AppShell>
-        </Providers>
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" className={GeistSans.className}>
+        <body>
+          <Providers agentexAPIBaseURL={agentexAPIBaseURL} agentName={agentName}>
+            <AppShell>
+              {children}
+            </AppShell>
+          </Providers>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
