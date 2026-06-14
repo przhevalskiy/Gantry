@@ -160,6 +160,7 @@ http://localhost:8001/redoc   ReDoc
 | `DELETE` | `/tasks/{task_id}` | Terminate a running workflow |
 | `GET` | `/projects` | List projects |
 | `POST` | `/projects` | Create a project |
+| `GET` | `/projects/{project_id}/memory` | Facts + recent episodes for a project |
 | `GET` | `/traces/{task_id}` | Retrieve structured agent traces |
 | `POST` | `/webhooks/github` | GitHub webhook receiver |
 
@@ -444,6 +445,15 @@ Gantry maintains persistent memory across builds so the system gets smarter over
 - **Platform-wide** (`~/.gantry/episodes.jsonl`) — history across every repo ever built on this machine
 
 Before planning, the Architect searches the platform-wide store. A new React project gets the learning from every prior React build you've run — what track decompositions worked, what failed, what quality scores were achieved. Same-repo episodes are boosted in ranking so local context still wins ties. The more tasks run, the better every future Architect gets.
+
+**API access** — memory is readable via the REST API:
+
+```
+GET /v1/projects/{project_id}/memory
+Authorization: Bearer <key>
+```
+
+Returns the facts object and the 20 most recent episodes. The **Projects** page in the UI surfaces this data on every project card.
 
 ---
 
