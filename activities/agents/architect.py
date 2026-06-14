@@ -8,7 +8,7 @@ from temporalio import activity
 
 from project.config import CLAUDE_SONNET_MODEL, CLAUDE_HAIKU_MODEL
 from project.planner import next_step, PlannerStep, FinalAnswer, PlannerError
-from project.architect_tools import ARCHITECT_TOOLS
+from project.tools.architect import ARCHITECT_TOOLS
 
 _ARCHITECT_SYSTEM = (
     "You are the Architect agent in a software engineering swarm. "

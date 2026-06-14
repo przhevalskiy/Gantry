@@ -14,7 +14,7 @@ All activity implementations have been split into focused domain modules:
 
 Import from the domain files directly for new code.
 """
-from activities.file_activities import (
+from activities.tools.file import (
     swarm_list_directory,
     swarm_read_file,
     swarm_write_file,
@@ -24,7 +24,7 @@ from activities.file_activities import (
     swarm_search_filesystem,
     swarm_find_test_files,
 )
-from activities.shell_activities import (
+from activities.tools.shell import (
     swarm_run_command,
     swarm_run_application_feedback,
     swarm_install_packages,
@@ -35,8 +35,8 @@ from activities.shell_activities import (
     swarm_deploy,
     swarm_verify_build,
 )
-from activities.security_activities import swarm_scan_secrets
-from activities.git_activities import (
+from activities.tools.security import swarm_scan_secrets
+from activities.tools.git import (
     swarm_git_status,
     swarm_git_create_branch,
     swarm_git_add,
@@ -49,14 +49,14 @@ from activities.git_activities import (
     swarm_git_clone,
     swarm_git_configure_remote,
 )
-from activities.github_activities import (
+from activities.tools.github import (
     swarm_github_create_repo,
     swarm_update_project_registry,
 )
-from activities.web_activities import swarm_web_search, swarm_fetch_url
-from activities.manifest_activities import manifest_write, manifest_read, manifest_append_edits
-from activities.memory_activities import swarm_memory_write, swarm_memory_read
-from activities.index_activities import (
+from activities.tools.web import swarm_web_search, swarm_fetch_url
+from activities.infra.manifest import manifest_write, manifest_read, manifest_append_edits
+from activities.data.memory import swarm_memory_write, swarm_memory_read
+from activities.data.index import (
     swarm_find_symbol,
     swarm_build_repo_index,
     swarm_query_repo_index,

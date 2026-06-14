@@ -179,6 +179,18 @@ async def memory_append_episode(repo_path: str, episode: dict) -> str:
     return f"Episode recorded ({episode.get('outcome', 'unknown')})."
 
 
+@activity.defn(name="memory_count_episodes")
+async def memory_count_episodes(repo_path: str) -> int:
+    """Return the number of past build episodes recorded for this repo."""
+    episodes_path = _memory_dir(repo_path) / _EPISODES_FILE
+    if not episodes_path.exists():
+        return 0
+    try:
+        return sum(1 for line in episodes_path.read_text().splitlines() if line.strip())
+    except Exception:
+        return 0
+
+
 @activity.defn(name="memory_search_episodes")
 async def memory_search_episodes(repo_path: str, query: str, top_k: int = 5) -> str:
     """

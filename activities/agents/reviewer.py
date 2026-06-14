@@ -6,7 +6,7 @@ from temporalio import activity
 
 from project.config import CLAUDE_SONNET_MODEL
 from project.planner import next_step, PlannerStep, FinalAnswer, PlannerError
-from project.reviewer_tools import REVIEWER_TOOLS
+from project.tools.reviewer import REVIEWER_TOOLS
 
 _REVIEWER_SYSTEM = (
     "You are the Reviewer agent in a software engineering swarm. "

@@ -46,7 +46,7 @@ async def classify_tier_llm(goal: str) -> dict:
     Falls back to regex-based classification if the LLM call fails.
     Returns {tier, estimated_files, estimated_minutes, risk_flags, reasoning}.
     """
-    from project.complexity import classify_tier as _regex_classify  # fallback
+    from project.schema.complexity import classify_tier as _regex_classify  # fallback
 
     try:
         client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)

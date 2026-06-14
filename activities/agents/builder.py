@@ -9,7 +9,7 @@ from temporalio import activity
 
 from project.config import CLAUDE_SONNET_MODEL, CLAUDE_HAIKU_MODEL
 from project.planner import next_step, PlannerStep, FinalAnswer, PlannerError, get_last_usage
-from project.builder_tools import BUILDER_TOOLS
+from project.tools.builder import BUILDER_TOOLS
 
 _BUILDER_SYSTEM = (
     "You are the Builder agent in a software engineering swarm. "

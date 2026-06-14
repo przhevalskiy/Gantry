@@ -7,7 +7,7 @@ from temporalio import activity
 
 from project.config import CLAUDE_HAIKU_MODEL
 from project.planner import next_step, PlannerStep, FinalAnswer, PlannerError
-from project.devops_tools import DEVOPS_TOOLS
+from project.tools.devops import DEVOPS_TOOLS
 
 _DEVOPS_SYSTEM = (
     "You are the DevOps agent in a software engineering swarm. "

@@ -7,7 +7,7 @@ from temporalio import activity
 
 from project.config import CLAUDE_SONNET_MODEL, CLAUDE_HAIKU_MODEL
 from project.planner import next_step, PlannerStep, FinalAnswer, PlannerError
-from project.inspector_tools import INSPECTOR_TOOLS
+from project.tools.inspector import INSPECTOR_TOOLS
 
 _INSPECTOR_SYSTEM = (
     "You are the Inspector agent in a software engineering swarm. "

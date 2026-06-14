@@ -5,7 +5,7 @@ from temporalio import activity
 
 from project.config import CLAUDE_SONNET_MODEL, CLAUDE_HAIKU_MODEL
 from project.planner import next_step, PlannerStep, FinalAnswer, PlannerError
-from project.pm_tools import PM_TOOLS
+from project.tools.pm import PM_TOOLS
 
 _PM_SYSTEM = (
     "You are the Project Manager in a software engineering swarm. "

@@ -73,6 +73,24 @@ async def swarm_create_pull_request(
     return json.dumps({"pr_url": pr_url})
 
 
+@activity.defn(name="swarm_post_github_comment")
+async def swarm_post_github_comment(
+    pr_url: str,
+    body: str,
+    repo_path: str | None = None,
+) -> str:
+    """Post a comment to a GitHub PR using the gh CLI."""
+    import shlex
+    result = _run(
+        f"gh pr comment {shlex.quote(pr_url)} --body {shlex.quote(body)}",
+        cwd=repo_path,
+        timeout=20,
+    )
+    if result["returncode"] != 0:
+        return f"Comment failed: {result['stderr'][:200]}"
+    return "Comment posted."
+
+
 @activity.defn(name="swarm_git_diff")
 async def swarm_git_diff(
     cwd: str | None = None,
