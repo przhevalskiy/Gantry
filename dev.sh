@@ -5,14 +5,14 @@
 #   cd scale-agentex/agentex && docker compose up -d
 #
 # This script:
-#   1. Kills stale processes on local ports (8000, 8233, 3000)
+#   1. Kills stale processes on local ports (8000, 8001, 8233, 3000)
 #   2. Starts Temporal dev server if not running (:7233)
-#   3. Starts the web-scout agent (ACP :8000 + Temporal worker)
-#   4. Starts gantry-ui (:3000)
+#   3. Starts the swarm-factory agent (ACP :8000 + Temporal worker)
+#   4. Starts the Gantry API (:8001)
+#   5. Starts gantry-ui (:3000)
 #
 # Usage:
-#   ./dev.sh               Start (live browser + search)
-#   ./dev.sh --mock        Mock browser/search (no Playwright/Tavily)
+#   ./dev.sh               Start all services
 #   ./dev.sh --cleanup     Clean up stale Temporal workflows on start
 #   ./dev.sh --stop        Kill all local processes
 #   ./dev.sh --status      Show what's running
@@ -71,8 +71,6 @@ _stop_all() {
   kill_port 8000
   kill_port 8001
   kill_port 8233
-  # Kill worker processes that connect to Temporal (not port-bound, missed by kill_port)
-  pkill -f "project.run_worker" 2>/dev/null || true
   pkill -f "agentex agents run" 2>/dev/null || true
   pkill -f "api.main" 2>/dev/null || true
   ok "Done."
@@ -104,13 +102,11 @@ _start_platform() {
 }
 
 # ── Flags ─────────────────────────────────────────────────────────────────────
-MOCK=false
 CLEANUP=false
 PLATFORM=false
 
 for arg in "$@"; do
   case $arg in
-    --mock)     MOCK=true ;;
     --cleanup)  CLEANUP=true ;;
     --platform) PLATFORM=true ;;
     --stop)     _stop_all; exit 0 ;;
@@ -160,18 +156,10 @@ else
   ok "Temporal already running on :7233"
 fi
 
-# ── Step 3: web-scout agent ───────────────────────────────────────────────────
-header "Starting web-scout agent"
+# ── Step 3: swarm-factory agent (ACP + Temporal worker) ──────────────────────
+header "Starting swarm-factory agent"
 
-VENV_PACKAGES="$ROOT/.venv/lib/python3.12/site-packages"
-export PYTHONPATH="$VENV_PACKAGES${PYTHONPATH:+:$PYTHONPATH}"
 export AGENTEX_BASE_URL="http://localhost:5003"
-
-if [ "$MOCK" = true ]; then
-  export USE_MOCK_BROWSER=true
-  export USE_MOCK_SEARCH=true
-  log "Mock mode: USE_MOCK_BROWSER=true USE_MOCK_SEARCH=true"
-fi
 
 AGENTEX_ARGS="--manifest manifest.yaml"
 [ "$CLEANUP" = true ] && AGENTEX_ARGS="$AGENTEX_ARGS --cleanup-on-start"

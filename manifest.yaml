@@ -14,7 +14,7 @@ local_development:
     host_address: host.docker.internal
   paths:
     acp: project/acp.py
-    worker: project/run_worker.py
+    worker: worker.py
 
 agent:
   acp_type: agentic
