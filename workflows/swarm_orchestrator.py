@@ -271,6 +271,7 @@ class SwarmOrchestrator(BaseWorkflow):
         lightweight_mode = bool(params.params.get("lightweight_mode", tp["lightweight_mode"])) if params.params else tp["lightweight_mode"]
         max_heal = int(params.params.get("max_heal_cycles", tp["max_heal_cycles"])) if params.params else tp["max_heal_cycles"]
         max_parallel_tracks = int(params.params.get("max_parallel_tracks", tp["max_parallel_tracks"])) if params.params else tp["max_parallel_tracks"]
+        disable_agents = set(params.params.get("disable_agents") or []) if params.params else set()
 
         tier_label = TIER_LABELS.get(tier, f"Tier {tier}")
         # Build tier announcement with LLM estimates when available
@@ -312,6 +313,7 @@ class SwarmOrchestrator(BaseWorkflow):
                 iteration=iteration,
                 tier=tier,
                 log=log,
+                disable_agents=disable_agents,
             )
 
             # Update conversation history so the next architect has context
@@ -411,8 +413,10 @@ class SwarmOrchestrator(BaseWorkflow):
         iteration: int,
         tier: int,
         log,
+        disable_agents: set | None = None,
     ) -> str:
         branch = _branch_name(f"{task_id}-r{iteration}", branch_prefix)
+        disabled = disable_agents or set()
 
         await adk.messages.create(
             task_id=task_id,
@@ -427,7 +431,7 @@ class SwarmOrchestrator(BaseWorkflow):
         )
 
         # ── Step 0: PM Agent (tier >= 1 — skip on Auto) ──────────────────────
-        if tier >= 1:
+        if tier >= 1 and "pm" not in disabled:
             await adk.messages.create(
                 task_id=task_id,
                 content=TextContent(
@@ -958,26 +962,33 @@ class SwarmOrchestrator(BaseWorkflow):
                 pass  # smoke test unavailable — proceed to Inspector as before
 
             # Inspector
-            await adk.messages.create(
-                task_id=task_id,
-                content=TextContent(
-                    author="agent",
-                    content=f"[Foreman] Dispatching Inspector ({cycle_label}) — running tests, lint, types",
-                ),
-            )
+            if "inspector" in disabled:
+                inspector_report = {"passed": True, "summary": "Inspector skipped via pipeline config.", "heal_instructions": []}
+                await adk.messages.create(
+                    task_id=task_id,
+                    content=TextContent(author="agent", content="[Foreman] Inspector skipped — pipeline.disable_agents"),
+                )
+            else:
+                await adk.messages.create(
+                    task_id=task_id,
+                    content=TextContent(
+                        author="agent",
+                        content=f"[Foreman] Dispatching Inspector ({cycle_label}) — running tests, lint, types",
+                    ),
+                )
 
-            inspector_json: str = await workflow.execute_child_workflow(
-                InspectorAgent.run,
-                args=[goal, repo_path, task_id, pre_existing_tests or None, _inspector_model, all_test_specs or None, qa_commands or None, baseline_failing_tests or None],
-                id=f"{task_id}-r{iteration}-inspector-{cycle}",
-                task_queue=task_queue,
-                execution_timeout=INSPECTOR_TIMEOUT,
-            )
+                inspector_json: str = await workflow.execute_child_workflow(
+                    InspectorAgent.run,
+                    args=[goal, repo_path, task_id, pre_existing_tests or None, _inspector_model, all_test_specs or None, qa_commands or None, baseline_failing_tests or None],
+                    id=f"{task_id}-r{iteration}-inspector-{cycle}",
+                    task_queue=task_queue,
+                    execution_timeout=INSPECTOR_TIMEOUT,
+                )
 
-            try:
-                inspector_report = json.loads(inspector_json)
-            except (json.JSONDecodeError, ValueError):
-                inspector_report = {"passed": False, "summary": inspector_json, "heal_instructions": []}
+                try:
+                    inspector_report = json.loads(inspector_json)
+                except (json.JSONDecodeError, ValueError):
+                    inspector_report = {"passed": False, "summary": inspector_json, "heal_instructions": []}
 
             if inspector_report.get("passed"):
                 log.info("inspector_passed", cycle=cycle, tests_skipped=inspector_report.get("tests_skipped", False))
@@ -996,8 +1007,8 @@ class SwarmOrchestrator(BaseWorkflow):
                     build_result["summary"] = (existing + f"\n\n{inspector_summary}").strip()
 
                 # ── Reviewer: logic + contract check ─────────────────────────
-                if lightweight_mode:
-                    reviewer_report = {"verdict": "approve", "summary": "Reviewer skipped in lightweight mode.", "comments": []}
+                if lightweight_mode or "reviewer" in disabled:
+                    reviewer_report = {"verdict": "approve", "summary": "Reviewer skipped.", "comments": []}
                 else:
                     await adk.messages.create(
                         task_id=task_id,
@@ -1187,15 +1198,15 @@ class SwarmOrchestrator(BaseWorkflow):
             tracks = [{"label": "heal", "implementation_steps": heal_instructions, "key_files": []}]
 
         # ── Step 3: Security ──────────────────────────────────────────────────
-        if lightweight_mode:
+        if lightweight_mode or "security" in disabled:
             security_report = {
                 "passed": True,
-                "summary": "Security skipped in lightweight mode.",
+                "summary": "Security skipped.",
                 "findings": [],
             }
             await adk.messages.create(
                 task_id=task_id,
-                content=TextContent(author="agent", content="[Foreman] Lightweight mode — skipping Security"),
+                content=TextContent(author="agent", content="[Foreman] Security skipped"),
             )
         else:
             await adk.messages.create(
