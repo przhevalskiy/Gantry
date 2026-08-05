@@ -1,0 +1,130 @@
+name: Gantry Submit Task
+description: Submit an engineering task to the Gantry API and optionally wait for the PR URL
+inputs:
+  api-key:
+    description: Gantry API key (gantry_...)
+    required: true
+  base-url:
+    description: Gantry API base URL
+    required: false
+    default: https://api.gantry.dev
+  goal:
+    description: Engineering goal in plain language
+    required: true
+  project-id:
+    description: Gantry project ID
+    required: true
+  github-token-secret:
+    description: Name of a stored org secret for GitHub PAT (optional)
+    required: false
+  tier:
+    description: Complexity tier (-1 = auto)
+    required: false
+    default: "-1"
+  wait:
+    description: Wait for task completion (true/false)
+    required: false
+    default: "false"
+  poll-interval:
+    description: Poll interval in seconds when wait=true
+    required: false
+    default: "15"
+  timeout:
+    description: Max wait time in seconds
+    required: false
+    default: "1800"
+  idempotency-key:
+    description: Idempotency-Key header value
+    required: false
+outputs:
+  task-id:
+    description: Submitted task ID
+    value: ${{ steps.submit.outputs.task-id }}
+  pr-url:
+    description: PR URL when wait=true and task completes
+    value: ${{ steps.wait.outputs.pr-url }}
+  status:
+    description: Final task status when wait=true
+    value: ${{ steps.wait.outputs.status }}
+runs:
+  using: composite
+  steps:
+    - name: Submit task
+      id: submit
+      shell: bash
+      env:
+        GANTRY_API_KEY: ${{ inputs.api-key }}
+        GANTRY_BASE_URL: ${{ inputs.base-url }}
+        GOAL: ${{ inputs.goal }}
+        PROJECT_ID: ${{ inputs.project-id }}
+        TIER: ${{ inputs.tier }}
+        GITHUB_TOKEN_SECRET: ${{ inputs.github-token-secret }}
+        IDEMPOTENCY_KEY: ${{ inputs.idempotency-key }}
+      run: |
+        set -euo pipefail
+        BODY=$(python3 - <<'PY'
+        import json, os
+        body = {
+            "goal": os.environ["GOAL"],
+            "project_id": os.environ["PROJECT_ID"],
+            "tier": int(os.environ.get("TIER", "-1")),
+        }
+        secret = os.environ.get("GITHUB_TOKEN_SECRET", "").strip()
+        if secret:
+            body["github_token_secret"] = secret
+        print(json.dumps(body))
+        PY
+        )
+        HEADERS=(-H "Authorization: Bearer ${GANTRY_API_KEY}" -H "Content-Type: application/json")
+        if [ -n "${IDEMPOTENCY_KEY:-}" ]; then
+          HEADERS+=(-H "Idempotency-Key: ${IDEMPOTENCY_KEY}")
+        fi
+        RESP=$(curl -sf -X POST "${GANTRY_BASE_URL}/v1/tasks" "${HEADERS[@]}" -d "${BODY}")
+        TASK_ID=$(python3 - <<'PY' "${RESP}"
+        import json, sys
+        print(json.loads(sys.argv[1])["task_id"])
+        PY
+        )
+        echo "task-id=${TASK_ID}" >> "$GITHUB_OUTPUT"
+        echo "Submitted task ${TASK_ID}"
+
+    - name: Wait for completion
+      id: wait
+      if: inputs.wait == 'true'
+      shell: bash
+      env:
+        GANTRY_API_KEY: ${{ inputs.api-key }}
+        GANTRY_BASE_URL: ${{ inputs.base-url }}
+        TASK_ID: ${{ steps.submit.outputs.task-id }}
+        POLL_INTERVAL: ${{ inputs.poll-interval }}
+        TIMEOUT: ${{ inputs.timeout }}
+      run: |
+        set -euo pipefail
+        DEADLINE=$(( $(date +%s) + TIMEOUT ))
+        while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+          RESP=$(curl -sf -H "Authorization: Bearer ${GANTRY_API_KEY}" \
+            "${GANTRY_BASE_URL}/v1/tasks/${TASK_ID}")
+          STATUS=$(python3 - <<'PY' "${RESP}"
+        import json, sys
+        print(json.loads(sys.argv[1]).get("status", "unknown"))
+        PY
+          )
+          echo "status=${STATUS}" >> "$GITHUB_OUTPUT"
+          case "${STATUS}" in
+            completed|failed|cancelled|terminated|timeout)
+              PR=$(python3 - <<'PY' "${RESP}"
+        import json, sys
+        data = json.loads(sys.argv[1])
+        result = data.get("result") or {}
+        print(result.get("pr_url") or "")
+        PY
+              )
+              echo "pr-url=${PR}" >> "$GITHUB_OUTPUT"
+              echo "Task ${TASK_ID} finished: ${STATUS}"
+              exit 0
+              ;;
+          esac
+          sleep "${POLL_INTERVAL}"
+        done
+        echo "Timed out waiting for task ${TASK_ID}" >&2
+        exit 1

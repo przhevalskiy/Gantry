@@ -30,10 +30,20 @@ def _sign(payload_bytes: bytes) -> str:
     return f"sha256={sig}"
 
 
-async def fire_webhook(url: str, event: str, payload: dict) -> bool:
+async def fire_webhook(
+    url: str,
+    event: str,
+    payload: dict,
+    *,
+    secret: str | None = None,
+) -> bool:
     """Fire a signed webhook. Returns True on success."""
     body = json.dumps({"event": event, **payload}).encode()
-    signature = _sign(body)
+    if secret:
+        sig = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+        signature = f"sha256={sig}"
+    else:
+        signature = _sign(body)
     headers = {
         "Content-Type": "application/json",
         "X-Gantry-Event": event,

@@ -1,4 +1,4 @@
-"""Background task: poll Agentex for completion, fire webhooks, and post GitHub callbacks."""
+"""Background task: poll Agentex for lifecycle + terminal webhooks."""
 import asyncio
 import re
 
@@ -6,13 +6,15 @@ import structlog
 
 from api.clients import agentex as agentex_client
 from api.clients import github as github_client
-from api.services import webhooks
-from api.store import tasks as task_store
+from api.repositories import builds as builds_repo
+from api.repositories import tasks as tasks_repo
+from api.services import task_events
 
 log = structlog.get_logger(__name__)
 
 POLL_INTERVAL = 10  # seconds
 TERMINAL_STATUSES = {"completed", "failed", "cancelled", "terminated", "timeout"}
+INTERMEDIATE_STATUSES = {"running", "waiting_approval"}
 
 
 def _extract_pr_url(messages: list[dict]) -> str | None:
@@ -22,6 +24,16 @@ def _extract_pr_url(messages: list[dict]) -> str | None:
             match = re.search(r"https://github\.com/\S+/pull/\d+", content)
             if match:
                 return match.group(0)
+    return None
+
+
+def _extract_branch(messages: list[dict], task_id: str) -> str | None:
+    for msg in reversed(messages):
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            match = re.search(rf"branch[:\s]+(\S*{re.escape(task_id[:8])}\S*)", content, re.I)
+            if match:
+                return match.group(1)
     return None
 
 
@@ -51,7 +63,7 @@ async def _handle_github_callback(task_id: str, meta: dict, status: str, pr_url:
         log.error("github_callback_failed", task_id=task_id, error=str(exc))
 
 
-async def _check_and_fire(task_id: str, meta: dict) -> None:
+async def _poll_task(task_id: str, meta: dict) -> None:
     try:
         task = await agentex_client.get_task(task_id)
     except Exception as exc:
@@ -59,52 +71,62 @@ async def _check_and_fire(task_id: str, meta: dict) -> None:
         return
 
     status = task.get("status", "")
+    meta = await tasks_repo.get_task_meta(task_id) or meta
+
+    if status in INTERMEDIATE_STATUSES:
+        await task_events.emit_for_agentex_status(task_id, meta, status)
+        meta = await tasks_repo.get_task_meta(task_id) or meta
+        await tasks_repo.update_task_status(task_id, status=status)
+        return
+
     if status not in TERMINAL_STATUSES:
         return
 
     pr_url = None
+    branch = None
+    messages: list[dict] = []
     try:
         messages = await agentex_client.get_messages(task_id)
         pr_url = _extract_pr_url(messages)
+        branch = _extract_branch(messages, task_id)
     except Exception:
         pass
 
-    # Fire outbound webhook if registered
-    webhook_url = meta.get("webhook_url")
-    if webhook_url:
-        if status == "completed":
-            event = "task.completed"
-            payload = {
-                "task_id": task_id,
-                "project_id": meta.get("project_id"),
-                "source": meta.get("source"),
-                "pr_url": pr_url,
-            }
-        else:
-            event = "task.failed"
-            payload = {
-                "task_id": task_id,
-                "project_id": meta.get("project_id"),
-                "source": meta.get("source"),
-                "status": status,
-            }
-        await webhooks.fire_webhook(webhook_url, event, payload)
-        log.info("webhook_fired", task_id=task_id, event=event)
+    await tasks_repo.update_task_status(task_id, status=status, pr_url=pr_url, branch=branch)
+    meta = await tasks_repo.get_task_meta(task_id) or meta
+    meta["pr_url"] = pr_url or meta.get("pr_url")
+    meta["branch"] = branch or meta.get("branch")
 
-    # Post completion comment back to GitHub if triggered from an issue
+    project_id = meta.get("project_id")
+    org_id = meta.get("org_id")
+    if project_id:
+        await builds_repo.upsert_build(
+            task_id=task_id,
+            project_id=project_id,
+            org_id=org_id,
+            branch=branch,
+            pr_url=pr_url,
+            status=status.upper() if status == "completed" else status,
+            tier=meta.get("tier"),
+            result={"pr_url": pr_url, "branch": branch} if pr_url or branch else None,
+        )
+
+    result = {"pr_url": pr_url, "branch": branch} if (pr_url or branch) else None
+    await task_events.emit_for_agentex_status(task_id, meta, status, result=result)
+
     if meta.get("source") == "github_issues":
         await _handle_github_callback(task_id, meta, status, pr_url)
 
-    task_store.mark_webhook_fired(task_id)
+    await tasks_repo.mark_webhook_fired(task_id)
 
 
 async def run_poller() -> None:
     log.info("poller_started", interval=POLL_INTERVAL)
     while True:
         await asyncio.sleep(POLL_INTERVAL)
-        pending = task_store.pending_tasks()
+        pending = await tasks_repo.pending_tasks()
         if pending:
             await asyncio.gather(
-                *[_check_and_fire(tid, meta) for tid, meta in pending],
+                *[_poll_task(tid, meta) for tid, meta in pending],
                 return_exceptions=True,
             )

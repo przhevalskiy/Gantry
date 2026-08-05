@@ -23,5 +23,11 @@ GH_TOKEN: str = os.getenv("GH_TOKEN", os.getenv("GITHUB_TOKEN", ""))
 # Postgres — required for multi-user production; optional in local dev
 DATABASE_URL: str = os.getenv("DATABASE_URL", "")
 
+# Bootstrap token — required to create the first API key when GANTRY_BOOTSTRAP_TOKEN is set
+GANTRY_BOOTSTRAP_TOKEN: str = os.getenv("GANTRY_BOOTSTRAP_TOKEN", "")
+
+# Fernet key for org secrets — generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+GANTRY_SECRETS_KEY: str = os.getenv("GANTRY_SECRETS_KEY", "")
+
 # Clerk — required for auth in production
 CLERK_SECRET_KEY: str = os.getenv("CLERK_SECRET_KEY", "")
