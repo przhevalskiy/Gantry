@@ -13,11 +13,11 @@ from api.repositories import audit as audit_repo
 from api.repositories import builds as builds_repo
 from api.repositories import projects as projects_repo
 from api.repositories import quotas as quotas_repo
-from api.repositories import secrets as secrets_repo
 from api.repositories import tasks as tasks_repo
 from api.repositories import usage as usage_repo
 from api.repositories.quotas import QuotaExceeded
 from api.schemas.pipeline import PipelineConfig
+from api.services import github_tokens
 from api.services import task_events
 from fastapi.responses import StreamingResponse
 
@@ -76,17 +76,16 @@ async def _verify_project(project_id: str, org_id: str) -> dict:
 
 async def _resolve_github_token(
     org_id: str,
+    project: dict,
     github_token: str | None,
     github_token_secret: str | None,
 ) -> str:
-    if github_token:
-        return github_token
-    if github_token_secret:
-        value = await secrets_repo.get_secret_value(org_id=org_id, name=github_token_secret)
-        if not value:
-            raise HTTPException(status_code=404, detail=f"secret not found: {github_token_secret}")
-        return value
-    return ""
+    return await github_tokens.resolve_token(
+        org_id=org_id,
+        project=project,
+        github_token=github_token,
+        github_token_secret=github_token_secret,
+    )
 
 
 def _resolve_pipeline_params(
@@ -119,8 +118,8 @@ async def _submit_one(
     pipeline: PipelineConfig | None = None,
 ) -> dict:
     try:
-        await _verify_project(project_id, org_id)
-        token = await _resolve_github_token(org_id, github_token or None, github_token_secret)
+        project = await _verify_project(project_id, org_id)
+        token = await _resolve_github_token(org_id, project, github_token or None, github_token_secret)
         effective_tier, extra_params = _resolve_pipeline_params(tier, pipeline)
         task_id = await agentex_client.submit_task(
             goal=goal,
@@ -246,6 +245,7 @@ async def bulk_submit_tasks(
     key: dict = Depends(require_scope("tasks:write")),
 ):
     await _verify_project(body.project_id, key["org_id"])
+    project = await projects_repo.get_project(body.project_id, org_id=key["org_id"])
     quotas = await quotas_repo.get_quotas(key["org_id"])
     if len(body.tasks) > quotas.max_bulk_size:
         raise HTTPException(
@@ -259,7 +259,7 @@ async def bulk_submit_tasks(
         raise HTTPException(status_code=429, detail=str(exc))
 
     token = await _resolve_github_token(
-        key["org_id"], body.github_token, body.github_token_secret
+        key["org_id"], project or {}, body.github_token, body.github_token_secret
     )
 
     coroutines = [

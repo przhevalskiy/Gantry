@@ -20,11 +20,23 @@ WEBHOOK_SECRET_PATH: Path = GANTRY_HOME / "webhook_secret"
 GITHUB_WEBHOOK_SECRET: str = os.getenv("GITHUB_WEBHOOK_SECRET", "")
 GH_TOKEN: str = os.getenv("GH_TOKEN", os.getenv("GITHUB_TOKEN", ""))
 
+# GitHub App — preferred over PAT-per-task for platform integrations
+GITHUB_APP_ID: str = os.getenv("GITHUB_APP_ID", "")
+GITHUB_APP_SLUG: str = os.getenv("GITHUB_APP_SLUG", "gantry")
+GITHUB_APP_PRIVATE_KEY: str = os.getenv("GITHUB_APP_PRIVATE_KEY", "")
+GITHUB_APP_WEBHOOK_SECRET: str = os.getenv("GITHUB_APP_WEBHOOK_SECRET", GITHUB_WEBHOOK_SECRET)
+GANTRY_PUBLIC_URL: str = os.getenv("GANTRY_PUBLIC_URL", f"http://localhost:{GANTRY_API_PORT}")
+
 # Postgres — required for multi-user production; optional in local dev
 DATABASE_URL: str = os.getenv("DATABASE_URL", "")
 
 # Bootstrap token — required to create the first API key when GANTRY_BOOTSTRAP_TOKEN is set
 GANTRY_BOOTSTRAP_TOKEN: str = os.getenv("GANTRY_BOOTSTRAP_TOKEN", "")
+
+GANTRY_INSTALL_STATE_SECRET: str = os.getenv(
+    "GANTRY_INSTALL_STATE_SECRET",
+    os.getenv("GANTRY_BOOTSTRAP_TOKEN", ""),
+)
 
 # Fernet key for org secrets — generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 GANTRY_SECRETS_KEY: str = os.getenv("GANTRY_SECRETS_KEY", "")

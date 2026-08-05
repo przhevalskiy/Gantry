@@ -18,11 +18,22 @@ async def submit_integration_task(
     meta: dict | None = None,
     branch_prefix: str = "swarm",
     pipeline_params: dict | None = None,
+    github_token: str | None = None,
 ) -> str:
+    from api.services import github_tokens
+
+    token = github_token
+    if token is None:
+        token = await github_tokens.resolve_token(
+            org_id=project.get("org_id"),
+            project=project,
+        )
+
     task_id = await agentex_client.submit_task(
         goal=goal,
         project_id=project["id"],
         branch_prefix=branch_prefix,
+        github_token=token or "",
         extra_params=pipeline_params or {},
     )
     await tasks_repo.save_task(

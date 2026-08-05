@@ -144,7 +144,7 @@ GitHub Issue labeled `gantry` → task submitted → org webhook fires `task.com
 - [x] `GET /v1/tasks/{id}/events` — SSE stage stream
 - [x] `GET /v1/audit` — key usage audit log
 - [x] Key scopes enforced: `tasks:read/write`, `projects:read/write`, `secrets:read/write`, `admin`
-- [ ] GitHub App installation (replace PAT-per-task) — deferred to Phase 3
+- [x] GitHub App installation (replace PAT-per-task) — see Phase 3 / `docs/integrations/github-app.md`
 - [x] Worker horizontal scaling guide — `docs/platform/scaling-workers.md`
 - [x] Public status page — `GET /status`
 - [ ] Stripe or manual invoicing wired to usage ledger — deferred
@@ -164,7 +164,7 @@ GitHub Issue labeled `gantry` → task submitted → org webhook fires `task.com
 - [x] Self-hosted Helm chart — `deploy/helm/gantry/`
 - [x] Pipeline customization API — `pipeline` on `POST /v1/tasks`, `disable_agents` in orchestrator
 - [x] White-label embedding option — `GET/PATCH /v1/settings`
-- [ ] GitHub App installation (replace PAT-per-task) — deferred
+- [x] GitHub App installation (replace PAT-per-task) — `/v1/integrations/github/install`
 - [ ] Stripe or manual invoicing wired to usage ledger — deferred
 
 **Phase 3 status:** complete (core) — Linear/Jira, Helm, Terraform, pipeline config, white-label settings

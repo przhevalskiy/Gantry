@@ -206,6 +206,7 @@ Task submission accepts an optional `pipeline` config to override tier, heal cyc
 
 | Source | Trigger | Docs |
 |---|---|---|
+| **GitHub App** | One-time org install | [`docs/integrations/github-app.md`](docs/integrations/github-app.md) |
 | **GitHub Issues** | Label issue `gantry` | [`docs/integrations/github-issues.md`](docs/integrations/github-issues.md) |
 | **Linear** | Label issue `gantry` | [`docs/integrations/linear.md`](docs/integrations/linear.md) |
 | **Jira** | Label issue `gantry` | [`docs/integrations/jira.md`](docs/integrations/jira.md) |
@@ -554,7 +555,6 @@ All swarm parameters are configurable from **Agents → Settings**:
 **Platform pivot (complete):** org-scoped API, webhooks, secrets, quotas, audit, Linear/Jira integrations, Helm/Terraform, pipeline customization. See [`PLATFORM_REFACTOR.md`](PLATFORM_REFACTOR.md).
 
 **Next:**
-- GitHub App installation (replace PAT-per-task)
 - Billing wired to usage ledger (Stripe or manual invoicing)
 - Redis-backed rate limits for multi-replica API deployments
 - Design partner validation — headless integrator flow in production

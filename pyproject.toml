@@ -25,6 +25,7 @@ dependencies = [
     "uvicorn>=0.30.0",
     "psycopg[binary,pool]>=3.2",
     "cryptography>=42.0.0",
+    "pyjwt[crypto]>=2.8.0",
 ]
 
 [project.optional-dependencies]
