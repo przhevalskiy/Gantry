@@ -1,10 +1,11 @@
 import { HttpClient } from './http';
 import { Tasks, Projects } from './resources';
+export { verifyWebhookSignature } from './webhooks';
 
 export { GantryApiError } from './http';
 export type { Task, Project, TaskStatus, SubmitTaskOptions, WaitOptions, BulkResponse, BulkResult } from './types';
 
-const DEFAULT_BASE_URL = 'https://api.monolift.dev';
+const DEFAULT_BASE_URL = 'https://api.gantry.dev';
 
 export class GantryClient {
   readonly tasks: Tasks;

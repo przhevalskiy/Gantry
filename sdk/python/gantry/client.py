@@ -3,7 +3,7 @@ import os
 from ._http import HttpClient
 from .resources import Tasks, Projects
 
-DEFAULT_BASE_URL = "https://api.monolift.dev"
+DEFAULT_BASE_URL = "https://api.gantry.dev"
 
 
 class GantryClient:
