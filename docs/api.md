@@ -1,8 +1,8 @@
-# Monolift REST API
+# Gantry REST API
 
-Base URL: `https://api.monolift.dev`  
+Base URL: `https://api.gantry.dev`  
 Local dev: `http://localhost:8001`  
-Interactive docs: `https://api.monolift.dev/docs`
+Interactive docs: `http://localhost:8001/docs`
 
 ---
 
@@ -17,7 +17,7 @@ Authorization: Bearer gantry_<64 hex chars>
 Create a key in the dashboard (Agents → API tab) or via the API:
 
 ```bash
-curl -X POST https://api.monolift.dev/keys \
+curl -X POST https://api.gantry.dev/v1/keys \
   -H "Content-Type: application/json" \
   -d '{"name": "my-key"}'
 ```
@@ -84,7 +84,7 @@ Submit an engineering task.
   "branch_prefix": "swarm",
   "tier": -1,
   "github_token": "ghp_...",
-  "webhook_url": "https://your-server.com/webhooks/monolift"
+  "webhook_url": "https://your-server.com/webhooks/gantry"
 }
 ```
 
@@ -176,9 +176,140 @@ Send a human-in-the-loop approval signal.
 
 ---
 
-## Webhooks
+## Secrets
 
-When you pass `webhook_url` to `POST /v1/tasks`, Monolift POSTs to that URL when the task reaches a terminal state.
+Store GitHub PATs and other credentials encrypted at rest. Values are never returned on read.
+
+### `POST /v1/secrets`
+
+```json
+{ "name": "github-pat", "value": "ghp_..." }
+```
+
+Response `201`:
+
+```json
+{
+  "secret": {
+    "id": "...",
+    "org_id": "...",
+    "name": "github-pat",
+    "created_at": "..."
+  }
+}
+```
+
+Reference by name when submitting tasks:
+
+```json
+{
+  "goal": "Add health check endpoint",
+  "project_id": "proj_abc",
+  "github_token_secret": "github-pat"
+}
+```
+
+### `GET /v1/secrets`
+
+List secret names (no values).
+
+### `DELETE /v1/secrets/:name`
+
+Revoke a secret. Returns `204`.
+
+Production requires `GANTRY_SECRETS_KEY` (Fernet key) in the API environment.
+
+---
+
+## Quotas
+
+Per-org limits (admin scope):
+
+### `GET /v1/quotas`
+
+Returns limits and current usage (`concurrent_tasks`, `tasks_today`).
+
+### `PATCH /v1/quotas`
+
+```json
+{
+  "max_concurrent_tasks": 20,
+  "max_tasks_per_day": 1000,
+  "max_bulk_size": 100,
+  "requests_per_minute": 300
+}
+```
+
+Exceeded limits return HTTP `429`.
+
+---
+
+## Audit log
+
+### `GET /v1/audit`
+
+Immutable org audit trail. Query params: `limit`, `action`, `key_id`.
+
+---
+
+## Scoped API keys
+
+Create keys with least privilege:
+
+```json
+{ "name": "ci-bot", "scopes": ["tasks:write", "projects:read"] }
+```
+
+Valid scopes: `admin`, `tasks:read`, `tasks:write`, `projects:read`, `projects:write`, `secrets:read`, `secrets:write`.
+
+---
+
+## Task event stream
+
+### `GET /v1/tasks/{id}/events`
+
+Server-Sent Events stream — status changes, lifecycle events, agent messages, terminal `done` event.
+
+---
+
+## Status
+
+### `GET /status`
+
+Public platform health — DB, Agentex, active task count.
+
+---
+
+## Org webhooks
+
+Register webhooks at the org level (recommended over per-task `webhook_url`):
+
+### `POST /v1/webhooks`
+
+```json
+{
+  "url": "https://your-server.com/hooks/gantry",
+  "events": ["task.queued", "task.started", "task.waiting_approval", "task.completed", "task.failed"]
+}
+```
+
+The response includes a `secret` for signature verification (shown once).
+
+### Events
+
+| Event | When |
+|---|---|
+| `task.queued` | Task accepted by API |
+| `task.started` | Agentex status → `running` |
+| `task.waiting_approval` | HITL checkpoint reached |
+| `task.completed` | PR opened successfully |
+| `task.failed` | Terminal failure |
+
+---
+
+## Webhooks (per-task)
+
+When you pass `webhook_url` to `POST /v1/tasks`, Gantry POSTs to that URL when the task reaches a terminal state.
 
 ### Payload
 
