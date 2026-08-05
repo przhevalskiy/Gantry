@@ -1,0 +1,58 @@
+# Default values for gantry self-hosted deployment.
+
+replicaCount:
+  api: 1
+  worker: 2
+
+image:
+  repository: ghcr.io/gantry/gantry
+  tag: "0.4.0"
+  pullPolicy: IfNotPresent
+
+api:
+  port: 8001
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+worker:
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+    limits:
+      cpu: "4"
+      memory: 8Gi
+
+service:
+  type: ClusterIP
+  port: 8001
+
+ingress:
+  enabled: false
+  className: nginx
+  host: api.gantry.local
+  tls: []
+
+# External dependencies — point at your Agentex / Temporal stack.
+agentex:
+  baseUrl: http://agentex:5003
+  agentName: swarm-orchestrator
+
+temporal:
+  address: temporal:7233
+
+database:
+  # Set via secret in production
+  url: ""
+
+env:
+  GANTRY_BOOTSTRAP_TOKEN: ""
+  GANTRY_SECRETS_KEY: ""
+  LINEAR_WEBHOOK_SECRET: ""
+  JIRA_WEBHOOK_SECRET: ""
+  GITHUB_WEBHOOK_SECRET: ""

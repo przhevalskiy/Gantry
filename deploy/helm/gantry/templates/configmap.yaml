@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "gantry.fullname" . }}-config
+  labels:
+    {{- include "gantry.labels" . | nindent 4 }}
+data:
+  AGENTEX_BASE_URL: {{ .Values.agentex.baseUrl | quote }}
+  AGENT_NAME: {{ .Values.agentex.agentName | quote }}
+  TEMPORAL_ADDRESS: {{ .Values.temporal.address | quote }}
