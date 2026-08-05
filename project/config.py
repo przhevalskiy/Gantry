@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 load_dotenv(override=False)
 
-ANTHROPIC_API_KEY: str = os.environ["ANTHROPIC_API_KEY"]
+ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
 CLAUDE_MODEL: str = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-6")
 CLAUDE_SONNET_MODEL: str = os.getenv("CLAUDE_SONNET_MODEL", CLAUDE_MODEL)
 CLAUDE_HAIKU_MODEL: str = os.getenv("CLAUDE_HAIKU_MODEL", "claude-haiku-4-5-20251001")

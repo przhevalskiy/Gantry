@@ -14,7 +14,9 @@ from pathlib import Path
 import anthropic
 from temporalio import activity
 
-from project.config import ANTHROPIC_API_KEY, CLAUDE_HAIKU_MODEL
+from project.config import CLAUDE_HAIKU_MODEL
+from project.llm_runtime import anthropic_api_key, haiku_model
+from project.llm_store import get as get_llm_credentials
 
 _SYSTEM = (
     "You are a build quality evaluator. Given a goal and a sample of the code produced, "
@@ -79,6 +81,7 @@ async def score_build_quality(
     inspector_passed: bool,
     heal_cycles: int,
     files_modified: int,
+    task_id: str = "",
 ) -> dict:
     """
     Score a completed build 0–10 using Haiku.
@@ -96,9 +99,15 @@ async def score_build_quality(
             f"Code sample:\n{code_sample[:_MAX_SAMPLE_CHARS]}"
         )
 
-        client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+        creds = get_llm_credentials(task_id)
+        api_key = anthropic_api_key(creds)
+        model = haiku_model(creds)
+        if not api_key:
+            raise RuntimeError("no anthropic api key")
+
+        client = anthropic.AsyncAnthropic(api_key=api_key)
         response = await client.messages.create(
-            model=CLAUDE_HAIKU_MODEL,
+            model=model,
             max_tokens=256,
             system=_SYSTEM,
             messages=[{"role": "user", "content": prompt}],

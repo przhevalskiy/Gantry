@@ -96,7 +96,7 @@ class PMAgent:
         for turn in range(MAX_PM_TURNS):
             raw = await workflow.execute_activity(
                 "plan_pm_step",
-                args=[task_prompt, context, _model],
+                args=[task_prompt, context, _model, parent_task_id],
                 **PLANNER_OPTIONS,
             )
             context = raw["context"]

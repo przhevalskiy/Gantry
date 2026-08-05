@@ -202,6 +202,8 @@ Full reference: [`docs/api.md`](docs/api.md)
 
 Task submission accepts an optional `pipeline` config to override tier, heal cycles, parallel tracks, and disable specific agents (`pm`, `inspector`, `reviewer`, `security`).
 
+**LLM BYOK:** Each org configures its own provider key via `PATCH /v1/settings` — customers pay their own inference bill. See [`docs/platform/llm-byok.md`](docs/platform/llm-byok.md).
+
 ### Integrations
 
 | Source | Trigger | Docs |

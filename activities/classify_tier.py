@@ -10,7 +10,9 @@ import json
 import anthropic
 from temporalio import activity
 
-from project.config import ANTHROPIC_API_KEY, CLAUDE_HAIKU_MODEL
+from project.config import CLAUDE_HAIKU_MODEL
+from project.llm_runtime import anthropic_api_key, haiku_model
+from project.llm_store import get as get_llm_credentials
 
 _SYSTEM = (
     "You are a software project complexity classifier. "
@@ -40,7 +42,7 @@ Respond with JSON only:
 
 
 @activity.defn(name="classify_tier_llm")
-async def classify_tier_llm(goal: str) -> dict:
+async def classify_tier_llm(goal: str, task_id: str = "") -> dict:
     """
     Use Haiku to classify goal complexity into a tier.
     Falls back to regex-based classification if the LLM call fails.
@@ -48,10 +50,16 @@ async def classify_tier_llm(goal: str) -> dict:
     """
     from project.schema.complexity import classify_tier as _regex_classify  # fallback
 
+    creds = get_llm_credentials(task_id)
+    api_key = anthropic_api_key(creds)
+    model = haiku_model(creds)
+
     try:
-        client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+        if not api_key:
+            raise RuntimeError("no anthropic api key")
+        client = anthropic.AsyncAnthropic(api_key=api_key)
         response = await client.messages.create(
-            model=CLAUDE_HAIKU_MODEL,
+            model=model,
             max_tokens=256,
             system=_SYSTEM,
             messages=[{"role": "user", "content": _PROMPT_TEMPLATE.format(goal=goal[:1000])}],

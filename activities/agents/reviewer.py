@@ -5,6 +5,7 @@ Uses REVIEWER_TOOLS (read_file, list_directory, git_diff, report_review).
 from temporalio import activity
 
 from project.config import CLAUDE_SONNET_MODEL
+from project.llm_store import get as get_llm_credentials
 from project.planner import next_step, PlannerStep, FinalAnswer, PlannerError
 from project.tools.reviewer import REVIEWER_TOOLS
 
@@ -26,8 +27,10 @@ _REVIEWER_SYSTEM = (
 async def plan_reviewer_step(
     task_prompt: str,
     context: list[dict],
+    task_id: str = "",
 ) -> dict:
     """Execute one Claude planning step for the Reviewer agent."""
+    creds = get_llm_credentials(task_id)
     try:
         result, new_context = await next_step(
             task_prompt,
@@ -35,6 +38,7 @@ async def plan_reviewer_step(
             tools=REVIEWER_TOOLS,
             system_prompt=_REVIEWER_SYSTEM,
             model=CLAUDE_SONNET_MODEL,
+            llm_credentials=creds,
         )
     except PlannerError as e:
         return {"type": "error", "message": str(e), "context": context}

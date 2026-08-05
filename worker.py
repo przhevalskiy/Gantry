@@ -81,6 +81,7 @@ from activities.agents.inspector import plan_inspector_step
 from activities.agents.reviewer import plan_reviewer_step
 from activities.agents.security import plan_security_step
 from activities.agents.devops import plan_devops_step
+from activities.llm_config import clear_task_llm_config, register_task_llm_config
 from activities.classify_tier import classify_tier_llm
 from activities.data.quality_score import score_build_quality
 from activities.infra.trace import trace_write, trace_read
@@ -149,6 +150,8 @@ async def main():
         plan_security_step,
         plan_devops_step,
         classify_tier_llm,
+        register_task_llm_config,
+        clear_task_llm_config,
         score_build_quality,
         trace_write,
         trace_read,

@@ -8,6 +8,7 @@ import json
 from temporalio import activity
 
 from project.config import CLAUDE_SONNET_MODEL, CLAUDE_HAIKU_MODEL
+from project.llm_store import get as get_llm_credentials
 from project.planner import next_step, PlannerStep, FinalAnswer, PlannerError, get_last_usage
 from project.tools.builder import BUILDER_TOOLS
 
@@ -42,8 +43,10 @@ async def plan_builder_step(
     task_prompt: str,
     context: list[dict],
     model: str = CLAUDE_SONNET_MODEL,
+    task_id: str = "",
 ) -> dict:
     """Execute one Claude planning step for the Builder agent."""
+    creds = get_llm_credentials(task_id)
     try:
         result, new_context = await next_step(
             task_prompt,
@@ -51,6 +54,7 @@ async def plan_builder_step(
             tools=BUILDER_TOOLS,
             system_prompt=_BUILDER_SYSTEM,
             model=model,
+            llm_credentials=creds,
         )
     except PlannerError as e:
         return {"type": "error", "message": str(e), "context": context}

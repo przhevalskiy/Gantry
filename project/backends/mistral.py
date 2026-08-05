@@ -128,15 +128,16 @@ async def make_mistral_request(
     tools: list[dict] | None,
     system_prompt: str,
     model: str,
+    api_key: str | None = None,
 ) -> tuple[str, list[dict], dict]:
     """
     Call Mistral API. Returns (stop_reason, content_blocks, usage_dict).
     Uses mistralai SDK if installed, falls back to httpx for raw REST.
     stop_reason: "end_turn" | "tool_use"
     """
-    mistral_key = os.environ.get("MISTRAL_API_KEY", "")
+    mistral_key = api_key or os.environ.get("MISTRAL_API_KEY", "")
     if not mistral_key:
-        raise PlannerError("MISTRAL_API_KEY not set in environment.")
+        raise PlannerError("MISTRAL_API_KEY not set for this task.")
 
     api_messages = _anthropic_context_to_mistral(messages, system_prompt)
 

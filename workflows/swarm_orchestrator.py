@@ -51,7 +51,8 @@ with workflow.unsafe.imports_passed_through():
     from project.planner import _extract_task_prompt
     from project.schema.complexity import classify_tier, params_for_tier, TIER_LABELS
     from workflows.child_workflow import ApprovalWorkflow, ClarificationWorkflow
-    from project.config import CLAUDE_HAIKU_MODEL as _CLAUDE_HAIKU_MODEL, CLAUDE_SONNET_MODEL as _CLAUDE_SONNET_MODEL, GH_TOKEN as _GH_TOKEN
+    from project.llm_runtime import extract_agentex_llm_params, model_for_tier
+    from project.config import GH_TOKEN as _GH_TOKEN
     from workflows.agents.pm import PMAgent
     from workflows.agents.architect import ArchitectAgent
     from workflows.agents.builder import BuilderAgent
@@ -80,9 +81,10 @@ def _branch_name(task_id: str, prefix: str = "swarm") -> str:
     return f"{prefix}/{safe}"
 
 
-def _model_for_tier(tier: int) -> str:
-    """Route to Haiku for simple tasks, Sonnet for complex ones."""
-    return _CLAUDE_HAIKU_MODEL if tier <= 1 else _CLAUDE_SONNET_MODEL
+def _model_for_tier(tier: int, task_params: dict | None = None) -> str:
+    """Route to fast/cheap or primary model using per-task BYOK settings."""
+    creds = extract_agentex_llm_params(task_params)
+    return model_for_tier(tier, creds)
 
 
 @workflow.defn(name="swarm-factory")
@@ -116,6 +118,15 @@ class SwarmOrchestrator(BaseWorkflow):
         goal = _extract_task_prompt(params.params)
         log = logger.bind(task_id=task_id)
         log.info("swarm_started", goal=goal[:80])
+
+        llm_creds = extract_agentex_llm_params(params.params if params.params else {})
+        if llm_creds:
+            await workflow.execute_activity(
+                "register_task_llm_config",
+                args=[task_id, llm_creds],
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            )
 
         task_queue = environment_variables.WORKFLOW_TASK_QUEUE or "web_scout_queue"
         repo_path = params.params.get("repo_path", ".") if params.params else "."
@@ -258,7 +269,7 @@ class SwarmOrchestrator(BaseWorkflow):
             try:
                 tier_meta = await workflow.execute_activity(
                     "classify_tier_llm",
-                    args=[goal],
+                    args=[goal, task_id],
                     start_to_close_timeout=timedelta(seconds=30),
                     retry_policy=RetryPolicy(maximum_attempts=2),
                 )
@@ -441,7 +452,7 @@ class SwarmOrchestrator(BaseWorkflow):
             )
             pm_json: str = await workflow.execute_child_workflow(
                 PMAgent.run,
-                args=[goal, repo_path, task_id, task_queue, tier, _model_for_tier(tier)],
+                args=[goal, repo_path, task_id, task_queue, tier, _model_for_tier(tier, params.params)],
                 id=f"{task_id}-r{iteration}-pm",
                 task_queue=task_queue,
                 execution_timeout=PM_TIMEOUT,
@@ -634,8 +645,8 @@ class SwarmOrchestrator(BaseWorkflow):
         heal_cycles = 0
         reviewer_heal_cycles = 0
         MAX_REVIEWER_HEAL_CYCLES = 1  # Reviewer retries don't consume Inspector budget
-        _builder_model = _model_for_tier(tier)
-        _inspector_model = _model_for_tier(tier)
+        _builder_model = _model_for_tier(tier, params.params)
+        _inspector_model = _model_for_tier(tier, params.params)
 
         # Collect all test specs from tracks for the Inspector's TDD verification
         all_test_specs: list[str] = []
@@ -1405,6 +1416,7 @@ class SwarmOrchestrator(BaseWorkflow):
                     inspector_report.get("passed", False),
                     heal_cycles,
                     len(edited_paths),
+                    task_id,
                 ],
                 start_to_close_timeout=timedelta(seconds=45),
                 retry_policy=RetryPolicy(maximum_attempts=1),
@@ -1513,6 +1525,11 @@ class SwarmOrchestrator(BaseWorkflow):
         except Exception:
             pass  # episode write is non-critical
 
-        return final
+        await workflow.execute_activity(
+            "clear_task_llm_config",
+            args=[task_id],
+            start_to_close_timeout=timedelta(seconds=10),
+            retry_policy=RetryPolicy(maximum_attempts=1),
+        )
 
         return final

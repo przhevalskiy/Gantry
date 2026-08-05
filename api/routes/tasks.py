@@ -16,8 +16,10 @@ from api.repositories import quotas as quotas_repo
 from api.repositories import tasks as tasks_repo
 from api.repositories import usage as usage_repo
 from api.repositories.quotas import QuotaExceeded
+from api.schemas.llm import LlmConfig
 from api.schemas.pipeline import PipelineConfig
 from api.services import github_tokens
+from api.services import llm_config as llm_config_service
 from api.services import task_events
 from fastapi.responses import StreamingResponse
 
@@ -36,6 +38,7 @@ class SubmitTaskRequest(BaseModel):
     github_token_secret: str | None = None
     webhook_url: str | None = None
     pipeline: PipelineConfig | None = None
+    llm: LlmConfig | None = None
 
 
 class BulkTaskItem(BaseModel):
@@ -44,6 +47,7 @@ class BulkTaskItem(BaseModel):
     tier: int | None = None
     webhook_url: str | None = None
     pipeline: PipelineConfig | None = None
+    llm: LlmConfig | None = None
 
 
 class BulkSubmitRequest(BaseModel):
@@ -55,6 +59,7 @@ class BulkSubmitRequest(BaseModel):
     github_token_secret: str | None = None
     webhook_url: str | None = None
     pipeline: PipelineConfig | None = None
+    llm: LlmConfig | None = None
 
 
 def _extract_pr_url(messages: list[dict]) -> str | None:
@@ -116,11 +121,15 @@ async def _submit_one(
     key_id: str,
     idempotency_key: str | None = None,
     pipeline: PipelineConfig | None = None,
+    llm: LlmConfig | None = None,
 ) -> dict:
     try:
         project = await _verify_project(project_id, org_id)
         token = await _resolve_github_token(org_id, project, github_token or None, github_token_secret)
         effective_tier, extra_params = _resolve_pipeline_params(tier, pipeline)
+        llm_params = await llm_config_service.resolve_llm_agentex_params(org_id, llm)
+        if llm_params:
+            extra_params = {**extra_params, **llm_params}
         task_id = await agentex_client.submit_task(
             goal=goal,
             project_id=project_id,
@@ -208,6 +217,7 @@ async def submit_task(
         key_id=key["id"],
         idempotency_key=idempotency_key,
         pipeline=body.pipeline,
+        llm=body.llm,
     )
 
     if "error" in result:
@@ -274,6 +284,7 @@ async def bulk_submit_tasks(
             webhook_url=item.webhook_url or body.webhook_url,
             key_id=key["id"],
             pipeline=item.pipeline or body.pipeline,
+            llm=item.llm or body.llm,
         )
         for item in body.tasks
     ]

@@ -228,7 +228,7 @@ class BuilderAgent:
             turns_left = MAX_BUILDER_TURNS - turn - 1
             raw = await workflow.execute_activity(
                 "plan_builder_step",
-                args=[task_prompt, context, _active_model(turn, turns_left)],
+                args=[task_prompt, context, _active_model(turn, turns_left), parent_task_id],
                 **PLANNER_OPTIONS,
             )
             context = raw["context"]

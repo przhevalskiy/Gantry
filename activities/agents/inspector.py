@@ -6,6 +6,7 @@ Model is passed per-call to support tier-based routing.
 from temporalio import activity
 
 from project.config import CLAUDE_SONNET_MODEL, CLAUDE_HAIKU_MODEL
+from project.llm_store import get as get_llm_credentials
 from project.planner import next_step, PlannerStep, FinalAnswer, PlannerError
 from project.tools.inspector import INSPECTOR_TOOLS
 
@@ -26,8 +27,10 @@ async def plan_inspector_step(
     task_prompt: str,
     context: list[dict],
     model: str = CLAUDE_SONNET_MODEL,
+    task_id: str = "",
 ) -> dict:
     """Execute one Claude planning step for the Inspector agent."""
+    creds = get_llm_credentials(task_id)
     try:
         result, new_context = await next_step(
             task_prompt,
@@ -35,6 +38,7 @@ async def plan_inspector_step(
             tools=INSPECTOR_TOOLS,
             system_prompt=_INSPECTOR_SYSTEM,
             model=model,
+            llm_credentials=creds,
         )
     except PlannerError as e:
         return {"type": "error", "message": str(e), "context": context}

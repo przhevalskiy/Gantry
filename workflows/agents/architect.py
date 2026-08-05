@@ -188,7 +188,7 @@ class ArchitectAgent:
         for turn in range(MAX_ARCHITECT_TURNS):
             raw = await workflow.execute_activity(
                 "plan_architect_step",
-                args=[task_prompt, context, _CLAUDE_SONNET_MODEL],
+                args=[task_prompt, context, _CLAUDE_SONNET_MODEL, parent_task_id],
                 **PLANNER_OPTIONS,
             )
             context = raw["context"]

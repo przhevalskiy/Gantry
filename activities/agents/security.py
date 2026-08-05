@@ -5,6 +5,8 @@ Uses SECURITY_TOOLS (scan_secrets, scan_dependencies, read_file, run_sast, repor
 from temporalio import activity
 
 from project.config import CLAUDE_HAIKU_MODEL
+from project.llm_store import get as get_llm_credentials
+from project.llm_runtime import haiku_model
 from project.planner import next_step, PlannerStep, FinalAnswer, PlannerError
 from project.tools.security import SECURITY_TOOLS
 
@@ -22,15 +24,17 @@ _SECURITY_SYSTEM = (
 
 
 @activity.defn(name="plan_security_step")
-async def plan_security_step(task_prompt: str, context: list[dict]) -> dict:
+async def plan_security_step(task_prompt: str, context: list[dict], task_id: str = "") -> dict:
     """Execute one Claude planning step for the Security agent."""
+    creds = get_llm_credentials(task_id)
     try:
         result, new_context = await next_step(
             task_prompt,
             context,
             tools=SECURITY_TOOLS,
             system_prompt=_SECURITY_SYSTEM,
-            model=CLAUDE_HAIKU_MODEL,
+            model=haiku_model(creds),
+            llm_credentials=creds,
         )
     except PlannerError as e:
         return {"type": "error", "message": str(e), "context": context}

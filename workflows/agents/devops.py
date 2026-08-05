@@ -190,7 +190,7 @@ class DevOpsAgent:
         for turn in range(MAX_DEVOPS_TURNS):
             raw = await workflow.execute_activity(
                 "plan_devops_step",
-                args=[task_prompt, context],
+                args=[task_prompt, context, parent_task_id],
                 **PLANNER_OPTIONS,
             )
             context = raw["context"]

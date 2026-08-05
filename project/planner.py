@@ -3,6 +3,7 @@
 Supported providers:
   - Anthropic Claude  (model names starting with "claude-")
   - Mistral           (model names starting with "mistral-", "open-mistral-", etc.)
+  - OpenAI-compatible (gpt-*, o1*, o3*, or custom base URL for Ollama/vLLM)
 
 The provider is selected automatically from the model name passed to next_step().
 Tool schemas use standard JSON Schema (input_schema), which both providers accept.
@@ -18,6 +19,8 @@ from project.config import ANTHROPIC_API_KEY, CLAUDE_MODEL
 from project.planner_types import PlannerStep, FinalAnswer, PlannerError, PlannerResult
 from project.backends.anthropic import make_claude_request
 from project.backends.mistral import is_mistral_model, make_mistral_request
+from project.backends.openai_compat import is_openai_compatible, make_openai_request
+from project.llm_runtime import anthropic_api_key, mistral_api_key, openai_api_key, openai_base_url
 
 logger = structlog.get_logger(__name__)
 
@@ -196,6 +199,7 @@ async def next_step(
     tools: list[dict] | None = None,
     system_prompt: str | None = None,
     model: str = CLAUDE_MODEL,
+    llm_credentials: dict | None = None,
 ) -> tuple[PlannerResult, list[dict]]:
     """
     Make one LLM API call and return the next step plus the updated context.
@@ -222,6 +226,7 @@ async def next_step(
                 tools=tools,
                 system_prompt=system,
                 model=model,
+                api_key=mistral_api_key(llm_credentials),
             )
         except PlannerError:
             raise
@@ -262,8 +267,58 @@ async def next_step(
 
         return FinalAnswer(answer="Task complete (unexpected stop reason)."), new_context
 
+    # ── OpenAI-compatible path ────────────────────────────────────────────────
+    if is_openai_compatible(model, llm_credentials):
+        try:
+            stop_reason, content_blocks, usage = await make_openai_request(
+                messages=messages,
+                tools=tools,
+                system_prompt=system,
+                model=model,
+                api_key=openai_api_key(llm_credentials),
+                base_url=openai_base_url(llm_credentials),
+            )
+        except PlannerError:
+            raise
+        except Exception as e:
+            raise PlannerError(f"OpenAI-compatible request failed: {e}") from e
+
+        log.info(
+            "planner_response",
+            stop_reason=stop_reason,
+            input_tokens=usage.get("input_tokens", 0),
+            output_tokens=usage.get("output_tokens", 0),
+        )
+        _last_usage["input_tokens"] = usage.get("input_tokens", 0)
+        _last_usage["output_tokens"] = usage.get("output_tokens", 0)
+
+        assistant_msg = {"role": "assistant", "content": content_blocks}
+        new_context = messages + [assistant_msg]
+
+        if stop_reason == "end_turn":
+            text_parts = [b["text"] for b in content_blocks if b.get("type") == "text"]
+            return FinalAnswer(answer=" ".join(text_parts) or "Task complete."), new_context
+
+        tool_blocks = [b for b in content_blocks if b.get("type") == "tool_use"]
+        first = tool_blocks[0] if tool_blocks else None
+        if first:
+            if first["name"] == "finish":
+                return FinalAnswer(answer=first["input"].get("answer", "Task complete.")), new_context
+            return PlannerStep(
+                tool_name=first["name"],
+                tool_use_id=first["id"],
+                tool_input=first["input"],
+            ), new_context
+
+        return FinalAnswer(answer="Task complete (unexpected stop reason)."), new_context
+
     # ── Anthropic / Claude path ───────────────────────────────────────────────
-    client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+    api_key = anthropic_api_key(llm_credentials)
+    if not api_key:
+        raise PlannerError(
+            "No Anthropic API key for this task. Configure org LLM settings or set ANTHROPIC_API_KEY."
+        )
+    client = anthropic.AsyncAnthropic(api_key=api_key)
     system_payload: list[dict[str, Any]] = [{
         "type": "text",
         "text": system,

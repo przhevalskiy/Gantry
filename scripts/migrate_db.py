@@ -45,6 +45,7 @@ async def main():
             "005_platform_grade.sql",
             "006_distribution.sql",
             "007_github_app.sql",
+            "008_org_llm.sql",
         ):
             sql = (ROOT / "api" / "migrations" / migration).read_text()
             await conn.execute(sql)

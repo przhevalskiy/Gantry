@@ -1,10 +1,34 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 
 from api import db
 from api.crypto import decrypt, encrypt
+
+
+def _secrets_path() -> Path:
+    import os
+
+    return Path(os.getenv("GANTRY_HOME", str(Path.home() / ".gantry"))) / "org_secrets.json"
+
+
+def _load_file_store() -> dict:
+    path = _secrets_path()
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text())
+    except Exception:
+        return {}
+
+
+def _save_file_store(store: dict) -> None:
+    path = _secrets_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(store, indent=2))
 
 
 async def upsert_secret(*, org_id: str, name: str, value: str) -> dict:
@@ -14,6 +38,10 @@ async def upsert_secret(*, org_id: str, name: str, value: str) -> dict:
     ciphertext = encrypt(value)
 
     if not db.is_available():
+        store = _load_file_store()
+        org_secrets = store.setdefault(org_id, {})
+        org_secrets[name] = ciphertext
+        _save_file_store(store)
         return {"name": name, "org_id": org_id, "created_at": None}
 
     row = await db.fetch_one(
@@ -38,7 +66,9 @@ async def upsert_secret(*, org_id: str, name: str, value: str) -> dict:
 
 async def list_secrets(*, org_id: str) -> list[dict]:
     if not db.is_available():
-        return []
+        org_secrets = _load_file_store().get(org_id, {})
+        return [{"name": name, "org_id": org_id} for name in sorted(org_secrets)]
+
     rows = await db.fetch_all(
         """
         SELECT id, org_id, name, created_at, updated_at
@@ -62,7 +92,11 @@ async def list_secrets(*, org_id: str) -> list[dict]:
 
 async def get_secret_value(*, org_id: str, name: str) -> Optional[str]:
     if not db.is_available():
-        return None
+        ciphertext = _load_file_store().get(org_id, {}).get(name)
+        if not ciphertext:
+            return None
+        return decrypt(ciphertext)
+
     row = await db.fetch_one(
         "SELECT encrypted_value FROM org_secrets WHERE org_id = %s AND name = %s",
         (org_id, name),
@@ -74,7 +108,15 @@ async def get_secret_value(*, org_id: str, name: str) -> Optional[str]:
 
 async def delete_secret(*, org_id: str, name: str) -> bool:
     if not db.is_available():
-        return False
+        store = _load_file_store()
+        org_secrets = store.get(org_id, {})
+        if name not in org_secrets:
+            return False
+        del org_secrets[name]
+        store[org_id] = org_secrets
+        _save_file_store(store)
+        return True
+
     row = await db.fetch_one(
         "SELECT id FROM org_secrets WHERE org_id = %s AND name = %s",
         (org_id, name),

@@ -72,7 +72,7 @@ class SecurityAgent:
         for turn in range(MAX_SECURITY_TURNS):
             raw = await workflow.execute_activity(
                 "plan_security_step",
-                args=[task_prompt, context],
+                args=[task_prompt, context, parent_task_id],
                 **PLANNER_OPTIONS,
             )
             context = raw["context"]
