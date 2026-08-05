@@ -7,7 +7,9 @@ import structlog
 from api.clients import agentex as agentex_client
 from api.clients import github as github_client
 from api.repositories import builds as builds_repo
+from api.repositories import projects as projects_repo
 from api.repositories import tasks as tasks_repo
+from api.services import github_tokens
 from api.services import task_events
 
 log = structlog.get_logger(__name__)
@@ -45,11 +47,24 @@ async def _handle_github_callback(task_id: str, meta: dict, status: str, pr_url:
         return
 
     if status == "completed" and pr_url:
-        body = f"✅ Done — PR opened: {pr_url}"
+        body = f"✅ Done — PR ready for review: {pr_url}"
     elif status == "completed":
         body = "✅ Gantry completed the task. Check the repository for new branches or commits."
     else:
         body = f"❌ Gantry task `{task_id}` ended with status `{status}`. Check the Gantry dashboard for details."
+
+    project = None
+    project_id = meta.get("project_id")
+    org_id = meta.get("org_id")
+    if project_id:
+        project = await projects_repo.get_project(project_id, org_id=org_id)
+    if not project:
+        project = {"github_owner": owner, "github_repo": repo, "org_id": org_id}
+
+    token = await github_tokens.resolve_token(org_id=org_id or "", project=project)
+    if not token:
+        log.warning("github_callback_no_token", task_id=task_id, owner=owner, repo=repo)
+        return
 
     try:
         await github_client.post_issue_comment(
@@ -57,6 +72,7 @@ async def _handle_github_callback(task_id: str, meta: dict, status: str, pr_url:
             repo=repo,
             issue_number=issue_number,
             body=body,
+            token=token,
         )
         log.info("github_callback_posted", task_id=task_id, issue=issue_number, status=status)
     except Exception as exc:
