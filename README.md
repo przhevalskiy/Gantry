@@ -2,9 +2,9 @@
 
 **Submit a task. Walk away. Come back to a pull request.**
 
-Gantry is a software engineering factory. You describe what needs to be built. A crew of specialised agents plans it, writes it in parallel across independent tracks, tests it, reviews the logic, heals failures automatically, and opens a PR on your GitHub repo — while you do something else.
+Gantry is an asynchronous software engineering factory. You describe what needs to be built. A crew of specialised agents plans it, writes it in parallel across independent tracks, tests it, reviews the logic, heals failures automatically, and opens a PR on your GitHub repo — while you do something else.
 
-Submit 1 task or 1000. Each is an independent pipeline. An engineering team can put an entire sprint's backlog in on Monday morning and spend the week reviewing PRs instead of writing boilerplate.
+Submit 1 task or 1000. Each is an independent pipeline. Platform teams embed it via REST API, webhooks, and SDKs — no UI required.
 
 ---
 
@@ -34,7 +34,9 @@ A construction project does not have one worker who designs the building, pours 
 
 ## Who it is for
 
-Engineering teams with a backlog of well-scoped tasks that keep getting deprioritised. Features that are clear enough to implement but take 4–8 hours of mechanical execution. The kind of work your team knows exactly how to do but hasn't had time to start.
+**Primary buyer:** platform and DevOps teams who want durable SWE pipeline infrastructure they can wire into internal portals, CI, and ticketing tools.
+
+**End user:** engineering teams with a backlog of well-scoped tasks that keep getting deprioritised — features that are clear enough to implement but take hours of mechanical execution.
 
 **Gantry handles well:**
 - Features that touch multiple files across the stack (API + UI + tests + config)
@@ -140,31 +142,82 @@ If the original plan was structurally wrong, the Architect re-decomposes with In
 
 ---
 
-## REST API
+## Platform API (primary interface)
 
-Gantry exposes a FastAPI server on `:8001` for programmatic access and webhook integrations.
+Gantry is **API-first**. The control plane runs on FastAPI (`:8001`) and works without the Next.js UI. Every resource is org-scoped; integrators get structured results (`result.pr_url`, `result.branch`) — never regex over agent chat.
 
 ```
-http://localhost:8001/docs    Swagger UI
-http://localhost:8001/redoc   ReDoc
+https://api.gantry.dev          Production
+http://localhost:8001/docs      Swagger UI (local)
+http://localhost:8001/status    Public health page
 ```
 
-**Key endpoints:**
+### Quick start (headless)
 
-| Method | Path | Description |
+```bash
+# 1. Apply schema (Postgres) or skip for file-backed local dev
+DATABASE_URL=postgresql://... python scripts/migrate_db.py
+
+# 2. Bootstrap an API key
+curl -X POST http://localhost:8001/v1/keys \
+  -H "Content-Type: application/json" \
+  -d '{"name": "bootstrap"}'
+
+export GANTRY_API_KEY=gantry_...
+
+# 3. Create a project linked to GitHub
+curl -X POST http://localhost:8001/v1/projects \
+  -H "Authorization: Bearer $GANTRY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "my-service", "github_url": "https://github.com/org/repo"}'
+
+# 4. Submit a task
+curl -X POST http://localhost:8001/v1/tasks \
+  -H "Authorization: Bearer $GANTRY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: deploy-001" \
+  -d '{"goal": "Add health check endpoint", "project_id": "<id>"}'
+
+# 5. Poll for structured result
+curl http://localhost:8001/v1/tasks/<task_id> \
+  -H "Authorization: Bearer $GANTRY_API_KEY"
+```
+
+Full reference: [`docs/api.md`](docs/api.md)
+
+### API surface
+
+| Area | Endpoints |
+|---|---|
+| **Tasks** | `POST /v1/tasks`, `POST /v1/tasks/bulk`, `GET /v1/tasks/{id}`, `GET /v1/tasks/{id}/events` (SSE) |
+| **Projects** | `GET/POST/PATCH /v1/projects`, `GET /v1/projects/{id}/memory` |
+| **Keys** | `POST/GET/DELETE /v1/keys` (scoped: `tasks:read/write`, `projects:read/write`, `admin`, …) |
+| **Secrets** | `POST/GET/DELETE /v1/secrets` — encrypted GitHub PAT storage |
+| **Webhooks** | `POST/GET/DELETE /v1/webhooks` — org lifecycle events (`task.completed`, …) |
+| **Quotas** | `GET/PATCH /v1/quotas` — concurrent tasks, daily limits, rate limits |
+| **Audit** | `GET /v1/audit` — key usage log |
+| **Usage** | `GET /v1/usage` — task event ledger |
+| **Settings** | `GET/PATCH /v1/settings` — white-label branding |
+| **Integrations** | `POST /v1/integrations/github\|linear\|jira/webhook` |
+
+Task submission accepts an optional `pipeline` config to override tier, heal cycles, parallel tracks, and disable specific agents (`pm`, `inspector`, `reviewer`, `security`).
+
+### Integrations
+
+| Source | Trigger | Docs |
 |---|---|---|
-| `POST` | `/tasks` | Submit a new build task |
-| `GET` | `/tasks/{task_id}` | Poll task status and build report |
-| `GET` | `/tasks/{task_id}/messages` | Stream agent messages (SSE) |
-| `POST` | `/tasks/{task_id}/signal` | Send HITL approval / rejection signal |
-| `DELETE` | `/tasks/{task_id}` | Terminate a running workflow |
-| `GET` | `/projects` | List projects |
-| `POST` | `/projects` | Create a project |
-| `GET` | `/projects/{project_id}/memory` | Facts + recent episodes for a project |
-| `GET` | `/traces/{task_id}` | Retrieve structured agent traces |
-| `POST` | `/webhooks/github` | GitHub webhook receiver |
+| **GitHub Issues** | Label issue `gantry` | [`docs/integrations/github-issues.md`](docs/integrations/github-issues.md) |
+| **Linear** | Label issue `gantry` | [`docs/integrations/linear.md`](docs/integrations/linear.md) |
+| **Jira** | Label issue `gantry` | [`docs/integrations/jira.md`](docs/integrations/jira.md) |
+| **GitHub Actions** | `.github/actions/gantry-submit` | Submit tasks from CI |
 
-Authentication uses a bearer token configured in `.env` as `GANTRY_API_KEY`. The Swagger docs at `/docs` include a live "Authorize" button.
+Link projects to ticketing systems via `linear_team_id` or `jira_project_key` on create/update.
+
+### Self-hosted
+
+- **Helm chart:** [`deploy/helm/gantry/`](deploy/helm/gantry/)
+- **Terraform module:** [`terraform/modules/gantry/`](terraform/modules/gantry/)
+- **Worker scaling:** [`docs/platform/scaling-workers.md`](docs/platform/scaling-workers.md)
 
 ---
 
@@ -179,10 +232,21 @@ pip install gantry-sdk
 ```python
 from gantry import GantryClient
 
-client = GantryClient(api_key="...", base_url="http://localhost:8001")
-task = client.tasks.create(goal="Add rate limiting to /api/users", project_id="proj_abc")
+client = GantryClient(api_key="...", base_url="https://api.gantry.dev")
+task = client.tasks.create(
+    goal="Add rate limiting to /api/users",
+    project_id="proj_abc",
+)
 result = client.tasks.wait(task.id)
 print(result.pr_url)
+```
+
+Webhook signature verification:
+
+```python
+from gantry.webhooks import verify_signature
+
+event = verify_signature(payload, signature, secret)
 ```
 
 Source: [`sdk/python/`](sdk/python/)
@@ -195,8 +259,9 @@ npm install @gantry/sdk
 
 ```typescript
 import { GantryClient } from "@gantry/sdk";
+import { verifyWebhookSignature } from "@gantry/sdk/webhooks";
 
-const client = new GantryClient({ apiKey: "...", baseUrl: "http://localhost:8001" });
+const client = new GantryClient({ apiKey: "...", baseUrl: "https://api.gantry.dev" });
 const task = await client.tasks.create({ goal: "Add rate limiting to /api/users", projectId: "proj_abc" });
 const result = await client.tasks.wait(task.id);
 console.log(result.prUrl);
@@ -275,47 +340,55 @@ Gantry/
 │   ├── run_worker.py                    # Temporal worker entrypoint
 │   └── acp.py                           # Agentex ACP server
 │
-├── api/                                 # ← new: Gantry REST API (:8001)
-│   ├── main.py                          # FastAPI app, CORS, router mounting
-│   ├── config.py                        # API env vars, GANTRY_API_KEY
-│   ├── auth.py                          # bearer token middleware
-│   ├── deps.py                          # shared FastAPI dependencies
-│   ├── temporal_client.py               # Temporal gRPC client wrapper
-│   ├── agentex_client.py                # Agentex message streaming client
-│   ├── github_client.py                 # GitHub API proxy helpers
-│   ├── poller.py                        # SSE task message streamer
-│   ├── webhooks.py                      # GitHub webhook receiver
-│   ├── routes/
-│   │   ├── tasks.py                     # POST /tasks, GET /tasks/{id}
-│   │   ├── projects.py                  # project CRUD
-│   │   ├── keys.py                      # API key management
-│   │   ├── github.py                    # GitHub repo proxy
-│   │   └── internal.py                  # health + metrics
-│   └── store/                           # lightweight in-process state store
+├── api/                                 # Gantry REST control plane (:8001)
+│   ├── main.py                          # FastAPI app, lifespan poller, rate limiting
+│   ├── config.py                        # env vars, secrets key, webhook secrets
+│   ├── crypto.py                        # Fernet encryption for org secrets
+│   ├── deps.py                          # auth, scoped API keys, client IP
+│   ├── middleware/                      # per-org rate limiting
+│   ├── migrations/                      # 001–006 idempotent Postgres schema
+│   ├── repositories/                    # DB + file fallback (org-scoped CRUD)
+│   ├── schemas/                         # PipelineConfig and shared models
+│   ├── clients/                         # Agentex, Temporal, GitHub httpx wrappers
+│   ├── services/                        # poller, webhooks, task events, integrations
+│   └── routes/
+│       ├── tasks.py                     # /v1/tasks — submit, poll, SSE, bulk
+│       ├── projects.py                  # /v1/projects — CRUD + memory
+│       ├── keys.py                      # /v1/keys — scoped API keys
+│       ├── secrets.py                   # /v1/secrets — encrypted PAT storage
+│       ├── org_webhooks.py              # /v1/webhooks — lifecycle delivery
+│       ├── quotas.py                    # /v1/quotas
+│       ├── audit.py                     # /v1/audit
+│       ├── usage.py                     # /v1/usage
+│       ├── status.py                    # /status — public health
+│       ├── org_settings.py              # /v1/settings — white-label
+│       ├── github.py                    # /v1/integrations/github/webhook
+│       ├── integrations_linear.py       # /v1/integrations/linear/webhook
+│       ├── integrations_jira.py         # /v1/integrations/jira/webhook
+│       └── internal.py                  # health + metrics
 │
-├── sdk/                                 # ← new: client SDKs
+├── sdk/                                 # Client SDKs
 │   ├── python/                          # pip install gantry-sdk
-│   │   ├── gantry/
-│   │   │   ├── client.py
-│   │   │   ├── resources.py
-│   │   │   └── types.py
-│   │   └── pyproject.toml
 │   └── typescript/                      # npm install @gantry/sdk
-│       ├── src/
-│       │   ├── index.ts
-│       │   ├── http.ts
-│       │   ├── resources.ts
-│       │   └── types.ts
-│       └── package.json
 │
-├── deploy/                              # ← new: production deployment
+├── deploy/
+│   ├── helm/gantry/                     # Self-hosted Kubernetes chart
 │   ├── docker-compose.prod.yml
-│   ├── nginx.conf
-│   ├── gantry-api.service               # systemd unit for API
-│   ├── gantry-worker.service            # systemd unit for Temporal worker
-│   └── setup.sh                         # one-shot server provisioning
+│   ├── gantry-api.service
+│   ├── gantry-worker.service
+│   └── setup.sh
 │
-├── ui/                                  # Next.js frontend
+├── terraform/modules/gantry/            # Helm release wrapper module
+│
+├── docs/
+│   ├── api.md                           # Full REST API reference
+│   ├── integrations/                    # GitHub, Linear, Jira guides
+│   └── platform/                        # Scaling, deployment docs
+│
+├── GANTRY_THESIS.md                     # Product thesis and positioning
+├── PLATFORM_REFACTOR.md                 # API-first pivot checklist (Phases 0–3)
+│
+├── ui/                                  # Optional Next.js client (:3000)
 │   ├── app/
 │   │   ├── page.tsx                     # home / search
 │   │   ├── task/[taskId]/               # live build view
@@ -356,9 +429,12 @@ Gantry/
 │       └── use-projects.ts
 │
 ├── tests/
-│   ├── test_orchestrator_guards.py      # tier-gated HITL checkpoint unit tests
-│   ├── test_pipeline_integration.py     # end-to-end pipeline stage transition tests
-│   └── test_track_conflicts.py          # pre-flight track conflict detection tests
+│   ├── test_platform_phase0.py          # Repository + key auth tests
+│   ├── test_platform_phase2.py          # Quotas + rate limit tests
+│   ├── test_platform_phase3.py          # Pipeline + integration tests
+│   ├── test_orchestrator_guards.py
+│   ├── test_pipeline_integration.py
+│   └── test_track_conflicts.py
 │
 ├── manifest.yaml                        # Agentex agent manifest
 ├── dev.sh                               # dev launcher (5 services)
@@ -383,8 +459,10 @@ Gantry/
 cp .env.example .env
 # Required: ANTHROPIC_API_KEY
 # Optional: GH_TOKEN (for GitHub clone + push)
-#           BRAVE_SEARCH_API_KEY (for web search in PM + Architect)
-#           GANTRY_API_KEY (REST API bearer token — defaults to dev key)
+#           DATABASE_URL (Postgres — omit for file-backed local dev)
+#           GANTRY_SECRETS_KEY (Fernet key for org secrets)
+#           GANTRY_BOOTSTRAP_TOKEN (protect key creation after bootstrap)
+#           GITHUB_WEBHOOK_SECRET, LINEAR_WEBHOOK_SECRET, JIRA_WEBHOOK_SECRET
 ```
 
 ```bash
@@ -473,6 +551,14 @@ All swarm parameters are configurable from **Agents → Settings**:
 
 ## Roadmap
 
-- **Next**: Multi-repo support (one task touching multiple repos), pre-flight track conflict validation to detect dependency clashes before builders launch
-- **Later**: Cost budgets + pre-task estimation, agent specialisation profiles (database builder, React builder, API builder), branch-level CI integration (wait for CI green before opening PR)
-- **Production**: Supabase Postgres for project registry, persistent volume for repo files, Vercel for UI, Fly.io for worker
+**Platform pivot (complete):** org-scoped API, webhooks, secrets, quotas, audit, Linear/Jira integrations, Helm/Terraform, pipeline customization. See [`PLATFORM_REFACTOR.md`](PLATFORM_REFACTOR.md).
+
+**Next:**
+- GitHub App installation (replace PAT-per-task)
+- Billing wired to usage ledger (Stripe or manual invoicing)
+- Redis-backed rate limits for multi-replica API deployments
+- Design partner validation — headless integrator flow in production
+
+**Later:** multi-repo orchestration, agent specialisation profiles, branch-level CI gating
+
+Product thesis and competitive positioning: [`GANTRY_THESIS.md`](GANTRY_THESIS.md)
