@@ -50,6 +50,11 @@ from workflows.swarm.reporting import _build_final_report, format_quality_commen
 with workflow.unsafe.imports_passed_through():
     from project.planner import _extract_task_prompt
     from project.schema.complexity import classify_tier, params_for_tier, TIER_LABELS
+    from project.schema.playbooks import (
+        architect_prompt_overlay,
+        inspector_prompt_overlay,
+        playbook_oracle_qa_commands,
+    )
     from workflows.child_workflow import ApprovalWorkflow, ClarificationWorkflow
     from project.llm_runtime import extract_agentex_llm_params, model_for_tier
     from project.config import GH_TOKEN as _GH_TOKEN
@@ -131,6 +136,7 @@ class SwarmOrchestrator(BaseWorkflow):
         task_queue = environment_variables.WORKFLOW_TASK_QUEUE or "web_scout_queue"
         repo_path = params.params.get("repo_path", ".") if params.params else "."
         branch_prefix = params.params.get("branch_prefix", "swarm") if params.params else "swarm"
+        playbook = (params.params or {}).get("playbook") or None
 
         # ── GitHub clone / init step ──────────────────────────────────────────
         # The per-task github_token takes precedence over the global GH_TOKEN env var.
@@ -325,6 +331,8 @@ class SwarmOrchestrator(BaseWorkflow):
                 tier=tier,
                 log=log,
                 disable_agents=disable_agents,
+                playbook=playbook,
+                task_params=params.params if params.params else None,
             )
 
             # Update conversation history so the next architect has context
@@ -368,6 +376,20 @@ class SwarmOrchestrator(BaseWorkflow):
 
         return last_result
 
+    async def _sync_task_meta(self, task_id: str, patch: dict) -> None:
+        """Write task metadata for API/SSE consumers (non-fatal on failure)."""
+        if not patch:
+            return
+        try:
+            await workflow.execute_activity(
+                "db_patch_task_meta",
+                args=[task_id, json.dumps(patch)],
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            )
+        except Exception:
+            pass
+
     async def _hitl_checkpoint(
         self,
         task_id: str,
@@ -383,6 +405,16 @@ class SwarmOrchestrator(BaseWorkflow):
             "action": action,
             "workflow_id": approval_wf_id,
         })
+        await self._sync_task_meta(
+            task_id,
+            {
+                "pending_hitl_add": {
+                    "checkpoint": checkpoint,
+                    "workflow_id": approval_wf_id,
+                    "action": action,
+                },
+            },
+        )
         await adk.messages.create(
             task_id=task_id,
             content=TextContent(
@@ -401,6 +433,7 @@ class SwarmOrchestrator(BaseWorkflow):
         )
 
         approved = result == "Approved"
+        await self._sync_task_meta(task_id, {"pending_hitl_remove": approval_wf_id})
         await adk.messages.create(
             task_id=task_id,
             content=TextContent(
@@ -425,9 +458,14 @@ class SwarmOrchestrator(BaseWorkflow):
         tier: int,
         log,
         disable_agents: set | None = None,
+        playbook: str | None = None,
+        task_params: dict | None = None,
     ) -> str:
         branch = _branch_name(f"{task_id}-r{iteration}", branch_prefix)
         disabled = disable_agents or set()
+        architect_overlay = architect_prompt_overlay(playbook)
+        inspector_overlay = inspector_prompt_overlay(playbook)
+        playbook_qa = playbook_oracle_qa_commands(playbook)
 
         await adk.messages.create(
             task_id=task_id,
@@ -452,7 +490,7 @@ class SwarmOrchestrator(BaseWorkflow):
             )
             pm_json: str = await workflow.execute_child_workflow(
                 PMAgent.run,
-                args=[goal, repo_path, task_id, task_queue, tier, _model_for_tier(tier, params.params)],
+                args=[goal, repo_path, task_id, task_queue, tier, _model_for_tier(tier, task_params)],
                 id=f"{task_id}-r{iteration}-pm",
                 task_queue=task_queue,
                 execution_timeout=PM_TIMEOUT,
@@ -474,7 +512,7 @@ class SwarmOrchestrator(BaseWorkflow):
 
         architect_json: str = await workflow.execute_child_workflow(
             ArchitectAgent.run,
-            args=[goal, repo_path, task_id, self._conversation_history or None, None],
+            args=[goal, repo_path, task_id, self._conversation_history or None, None, architect_overlay or None],
             id=f"{task_id}-r{iteration}-architect",
             task_queue=task_queue,
             execution_timeout=ARCHITECT_TIMEOUT,
@@ -570,6 +608,7 @@ class SwarmOrchestrator(BaseWorkflow):
                 ),
             )
             log.warning("track_file_conflicts_resolved", count=len(conflict_warnings))
+            await self._sync_task_meta(task_id, {"track_warnings": conflict_warnings})
 
         await adk.messages.create(
             task_id=task_id,
@@ -645,8 +684,8 @@ class SwarmOrchestrator(BaseWorkflow):
         heal_cycles = 0
         reviewer_heal_cycles = 0
         MAX_REVIEWER_HEAL_CYCLES = 1  # Reviewer retries don't consume Inspector budget
-        _builder_model = _model_for_tier(tier, params.params)
-        _inspector_model = _model_for_tier(tier, params.params)
+        _builder_model = _model_for_tier(tier, task_params)
+        _inspector_model = _model_for_tier(tier, task_params)
 
         # Collect all test specs from tracks for the Inspector's TDD verification
         all_test_specs: list[str] = []
@@ -655,6 +694,8 @@ class SwarmOrchestrator(BaseWorkflow):
 
         # QA commands from Architect — passed directly to Inspector so it never has to discover them
         qa_commands: dict = architect_plan.get("qa_commands") or {}
+        if playbook_qa:
+            qa_commands = {**playbook_qa, **qa_commands}
 
         # ── Baseline test run: capture pre-existing failures before builders start ──
         # Runs the configured test suite on the unmodified repo. Any tests that
@@ -895,7 +936,7 @@ class SwarmOrchestrator(BaseWorkflow):
                 }
                 replan_json: str = await workflow.execute_child_workflow(
                     ArchitectAgent.run,
-                    args=[goal, repo_path, task_id, self._conversation_history or None, failure_context],
+                    args=[goal, repo_path, task_id, self._conversation_history or None, failure_context, architect_overlay or None],
                     id=f"{task_id}-r{iteration}-architect-replan-{cycle}",
                     task_queue=task_queue,
                     execution_timeout=ARCHITECT_TIMEOUT,
@@ -990,7 +1031,17 @@ class SwarmOrchestrator(BaseWorkflow):
 
                 inspector_json: str = await workflow.execute_child_workflow(
                     InspectorAgent.run,
-                    args=[goal, repo_path, task_id, pre_existing_tests or None, _inspector_model, all_test_specs or None, qa_commands or None, baseline_failing_tests or None],
+                    args=[
+                        goal,
+                        repo_path,
+                        task_id,
+                        pre_existing_tests or None,
+                        _inspector_model,
+                        all_test_specs or None,
+                        qa_commands or None,
+                        baseline_failing_tests or None,
+                        inspector_overlay or None,
+                    ],
                     id=f"{task_id}-r{iteration}-inspector-{cycle}",
                     task_queue=task_queue,
                     execution_timeout=INSPECTOR_TIMEOUT,
@@ -1135,7 +1186,7 @@ class SwarmOrchestrator(BaseWorkflow):
                 try:
                     replan_json2: str = await workflow.execute_child_workflow(
                         ArchitectAgent.run,
-                        args=[goal, repo_path, task_id, self._conversation_history or None, failure_context_heal],
+                        args=[goal, repo_path, task_id, self._conversation_history or None, failure_context_heal, architect_overlay or None],
                         id=f"{task_id}-r{iteration}-architect-replan-heal-{cycle}",
                         task_queue=task_queue,
                         execution_timeout=ARCHITECT_TIMEOUT,

@@ -49,6 +49,7 @@ class ArchitectAgent:
         parent_task_id: str,
         conversation_history: list[dict] | None = None,
         failure_context: dict | None = None,
+        prompt_overlay: str | None = None,
     ) -> str:
         """
         Map the repository and produce a multi-track ArchitectPlan.
@@ -184,6 +185,8 @@ class ArchitectAgent:
             f"  Bad: 'Add logging'. Good: 'In workflows/builder_agent.py, add log.info after each dispatch.'\n"
             f"\nCall report_plan with repo_root='{repo_path}' and the tracks array when ready.\n"
         )
+        if prompt_overlay:
+            task_prompt += f"\n\n{prompt_overlay}\n"
 
         for turn in range(MAX_ARCHITECT_TURNS):
             raw = await workflow.execute_activity(

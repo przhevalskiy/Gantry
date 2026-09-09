@@ -73,7 +73,7 @@ from activities.data.memory import (
     memory_count_episodes,
 )
 from activities.tools.git import swarm_post_github_comment
-from activities.infra.db import db_upsert_build
+from activities.infra.db import db_upsert_build, db_patch_task_meta
 from activities.agents.pm import plan_pm_step
 from activities.agents.architect import plan_architect_step
 from activities.agents.builder import plan_builder_step
@@ -142,6 +142,7 @@ async def main():
         memory_count_episodes,
         swarm_post_github_comment,
         db_upsert_build,
+        db_patch_task_meta,
         plan_pm_step,
         plan_architect_step,
         plan_builder_step,

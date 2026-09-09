@@ -54,6 +54,7 @@ class InspectorAgent:
         test_spec: list[str] | None = None,
         qa_commands: dict | None = None,
         baseline_failing_tests: list[str] | None = None,
+        prompt_overlay: str | None = None,
     ) -> str:
         log = logger.bind(parent_task_id=parent_task_id)
         log.info("inspector_started", pre_existing_tests=len(pre_existing_tests or []), has_test_spec=bool(test_spec), baseline_failures=len(baseline_failing_tests or []))
@@ -105,24 +106,36 @@ class InspectorAgent:
         _test_cmd  = _qa.get("test")
         _lint_cmd  = _qa.get("lint")
         _type_cmd  = _qa.get("type_check")
+        _a11y_cmd  = _qa.get("a11y")
 
-        if _test_cmd or _lint_cmd or _type_cmd:
+        if _test_cmd or _lint_cmd or _type_cmd or _a11y_cmd:
             _step_test = f"3. Run the test suite: `{_test_cmd}`" if _test_cmd else "3. No test command provided — skip tests and set tests_skipped=True."
             _step_lint = f"4. Run the linter: `{_lint_cmd}`" if _lint_cmd else "4. No lint command provided — skip lint."
             _step_type = f"5. Run type checking: `{_type_cmd}`" if _type_cmd else "5. No type-check command provided — skip type check."
+            _step_a11y = f"6. Run accessibility checks: `{_a11y_cmd}`" if _a11y_cmd else ""
             _discovery_note = ""
         else:
             _step_test = "3. Discover and run the test suite (e.g. 'pytest tests/ --tb=short -q' or 'npm test -- --run'). Check pyproject.toml or package.json for the configured test command."
             _step_lint = "4. Run the linter (e.g. 'ruff check .' or 'eslint src/')."
             _step_type = "5. Run type checking if applicable (e.g. 'mypy .' or 'npx tsc --noEmit')."
+            _step_a11y = ""
             _discovery_note = "   Look at pyproject.toml, package.json, or Makefile to determine the correct commands. Only scan the project root — do NOT recurse into vendored or submodule directories.\n"
+
+        overlay_block = f"\n{prompt_overlay}\n" if prompt_overlay else ""
+
+        qa_steps = [_step_test, _step_lint, _step_type]
+        if _step_a11y:
+            qa_steps.append(_step_a11y)
+        report_step_num = 2 + len(qa_steps) + 1
+        qa_steps_block = "\n".join(qa_steps)
 
         task_prompt = (
             f"You are the Inspector agent. Your goal:\n{goal}\n\n"
             f"Repository root: {repo_path}\n"
             f"{regression_note}"
             f"{baseline_note}"
-            f"{tdd_note}\n"
+            f"{tdd_note}"
+            f"{overlay_block}\n"
             "Instructions:\n"
             "1. Check if dependencies are installed BEFORE running tests:\n"
             "   - For Node.js: check if node_modules/ exists. If NOT, call report_inspection with\n"
@@ -134,13 +147,11 @@ class InspectorAgent:
             "   - NEVER try to install dependencies — that is not your job.\n"
             "2. Run all checks from the repo root directory.\n"
             f"{_discovery_note}"
-            f"{_step_test}\n"
-            f"{_step_lint}\n"
-            f"{_step_type}\n"
-            "6. Read failing files for context, then call report_inspection.\n"
+            f"{qa_steps_block}\n"
+            f"{report_step_num}. Read failing files for context, then call report_inspection.\n"
             "   - Populate heal_items with one entry per error: {file (absolute path), line, issue, fix, severity}.\n"
             "   - heal_items are used first by the heal Builder — precise file+line+fix entries produce surgical edits.\n"
-            "7. If you cannot determine pass/fail after 3 tool calls, call report_inspection with your best assessment.\n"
+            f"{report_step_num + 1}. If you cannot determine pass/fail after 3 tool calls, call report_inspection with your best assessment.\n"
             "   Do NOT burn all turns trying to get a perfect result — a partial report is better than max_turns."
         )
 
