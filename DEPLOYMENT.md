@@ -110,20 +110,20 @@ curl https://api.monolift.dev/health
 
 1. Go to [vercel.com/new](https://vercel.com/new)
 2. Import the GitHub repo
-3. Set **Root Directory** to `ui`
-4. Set **Framework Preset** to `Next.js`
+3. Set **Root Directory** to `apps/web`
+4. Set **Framework Preset** to `Vite`
 5. Add environment variables (Settings → Environment Variables):
 
 | Variable | Value |
 |----------|-------|
-| `NEXT_PUBLIC_GANTRY_URL` | `https://api.monolift.dev` |
-| `GANTRY_API_URL` | `https://api.monolift.dev` |
-| `INTERNAL_API_KEY` | *(same value as on server)* |
+| `VITE_GANTRY_API_URL` | `https://api.monolift.dev` |
 
 6. Click **Deploy**
 7. Add custom domain: `app.monolift.dev`
    - Vercel will give you DNS records to add (usually a CNAME)
    - SSL is automatic
+
+Local dev UI: `cd apps/web && npm run dev` (Vite `:5173`, proxies `/v1` → API).
 
 ---
 

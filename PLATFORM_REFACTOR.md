@@ -17,7 +17,7 @@ These rules are non-negotiable across every phase. Violating any one is a regres
 | I5 | **Idempotent migrations** | All SQL uses `IF NOT EXISTS` / safe `ALTER`; migrate script is re-runnable |
 | I6 | **Local dev works without Postgres** | File-backed fallback when `DATABASE_URL` is unset; same API surface |
 | I7 | **Workflow engine unchanged** | Temporal + Agentex orchestration is not replaced — only the control plane |
-| I8 | **UI is an optional client** | Next.js may call internal routes; public `/v1/*` never proxies to UI |
+| I8 | **UI is an optional client** | `apps/web` (Vite) calls Gantry `/v1/*` only; no Next.js proxy |
 
 ---
 

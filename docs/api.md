@@ -83,6 +83,7 @@ Submit an engineering task.
   "project_id": "proj_abc",
   "branch_prefix": "swarm",
   "tier": -1,
+  "playbook": "platform-backlog",
   "github_token": "ghp_...",
   "webhook_url": "https://your-server.com/webhooks/gantry"
 }
@@ -94,6 +95,7 @@ Submit an engineering task.
 | `project_id` | ✓ | — | ID of the linked project |
 | `branch_prefix` | | `swarm` | Git branch prefix |
 | `tier` | | `-1` (auto) | Model tier: 0=Haiku, 1=Sonnet, 2=Opus |
+| `playbook` | | — | Vertical overlay: `platform-backlog`, `a11y-remediation`, `monorepo-slice` |
 | `github_token` | | `GH_TOKEN` from env | Override the GitHub token for this task |
 | `webhook_url` | | — | URL to POST when task completes |
 
@@ -168,11 +170,51 @@ Returns source metadata. No auth required.
 Terminate a running task. Returns `204`.
 
 ### `POST /v1/tasks/:id/approve`
-Send a human-in-the-loop approval signal.
+Send a human-in-the-loop approval signal. Optional `checkpoint` records an Agentex-named HITL event in the audit log.
 
 ```json
-{ "workflow_id": "task_xyz", "approved": true }
+{ "workflow_id": "task_xyz", "approved": true, "checkpoint": "architect_plan" }
 ```
+
+### `POST /v1/tasks/:id/hitl`
+Named HITL door (`C3`). `checkpoint` must be one of `pm_clarification`, `architect_plan`, `max_heals`, `devops`.
+
+```json
+{
+  "checkpoint": "architect_plan",
+  "workflow_id": "<gantry_approval workflow id>",
+  "approved": true
+}
+```
+
+Clarification:
+
+```json
+{
+  "checkpoint": "pm_clarification",
+  "workflow_id": "<gantry_clarification workflow id>",
+  "payload": { "Which auth provider?": "Auth0" }
+}
+```
+
+### `GET /v1/tasks/:id/hitl`
+Audit events for this task (`hitl.*` and `task.approved`). File-backed when Postgres is unset.
+
+---
+
+## Agents (Agentex track)
+
+### `GET /v1/agents`
+
+Crew catalog: ACP name `swarm-factory`, Temporal child identities, L2–L5 mapping, HITL checkpoints, ACP `task/create` example. Auth: `tasks:read`.
+
+Foreman is the only ACP task entry. Children are `entrypoint: temporal_child`.
+
+### `GET /v1/agents/:name`
+
+One catalog row (`swarm-factory`, `gantry-builder`, …).
+
+Install on a cluster: [`docs/platform/agentex-cluster.md`](platform/agentex-cluster.md).
 
 ---
 

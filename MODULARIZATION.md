@@ -1,5 +1,7 @@
 # Modularization Plan
 
+> **Note:** The legacy Next.js `ui/` client was removed in favor of [`apps/web/`](apps/web/). Sections below referencing `ui/` are historical.
+
 Refactor the largest files into focused modules. No behavior changes — only structural splits.
 Work top-down by impact: orchestrator first, then frontend mega-components.
 

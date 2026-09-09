@@ -1,566 +1,335 @@
 # Gantry
 
-**Submit a task. Walk away. Come back to a pull request.**
+**Async code-agent platform with a tenant control plane.**
 
-Gantry is an asynchronous software engineering factory. You describe what needs to be built. A crew of specialised agents plans it, writes it in parallel across independent tracks, tests it, reviews the logic, heals failures automatically, and opens a PR on your GitHub repo — while you do something else.
+Gantry runs software engineering tasks as durable, orchestrated agent workflows. You submit a goal against a GitHub-linked project; a Temporal pipeline plans the work, writes code in parallel tracks, verifies it, and opens a pull request. Integrators use the REST API, webhooks, and SDKs. The web UI is optional — a run console, not the product core.
 
-Submit 1 task or 1000. Each is an independent pipeline. Platform teams embed it via REST API, webhooks, and SDKs — no UI required.
+---
+
+## What this is
+
+Gantry is three systems wired together:
+
+```
+Integrator / apps/web  →  api/ (FastAPI)  →  Agentex  →  Temporal worker (workflows + activities)
+```
+
+| Layer | Role |
+|-------|------|
+| **`workflows/` + `activities/` + `worker.py`** | The engine. One Agentex entry agent (`swarm-factory`) runs a Temporal Foreman workflow that composes child workflows (PM, Architect, Builder, Inspector, Reviewer, Security, DevOps). LLM planner activities call repo tools (read/write/patch, git, tests, symbol index). |
+| **`api/`** | The control plane. Org-scoped API keys, projects, task metadata, quotas, audit, webhooks, HITL routing. Submits work to Agentex via ACP `task/create` and polls Agentex for status. Does not execute agent logic itself. |
+| **`apps/web/`** | An optional operator UI. Submits tasks through `/v1/tasks`, streams run output from `/v1/tasks/{id}/events`, and surfaces HITL checkpoints. Chat layout is legacy UX; the wire protocol is task-based. |
+
+**Primary artifact:** a **task run** (with optional `result.pr_url`, `result.branch`), not a conversation thread.
+
+**Primary interface:** `POST /v1/tasks` on the Gantry API (`:8001`). The API works without the UI.
 
 ---
 
 ## What this is not
 
-**Not a pair programmer.** Gantry is not Cursor, GitHub Copilot, or Claude Code. Those tools are synchronous — they require an engineer present, guiding, correcting, prompting the next step. The bottleneck is human attention. Gantry is asynchronous. The pipeline runs without you. You write the goal. You review the PR. Everything in between is the factory's problem.
+| Category | Gantry | Cursor / Copilot / Claude Code |
+|----------|--------|--------------------------------|
+| Interaction | Submit a goal, poll or stream run status | Synchronous pair programming in the editor |
+| Unit of work | Durable pipeline run → PR | Interactive edit session |
+| Where it runs | Agentex + Temporal worker on your infra | Local IDE / CLI |
 
-Claude Code is for an engineer who wants to move faster right now, in the flow of their current work. Gantry is for a tech lead who has 20 tickets in the backlog and wants 15 of them drafted by tomorrow without assigning them to anyone. One is a power tool. The other is a factory floor. Nobody says a factory is a slower version of a craftsman's workshop. They are not competing. One makes one chair at a time, beautifully, with full attention. The other makes a thousand chairs while the craftsman sleeps.
-
-**Not a chat interface.** There is no conversation. You give Gantry a goal, it runs a full engineering pipeline, and it delivers a branch with a pull request. The only time it stops and waits for you is at explicit approval checkpoints on complex tasks — reviewing the build plan before builders launch, or confirming a deployment. Otherwise it runs to completion without you.
-
-**Not a wrapper around an LLM.** A single LLM call does not build software. What does is the orchestration — parallel execution across independent tracks, structured handoffs between specialised roles, a self-healing loop that retries failures with concrete fix instructions, and durable state that survives crashes and restarts. The LLM is a component. The factory is the product.
-
----
-
-## The construction crew
-
-Think of Gantry as a silicon construction crew — a non-contested engineering team that works in parallel, never argues about scope, and hands you a PR when the job is done.
-
-Each role in the pipeline is a specialised agent with its own toolset, context window, and model. They do not share memory mid-build — they hand off structured artifacts. The Architect produces a plan. The Builders execute tracks from that plan simultaneously. The Inspector verifies and generates precise fix instructions. The Reviewer checks logic correctness before the branch is staged. The crew does not need to be managed. It needs to be assigned.
-
-A construction project does not have one worker who designs the building, pours concrete, frames walls, runs electrical, and inspects the work. It has a crew with defined roles running in parallel, coordinated by a foreman. That is the model.
-
-**At scale:** each task is an independent Temporal workflow with no shared state between runs. The only limits are worker capacity, LLM rate limits, and GitHub API throughput — all horizontally scalable. 1000 tasks in, 1000 PRs out.
+The web UI still *looks* like a chat app (discussions, message bubbles, streaming text). Under the hood each message submits a factory task and renders Agentex output. Treat chat as **run observability**, not the domain model.
 
 ---
 
-## Who it is for
+## Pipeline
 
-**Primary buyer:** platform and DevOps teams who want durable SWE pipeline infrastructure they can wire into internal portals, CI, and ticketing tools.
-
-**End user:** engineering teams with a backlog of well-scoped tasks that keep getting deprioritised — features that are clear enough to implement but take hours of mechanical execution.
-
-**Gantry handles well:**
-- Features that touch multiple files across the stack (API + UI + tests + config)
-- Scaffolding a new service, module, or integration from a spec
-- Applying a consistent change across many files — logging, tracing, auth guards, error handling
-- Greenfield projects where the architecture is clear and execution is the bottleneck
-
-**Gantry does not handle well:**
-- Exploratory debugging ("why is this flaky test failing in CI?")
-- Architecture decisions that require human judgment mid-task
-- Tasks with ambiguous requirements that need iteration to discover
-- Anything that requires a conversation to define
-
----
-
-## What it does
-
-Gantry takes a natural language goal and runs it through a structured pipeline:
+Each task is one Temporal workflow (`swarm-factory`). The Foreman composes child workflows — they are not separate ACP targets.
 
 ```
 PM → Architect → Builders (parallel) → Inspector ↺ → Reviewer → Security → DevOps
 ```
 
-Each stage is a separate agent with a focused toolset. The Architect decomposes the goal into independent tracks. Multiple Builder agents write code simultaneously. The Inspector runs tests and lint, triggering self-healing cycles if anything fails. The Reviewer reads the full diff and checks logic correctness, edge cases, and API contracts — flagging real bugs before they reach staging. Security scans for secrets and CVEs. DevOps branches, commits, pushes, and opens a PR.
+| Stage | Responsibility |
+|-------|----------------|
+| **PM** | Goal enrichment; optional clarification HITL (tier ≥ 1) |
+| **Architect** | Repo map, parallel track plan, conflict resolution on overlapping files |
+| **Builder** | Tool-using LLM loop: read → edit → `verify_build` → `finish_build` |
+| **Inspector** | Tests, lint, types; emits heal instructions on failure |
+| **Reviewer** | Diff review; logic bugs re-enter the heal loop |
+| **Security** | Secret/CVE scan; can block PR |
+| **DevOps** | Branch, commit, push, open PR |
 
-On Standard and Full Crew tiers, the pipeline pauses at key decisions — build plan review before builders launch, deployment approval before the PR is opened — and waits for your explicit sign-off via an inline approval card in the UI. Approve, reject, or enable auto-approve to let it run unattended.
+Heal cycles retry Builder from a git snapshot. If the plan was wrong, Architect re-plans before burning more cycles. Named HITL checkpoints (plan approval, deploy approval, PM clarification) pause the workflow until signalled via REST.
 
-If you point Gantry at a local directory that has no GitHub remote, it creates the GitHub repo automatically before the first push.
+Crew catalog (read-only): `GET /v1/agents`. Only **`swarm-factory`** accepts ACP `task/create`.
 
-The whole pipeline is a [Temporal](https://temporal.io) workflow. Close your laptop mid-build — it continues when the worker comes back.
-
----
-
-## What makes it different
-
-**Parallel by design.** The Architect splits work into independent tracks (frontend, backend, tests, infra). Builders run simultaneously. A full-stack feature that would take one agent 45 minutes sequentially takes 15 in parallel.
-
-**Self-correcting.** When the Inspector finds failures, it generates concrete fix instructions and re-invokes the Builder. When the Reviewer finds logic bugs, it converts review comments into heal instructions and re-enters the same cycle — fresh code, fresh tests, fresh review. If the original plan was structurally wrong, the Architect re-decomposes before burning heal cycles. The swarm escalates to you only after exhausting every automated recovery path.
-
-**Code-aware.** After each build, a symbol index maps every function, class, and type to its file and line number. Agents query the index instead of reading files blind. Builders use it to locate definitions before editing. The Architect uses it to plan on re-runs.
-
-**GitHub-native.** Connect a GitHub repo by URL, or point at a local directory and Gantry creates the remote repo for you. Builds on the repo and pushes a branch with a PR. Works with public and private repos via a Personal Access Token.
-
-**Durable.** Every agent is a Temporal child workflow. Every file write, LLM call, and shell command is a retryable activity. Crashes replay from the last checkpoint. Nothing is lost.
-
----
-
-## The crew
-
-| # | Agent | Role | Key Tools | Model |
-|---|---|---|---|---|
-| — | **Foreman** | Orchestrates the pipeline, manages heal loops, HITL checkpoints | — | — |
-| 1 | **PM** | Enriches the goal, asks clarifying questions (tier ≥ 1), fetches external context | `fetch_url`, `memory_read`, `web_search` | Sonnet / Haiku |
-| 2 | **Architect** | Maps the repo, decomposes into parallel tracks, probes the web for unfamiliar APIs | `list_directory`, `read_file`, `find_symbol`, `web_search`, `fetch_url`, `run_command` | Sonnet |
-| 3 | **Builder** | Writes code, self-verifies with lint + type-check, navigates the codebase via symbol index | `write_file`, `edit_file`, `find_symbol`, `run_command`, `list_directory`, `verify_build` | Sonnet / Haiku |
-| 4 | **Inspector** | Runs tests, lint, type-check, coverage; generates precise heal instructions | `run_tests`, `run_lint`, `run_type_check`, `run_coverage`, `list_directory`, `search_files`, `read_file` | Sonnet / Haiku |
-| 5 | **Reviewer** | Reads the full diff, checks logic correctness, edge cases, API contracts | `git_diff`, `read_file`, `search_files`, `find_symbol`, `report_review` | Sonnet |
-| 6 | **Security** | Scans for secrets, CVEs, insecure patterns; blocks PR on critical findings | `scan_secrets`, `scan_dependencies`, `run_sast`, `git_diff`, `search_files` | Haiku |
-| 7 | **DevOps** | Branches, commits, pushes, opens PR, optionally runs migrations and deploys | `git_add`, `git_commit`, `git_push`, `create_pull_request`, `run_migration`, `deploy`, `memory_read`, `memory_write` | Haiku |
-
-Model routing is automatic: Haiku (`claude-haiku-4-5-20251001`) for Tier 0/1 tasks (micro fixes, simple scripts), Sonnet (`claude-sonnet-4-6`) for Tier 2/3 (features, full-stack builds). ~10x cost reduction on simple tasks.
+Details: [`docs/platform/oracle-tiers.md`](docs/platform/oracle-tiers.md), [`docs/platform/agentex-citizen.md`](docs/platform/agentex-citizen.md)
 
 ---
 
 ## Complexity tiers
 
-Gantry classifies every goal using a fast LLM call before dispatching agents:
+Tier controls parallelism, heal budget, optional agents, and HITL gates. Auto-classified from the goal, or override on submit.
 
-| Tier | Label | Tracks | Heal cycles | Reviewer | Security | HITL |
-|---|---|---|---|---|---|---|
-| 0 | Micro | 1 | 0 | ✗ | ✗ | ✗ |
-| 1 | Lightweight | 1 | 1 | ✗ | ✗ | ✗ |
-| 2 | Standard | 2 | 2 | ✓ | ✓ | Architect review |
-| 3 | Full Crew | 4 | 2 | ✓ | ✓ | Architect + DevOps |
+| Tier | Label | Parallel tracks | Heal cycles | Reviewer / Security | HITL |
+|------|-------|-----------------|-------------|---------------------|------|
+| 0 | Micro | 1 | 0 | off | none |
+| 1 | Lightweight | 1 | 1 | off | PM clarification |
+| 2 | Standard | 2 | 2 | on | + architect plan |
+| 3 | Full Crew | 4 | 2 | on | + devops |
 
-Override with `tier=0–3` in the task params or via the Settings panel.
+Pass `tier` and optional `pipeline` overrides on `POST /v1/tasks`:
+
+```json
+{
+  "goal": "Add health check endpoint",
+  "project_id": "proj_abc",
+  "tier": 2,
+  "pipeline": {
+    "max_parallel_tracks": 2,
+    "max_heal_cycles": 2,
+    "disable_agents": ["pm"]
+  }
+}
+```
+
+**Playbooks** (`playbook: "platform-backlog"`, `a11y-remediation`, `monorepo-slice`) apply vertical presets without forking the engine. See [`docs/verticals/README.md`](docs/verticals/README.md).
 
 ---
 
-## Self-healing loop
+## Control plane API
 
-```
-Builder writes code
-    ↓
-verify_build (lint + types inline)
-    ↓
-Inspector runs full test suite
-    ↓ fail
-heal_instructions → Builder (up to max_heal_cycles)
-    ↓ pass
-Reviewer reads diff — checks logic, edge cases, API contracts
-    ↓ request_changes
-reviewer comments → heal_instructions → Builder (re-enters loop)
-    ↓ approve
-Security scan
-    ↓
-DevOps — branch, commit, push, PR
-```
+Base URL: `http://localhost:8001` (dev) · Swagger: `/docs` · Health: `/health`
 
-Each heal cycle starts from a git snapshot taken before the cycle began. A bad heal can't corrupt a good previous state. The Reviewer only flags real logic bugs — not style, formatting, or naming — to avoid wasting heal cycles on cosmetic issues.
+All `/v1/*` routes require `Authorization: Bearer gantry_…`.
 
-If the original plan was structurally wrong, the Architect re-decomposes with Inspector findings before burning more heal cycles. The swarm escalates to you only after exhausting every automated recovery path.
-
----
-
-## Platform API (primary interface)
-
-Gantry is **API-first**. The control plane runs on FastAPI (`:8001`) and works without the Next.js UI. Every resource is org-scoped; integrators get structured results (`result.pr_url`, `result.branch`) — never regex over agent chat.
-
-```
-https://api.gantry.dev          Production
-http://localhost:8001/docs      Swagger UI (local)
-http://localhost:8001/status    Public health page
-```
-
-### Quick start (headless)
+### Headless quick start
 
 ```bash
-# 1. Apply schema (Postgres) or skip for file-backed local dev
-DATABASE_URL=postgresql://... python scripts/migrate_db.py
-
-# 2. Bootstrap an API key
+# Create a key (bootstrap — see docs for production hardening)
 curl -X POST http://localhost:8001/v1/keys \
   -H "Content-Type: application/json" \
   -d '{"name": "bootstrap"}'
 
 export GANTRY_API_KEY=gantry_...
 
-# 3. Create a project linked to GitHub
+# Link a GitHub repo
 curl -X POST http://localhost:8001/v1/projects \
   -H "Authorization: Bearer $GANTRY_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"name": "my-service", "github_url": "https://github.com/org/repo"}'
 
-# 4. Submit a task
+# Submit a task
 curl -X POST http://localhost:8001/v1/tasks \
   -H "Authorization: Bearer $GANTRY_API_KEY" \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: deploy-001" \
   -d '{"goal": "Add health check endpoint", "project_id": "<id>"}'
 
-# 5. Poll for structured result
+# Poll status + structured result
 curl http://localhost:8001/v1/tasks/<task_id> \
+  -H "Authorization: Bearer $GANTRY_API_KEY"
+
+# Stream run events (SSE)
+curl -N http://localhost:8001/v1/tasks/<task_id>/events \
   -H "Authorization: Bearer $GANTRY_API_KEY"
 ```
 
-Full reference: [`docs/api.md`](docs/api.md)
+SSE event types: `status`, `lifecycle`, `message`, `hitl`, `error`, `done`. Schema: [`docs/platform/sse-events.md`](docs/platform/sse-events.md).
 
-### API surface
+The SSE endpoint aggregates Agentex task status and messages with Gantry metadata (lifecycle webhooks fired, pending HITL). It is a **polling adapter**, not a native workflow event bus.
+
+### Surface map
 
 | Area | Endpoints |
-|---|---|
-| **Tasks** | `POST /v1/tasks`, `POST /v1/tasks/bulk`, `GET /v1/tasks/{id}`, `GET /v1/tasks/{id}/events` (SSE) |
+|------|-----------|
+| **Tasks** | `POST /v1/tasks`, `POST /v1/tasks/bulk`, `GET /v1/tasks/{id}`, `GET /v1/tasks/{id}/events`, `POST /v1/tasks/{id}/hitl`, `POST /v1/tasks/{id}/approve` |
+| **Agents** | `GET /v1/agents`, `GET /v1/agents/{name}` |
 | **Projects** | `GET/POST/PATCH /v1/projects`, `GET /v1/projects/{id}/memory` |
-| **Keys** | `POST/GET/DELETE /v1/keys` (scoped: `tasks:read/write`, `projects:read/write`, `admin`, …) |
-| **Secrets** | `POST/GET/DELETE /v1/secrets` — encrypted GitHub PAT storage |
-| **Webhooks** | `POST/GET/DELETE /v1/webhooks` — org lifecycle events (`task.completed`, …) |
-| **Quotas** | `GET/PATCH /v1/quotas` — concurrent tasks, daily limits, rate limits |
-| **Audit** | `GET /v1/audit` — key usage log |
-| **Usage** | `GET /v1/usage` — task event ledger |
-| **Settings** | `GET/PATCH /v1/settings` — white-label branding |
-| **Integrations** | `POST /v1/integrations/github\|linear\|jira/webhook` |
+| **Keys / secrets / webhooks / quotas / audit / usage / settings** | See [`docs/api.md`](docs/api.md) |
+| **Integrations** | GitHub, Linear, Jira webhooks under `/v1/integrations/*` |
 
-Task submission accepts an optional `pipeline` config to override tier, heal cycles, parallel tracks, and disable specific agents (`pm`, `inspector`, `reviewer`, `security`).
+Full reference: [`docs/api.md`](docs/api.md)
 
-**LLM BYOK:** Each org configures its own provider key via `PATCH /v1/settings` — customers pay their own inference bill. See [`docs/platform/llm-byok.md`](docs/platform/llm-byok.md).
+---
 
-### Integrations
+## Web UI (`apps/web`)
 
-| Source | Trigger | Docs |
-|---|---|---|
-| **GitHub App** | One-time org install | [`docs/integrations/github-app.md`](docs/integrations/github-app.md) |
-| **GitHub Issues** | Label issue `gantry` | [`docs/integrations/github-issues.md`](docs/integrations/github-issues.md) |
-| **Linear** | Label issue `gantry` | [`docs/integrations/linear.md`](docs/integrations/linear.md) |
-| **Jira** | Label issue `gantry` | [`docs/integrations/jira.md`](docs/integrations/jira.md) |
-| **GitHub Actions** | `.github/actions/gantry-submit` | Submit tasks from CI |
+Static Vite + React app. Deployed separately (e.g. Vercel); talks to the Gantry API only.
 
-Link projects to ticketing systems via `linear_team_id` or `jira_project_key` on create/update.
+```
+Browser (:5173)  →  Gantry API (:8001)  →  Agentex (:5003)  →  worker
+```
 
-### Self-hosted
+| Server-backed | Client-local (browser) |
+|---------------|------------------------|
+| Projects (hubspaces) | Discussions / sidebar history |
+| Task submit + SSE stream | Starters (saved prompts) |
+| API key auth | Chat message cache |
 
-- **Helm chart:** [`deploy/helm/gantry/`](deploy/helm/gantry/)
-- **Terraform module:** [`terraform/modules/gantry/`](terraform/modules/gantry/)
-- **Worker scaling:** [`docs/platform/scaling-workers.md`](docs/platform/scaling-workers.md)
+Flow: create a **Hubspace** (project + GitHub URL) → **New Task** (types a goal) → UI calls `POST /v1/tasks` → streams `/v1/tasks/{id}/events` into the chat view. **Team** page configures default tier and pipeline flags sent on each submit.
+
+Local dev: `./dev.sh` sets `GANTRY_DEV_AUTH_BYPASS` so the UI skips the API-key modal. Never enable that in production.
+
+UI docs: [`apps/web/README.md`](apps/web/README.md)
 
 ---
 
 ## SDKs
 
-### Python
-
-```bash
-pip install gantry-sdk
-```
+**Python** — [`sdk/python/`](sdk/python/)
 
 ```python
 from gantry import GantryClient
 
-client = GantryClient(api_key="...", base_url="https://api.gantry.dev")
-task = client.tasks.create(
-    goal="Add rate limiting to /api/users",
-    project_id="proj_abc",
-)
-result = client.tasks.wait(task.id)
+client = GantryClient(api_key="...", base_url="http://localhost:8001")
+task = client.tasks.submit("Add rate limiting", project_id="proj_abc")
+result = client.tasks.wait(task.task_id)
 print(result.pr_url)
 ```
 
-Webhook signature verification:
-
-```python
-from gantry.webhooks import verify_signature
-
-event = verify_signature(payload, signature, secret)
-```
-
-Source: [`sdk/python/`](sdk/python/)
-
-### TypeScript / Node.js
-
-```bash
-npm install @gantry/sdk
-```
+**TypeScript** — [`sdk/typescript/`](sdk/typescript/)
 
 ```typescript
 import { GantryClient } from "@gantry/sdk";
-import { verifyWebhookSignature } from "@gantry/sdk/webhooks";
 
-const client = new GantryClient({ apiKey: "...", baseUrl: "https://api.gantry.dev" });
-const task = await client.tasks.create({ goal: "Add rate limiting to /api/users", projectId: "proj_abc" });
+const client = new GantryClient({ apiKey: "...", baseUrl: "http://localhost:8001" });
+const task = await client.tasks.create({ goal: "Add rate limiting", projectId: "proj_abc" });
 const result = await client.tasks.wait(task.id);
-console.log(result.prUrl);
-```
-
-Source: [`sdk/typescript/`](sdk/typescript/)
-
----
-
-## Stack
-
-**Backend**
-- [Scale Agentex](https://github.com/scaleapi/scale-agentex) — agent hosting, ACP protocol, message streaming
-- [Temporal](https://temporal.io) — durable workflow orchestration, activity retries, child workflows
-- [FastAPI](https://fastapi.tiangolo.com) — REST API server with Swagger docs
-- [Anthropic Claude](https://anthropic.com) (`claude-sonnet-4-6`, `claude-haiku-4-5-20251001`) — all LLM reasoning
-- Python 3.12 / [uv](https://github.com/astral-sh/uv)
-
-**Frontend**
-- [Next.js](https://nextjs.org) / React 19
-- [TanStack Query](https://tanstack.com/query)
-- [Zustand](https://zustand-demo.pmnd.rs)
-
----
-
-## Project structure
-
-```
-Gantry/
-├── activities/
-│   ├── _shared.py                       # base types and shared helpers
-│   ├── file_activities.py               # read, write, patch, delete, list
-│   ├── shell_activities.py              # run_command, run_tests, lint, type-check, coverage
-│   ├── git_activities.py                # git init, diff, commit, branch, push
-│   ├── github_activities.py             # repo creation, PR open via gh CLI
-│   ├── web_activities.py                # fetch_url, brave search
-│   ├── security_activities.py           # secret scan, CVE lookup
-│   ├── index_activities.py              # symbol index build + query
-│   ├── manifest_activities.py           # Agentex manifest generation
-│   ├── swarm_activities.py              # backward-compat re-export shim
-│   ├── memory_activities.py             # facts store + episodic memory
-│   ├── classify_tier_activity.py        # LLM-based complexity classification
-│   ├── quality_score_activity.py        # LLM build quality scoring (0–10)
-│   ├── trace_activity.py                # structured agent trace recording
-│   ├── builder_planner_activity.py
-│   ├── architect_planner_activity.py
-│   ├── inspector_planner_activity.py
-│   ├── reviewer_planner_activity.py     # ← new: Reviewer tool-use loop
-│   ├── security_planner_activity.py
-│   ├── devops_planner_activity.py
-│   └── pm_planner_activity.py
-│
-├── workflows/
-│   ├── swarm_orchestrator.py            # Foreman — top-level pipeline, HITL checkpoints
-│   ├── architect_agent.py               # pre-loads PM memory before planning
-│   ├── builder_agent.py
-│   ├── inspector_agent.py               # self-healing loop, dependency-skip logic
-│   ├── reviewer_agent.py                # ← new: logic review, approve/request_changes
-│   ├── security_agent.py
-│   ├── devops_agent.py
-│   └── pm_agent.py
-│
-├── project/
-│   ├── config.py                        # env vars, model constants, GH_TOKEN
-│   ├── child_workflow.py                # ApprovalWorkflow — durable HITL signal handler
-│   ├── planner.py                       # Claude tool-use loop, context management
-│   ├── complexity.py                    # tier params + regex fallback
-│   ├── architect_tools.py
-│   ├── builder_tools.py                 # verify_build, find_symbol, query_index
-│   ├── inspector_tools.py               # run_coverage, list_directory, search_files
-│   ├── reviewer_tools.py                # ← new: git_diff, read_file, report_review
-│   ├── devops_tools.py                  # memory_write, run_migration, deploy
-│   ├── security_tools.py                # git_diff, search_files, scan_dependencies
-│   ├── pm_tools.py                      # fetch_url, memory_read
-│   ├── memory_tools.py
-│   ├── run_worker.py                    # Temporal worker entrypoint
-│   └── acp.py                           # Agentex ACP server
-│
-├── api/                                 # Gantry REST control plane (:8001)
-│   ├── main.py                          # FastAPI app, lifespan poller, rate limiting
-│   ├── config.py                        # env vars, secrets key, webhook secrets
-│   ├── crypto.py                        # Fernet encryption for org secrets
-│   ├── deps.py                          # auth, scoped API keys, client IP
-│   ├── middleware/                      # per-org rate limiting
-│   ├── migrations/                      # 001–006 idempotent Postgres schema
-│   ├── repositories/                    # DB + file fallback (org-scoped CRUD)
-│   ├── schemas/                         # PipelineConfig and shared models
-│   ├── clients/                         # Agentex, Temporal, GitHub httpx wrappers
-│   ├── services/                        # poller, webhooks, task events, integrations
-│   └── routes/
-│       ├── tasks.py                     # /v1/tasks — submit, poll, SSE, bulk
-│       ├── projects.py                  # /v1/projects — CRUD + memory
-│       ├── keys.py                      # /v1/keys — scoped API keys
-│       ├── secrets.py                   # /v1/secrets — encrypted PAT storage
-│       ├── org_webhooks.py              # /v1/webhooks — lifecycle delivery
-│       ├── quotas.py                    # /v1/quotas
-│       ├── audit.py                     # /v1/audit
-│       ├── usage.py                     # /v1/usage
-│       ├── status.py                    # /status — public health
-│       ├── org_settings.py              # /v1/settings — white-label
-│       ├── github.py                    # /v1/integrations/github/webhook
-│       ├── integrations_linear.py       # /v1/integrations/linear/webhook
-│       ├── integrations_jira.py         # /v1/integrations/jira/webhook
-│       └── internal.py                  # health + metrics
-│
-├── sdk/                                 # Client SDKs
-│   ├── python/                          # pip install gantry-sdk
-│   └── typescript/                      # npm install @gantry/sdk
-│
-├── deploy/
-│   ├── helm/gantry/                     # Self-hosted Kubernetes chart
-│   ├── docker-compose.prod.yml
-│   ├── gantry-api.service
-│   ├── gantry-worker.service
-│   └── setup.sh
-│
-├── terraform/modules/gantry/            # Helm release wrapper module
-│
-├── docs/
-│   ├── api.md                           # Full REST API reference
-│   ├── integrations/                    # GitHub, Linear, Jira guides
-│   └── platform/                        # Scaling, deployment docs
-│
-├── GANTRY_THESIS.md                     # Product thesis and positioning
-├── PLATFORM_REFACTOR.md                 # API-first pivot checklist (Phases 0–3)
-│
-├── ui/                                  # Optional Next.js client (:3000)
-│   ├── app/
-│   │   ├── page.tsx                     # home / search
-│   │   ├── task/[taskId]/               # live build view
-│   │   ├── projects/                    # project dashboard
-│   │   ├── agents/                      # agent directory + settings + API tab
-│   │   ├── docs/                        # platform documentation
-│   │   └── api/
-│   │       ├── projects/                # project CRUD + registry
-│   │       ├── tasks/[taskId]/
-│   │       │   ├── signal/              # Temporal approval signal proxy
-│   │       │   └── terminate/           # workflow cancellation
-│   │       ├── traces/                  # agent trace retrieval
-│   │       ├── tree/                    # repo file tree
-│   │       └── github/repos/            # GitHub repo proxy (PAT-authenticated)
-│   ├── components/
-│   │   ├── feed/                        # message-feed domain modules
-│   │   │   ├── agent-utils.ts
-│   │   │   ├── agent-row.tsx
-│   │   │   ├── plan-cards.tsx
-│   │   │   ├── builder-cards.tsx
-│   │   │   ├── hitl-cards.tsx
-│   │   │   ├── status-indicators.tsx
-│   │   │   ├── tool-icon.tsx
-│   │   │   └── builder-progress.ts
-│   │   ├── swarm/                       # swarm-view domain modules
-│   │   │   ├── utils.ts                 # stage parsers incl. reviewer stage
-│   │   │   ├── pipeline-tracker.tsx     # animated 8-stage pipeline
-│   │   │   ├── traces-panel.tsx
-│   │   │   ├── context-usage.tsx
-│   │   │   ├── preview-pane.tsx
-│   │   │   └── report-card.tsx
-│   │   └── agents/
-│   │       ├── config-panel.tsx
-│   │       └── agent-directory.tsx      # 8-agent directory with Reviewer card
-│   └── lib/
-│       ├── agent-config-store.ts
-│       ├── project-repository.ts
-│       └── use-projects.ts
-│
-├── tests/
-│   ├── test_platform_phase0.py          # Repository + key auth tests
-│   ├── test_platform_phase2.py          # Quotas + rate limit tests
-│   ├── test_platform_phase3.py          # Pipeline + integration tests
-│   ├── test_orchestrator_guards.py
-│   ├── test_pipeline_integration.py
-│   └── test_track_conflicts.py
-│
-├── manifest.yaml                        # Agentex agent manifest
-├── dev.sh                               # dev launcher (5 services)
-├── pyproject.toml
-└── .env.example
 ```
 
 ---
 
-## Getting started
+## Local development
 
 ### Prerequisites
 
 - Python 3.12+ and [uv](https://github.com/astral-sh/uv)
 - Node.js 20+
-- [Temporal CLI](https://docs.temporal.io/cli) — `brew install temporal`
-- Scale Agentex platform — `cd scale-agentex/agentex && docker compose up -d`
+- [Temporal CLI](https://docs.temporal.io/cli) (or Temporal via Agentex Docker)
+- [Scale Agentex](https://github.com/scaleapi/scale-agentex) platform — `scale-agentex/agentex` via Docker Compose
 
 ### Setup
 
 ```bash
 cp .env.example .env
-# Required: ANTHROPIC_API_KEY
-# Optional: GH_TOKEN (for GitHub clone + push)
-#           DATABASE_URL (Postgres — omit for file-backed local dev)
-#           GANTRY_SECRETS_KEY (Fernet key for org secrets)
-#           GANTRY_BOOTSTRAP_TOKEN (protect key creation after bootstrap)
-#           GITHUB_WEBHOOK_SECRET, LINEAR_WEBHOOK_SECRET, JIRA_WEBHOOK_SECRET
-```
+# Required for worker: ANTHROPIC_API_KEY
+# Optional: GH_TOKEN, DATABASE_URL, GANTRY_SECRETS_KEY
 
-```bash
-# Install Python deps
 uv sync
-
-# Install UI deps
-cd ui && npm install
+cd apps/web && npm install
 ```
 
 ### Run
 
 ```bash
-./dev.sh
+./dev.sh              # Temporal, Agentex (if needed), worker, API :8001, UI :5173
+./dev.sh --status     # port check
+./dev.sh --stop       # tear down local processes
+./dev.sh --platform   # restart Agentex Docker first
 ```
 
-Starts five services:
+| Service | Port |
+|---------|------|
+| Agentex API | 5003 |
+| Agent ACP (`swarm-factory`) | 8000 |
+| Gantry API | 8001 |
+| Factory UI | 5173 |
+| Temporal | 7233 |
 
-1. Temporal dev server (`:7233`)
-2. Agentex platform (`:5003`)
-3. Gantry worker — ACP server (`:8000`) + Temporal worker
-4. **Gantry REST API** (`:8001`) — FastAPI with Swagger at `/docs`
-5. Next.js UI (`:3000`)
+Open [http://localhost:5173](http://localhost:5173) for the UI, [http://localhost:8001/docs](http://localhost:8001/docs) for the API.
 
-Open [http://localhost:3000](http://localhost:3000).
-
-```bash
-./dev.sh --stop      # tear everything down
-./dev.sh --status    # show which services are running
-./dev.sh --platform  # also restart Docker platform first
-```
+Verification: `bash scripts/release_gate.sh`
 
 ---
 
-## GitHub integration
+## Deployment
 
-To build on an existing GitHub repo:
+- **Helm:** [`deploy/helm/gantry/`](deploy/helm/gantry/)
+- **Agentex cluster:** [`docs/platform/agentex-cluster.md`](docs/platform/agentex-cluster.md)
+- **Worker scaling:** [`docs/platform/scaling-workers.md`](docs/platform/scaling-workers.md)
 
-1. Go to **Agents → Settings → GitHub** and paste a Personal Access Token
-   - Classic PAT: needs `repo` scope
-   - Fine-grained: needs `contents: write` + `pull_requests: write`
-2. Create a project and paste the GitHub HTTPS URL (e.g. `https://github.com/owner/repo`)
-3. Submit a goal — Gantry clones the repo, builds, and opens a PR
+Agentex, Temporal, and the worker stay off static hosting. Only `apps/web` is a static frontend.
 
-The token is stored in your browser only. It's passed to the worker as a task param and used only for clone and push operations.
+---
+
+## Repository layout
+
+```
+Gantry/
+├── api/                    # FastAPI control plane (:8001)
+│   ├── routes/             # /v1/tasks, projects, keys, agents, …
+│   ├── repositories/       # org-scoped storage (Postgres or file fallback)
+│   ├── clients/            # Agentex + Temporal httpx wrappers
+│   └── services/           # poller, webhooks, task event emission
+│
+├── workflows/              # Temporal workflows
+│   ├── swarm_orchestrator.py # Foreman (swarm-factory)
+│   ├── child_workflow.py     # HITL approval + clarification
+│   ├── agents/               # PM, Architect, Builder, Inspector, …
+│   └── swarm/                # track planning, healing, reporting
+│
+├── activities/             # Temporal activities (side effects)
+│   ├── agents/               # LLM planner steps per role
+│   ├── tools/                # file, git, shell, security, web
+│   ├── data/                 # memory, symbol index, quality score
+│   └── infra/                # manifest, trace, db patch
+│
+├── project/                  # Agent config, planner, tools, schemas
+│   ├── acp.py                # FastACP → Temporal
+│   └── schema/               # crew catalog, playbooks, complexity tiers
+│
+├── apps/web/                 # Vite operator UI (optional)
+├── sdk/python/               # gantry-sdk
+├── sdk/typescript/           # @gantry/sdk
+├── playbooks/                # Vertical YAML presets
+├── manifest.yaml             # Agentex agent manifest (swarm-factory)
+├── worker.py                 # Temporal worker bootstrap
+├── dev.sh                    # local launcher
+└── docs/                     # API reference, platform invariants, verticals
+```
+
+Platform invariants and merge status: [`PLATFORM_REFACTOR.md`](PLATFORM_REFACTOR.md), [`docs/platform/platform-merge-plan.md`](docs/platform/platform-merge-plan.md)
+
+---
+
+## Horizontal capabilities
+
+These are the engine primitives vertical playbooks plug into — not UI features.
+
+| Code | Capability |
+|------|------------|
+| **H-PAR** | Parallel Builder tracks from Architect plan |
+| **H-CON** | Conflict resolution on overlapping `key_files` |
+| **H-DEP** | Dependency-ordered track waves |
+| **H-ORA** | Inspector (+ playbook oracles) gates quality |
+| **H-HEAL** | Inspector/Reviewer → Builder retry loops |
+| **H-BULK** | `POST /v1/tasks/bulk` — isolated runs, partial failure OK |
+| **H-HITL** | Named checkpoints via REST + SSE `hitl` events |
+| **H-SSE** | `GET /v1/tasks/{id}/events` for UI and SDK streaming |
+| **H-DUR** | Temporal durability — crash-safe replay |
+| **H-BYOK** | Per-org LLM keys via `/v1/settings` |
+| **H-ACP** | Single ACP entry; crew as Temporal children |
+
+---
+
+## GitHub auth
+
+Tasks need a GitHub token to clone and push. Options:
+
+1. **Per-task** — pass `github_token` or `github_token_secret` on submit
+2. **Org secret** — store via `POST /v1/secrets`, reference by name
+3. **GitHub App** — preferred for integrations ([`docs/integrations/github-app.md`](docs/integrations/github-app.md))
+
+Projects store the repo URL (`POST /v1/projects`). The worker clones that repo, builds on a branch, and opens a PR.
 
 ---
 
 ## Memory
 
-Gantry maintains persistent memory across builds so the system gets smarter over time.
-
-**Facts store** (`.gantry/memory/facts.json`) — key/value facts written by any agent during a build. Architects store tech stack decisions. Builders store known failure patterns. DevOps stores deployment notes. Facts with `arch.` or `pm.` prefixes expire after 90 days.
-
-**Episodic memory** — one record per completed build, written at two levels:
-
-- **Per-repo** (`.gantry/memory/episodes.jsonl`) — history for this specific repository
-- **Platform-wide** (`~/.gantry/episodes.jsonl`) — history across every repo ever built on this machine
-
-Before planning, the Architect searches the platform-wide store. A new React project gets the learning from every prior React build you've run — what track decompositions worked, what failed, what quality scores were achieved. Same-repo episodes are boosted in ranking so local context still wins ties. The more tasks run, the better every future Architect gets.
-
-**API access** — memory is readable via the REST API:
-
-```
-GET /v1/projects/{project_id}/memory
-Authorization: Bearer <key>
-```
-
-Returns the facts object and the 20 most recent episodes. The **Projects** page in the UI surfaces this data on every project card.
+Cross-run learning uses a local facts store and episodic log (`.gantry/memory/` on the worker host). Architects query prior episodes before planning. Readable via `GET /v1/projects/{id}/memory`.
 
 ---
 
-## Configuration
+## Positioning docs
 
-All swarm parameters are configurable from **Agents → Settings**:
-
-| Setting | Default | Description |
-|---|---|---|
-| Branch prefix | `swarm` | Git branches named `prefix/task-id` |
-| Max parallel tracks | 4 | Concurrent Builder agents |
-| Max heal cycles | 3 | Inspector → Builder retry limit |
-| Tier override | Auto | Force a specific complexity tier |
-| GitHub PAT | — | Token for clone + push |
-
----
-
-## Roadmap
-
-**Platform pivot (complete):** org-scoped API, webhooks, secrets, quotas, audit, Linear/Jira integrations, Helm/Terraform, pipeline customization. See [`PLATFORM_REFACTOR.md`](PLATFORM_REFACTOR.md).
-
-**Next:**
-- Billing wired to usage ledger (Stripe or manual invoicing)
-- Redis-backed rate limits for multi-replica API deployments
-- Design partner validation — headless integrator flow in production
-
-**Later:** multi-repo orchestration, agent specialisation profiles, branch-level CI gating
-
-Product thesis and competitive positioning: [`GANTRY_THESIS.md`](GANTRY_THESIS.md)
+- Product thesis: [`GANTRY_THESIS.md`](GANTRY_THESIS.md)
+- API-first pivot checklist: [`PLATFORM_REFACTOR.md`](PLATFORM_REFACTOR.md)
+- Merge plan + invariants: [`docs/platform/platform-merge-plan.md`](docs/platform/platform-merge-plan.md)
