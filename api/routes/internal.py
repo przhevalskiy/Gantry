@@ -1,7 +1,5 @@
-"""Internal endpoints — called by Next.js server-side routes, not public callers.
+"""Internal endpoints — worker/ops proxies, not public browser callers.
 
-Next.js runs on Vercel and cannot reach Temporal's gRPC port directly.
-These endpoints act as a proxy: Next.js → Gantry API → Temporal.
 Authenticated by INTERNAL_API_KEY (shared secret, never exposed to browsers).
 """
 import json

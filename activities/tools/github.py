@@ -36,22 +36,27 @@ async def swarm_update_project_registry(project_id: str, github_url: str) -> str
     """
     Update a project's github_url in the registry.
 
-    Strategy: call the Next.js API first (single authoritative writer).
-    Falls back to a direct locked file write if the UI is unreachable.
+    Primary: Gantry API internal route (M2 — no Next.js proxy).
+    Falls back to a direct locked file write when the API is unreachable.
     """
     import fcntl
     import httpx
-    from project.config import GANTRY_UI_URL
 
-    # ── Primary: Next.js API ──────────────────────────────────────────────────
+    api_url = os.getenv("GANTRY_API_URL", "http://localhost:8001")
+    internal_key = os.getenv("INTERNAL_API_KEY", "")
+    headers: dict[str, str] = {"Content-Type": "application/json"}
+    if internal_key:
+        headers["x-internal-key"] = internal_key
+
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.patch(
-                f"{GANTRY_UI_URL}/api/projects",
-                json={"id": project_id, "github_url": github_url},
+                f"{api_url}/internal/db/projects/{project_id}",
+                json={"github_url": github_url},
+                headers=headers,
             )
             if resp.status_code == 200:
-                return f"Registry updated via API: {project_id} → {github_url}"
+                return f"Registry updated via Gantry API: {project_id} → {github_url}"
     except Exception:
         pass
 

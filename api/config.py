@@ -6,15 +6,21 @@ load_dotenv(override=False)
 
 GANTRY_API_PORT: int = int(os.getenv("GANTRY_API_PORT", "8001"))
 AGENTEX_BASE_URL: str = os.getenv("AGENTEX_BASE_URL", "http://localhost:5003")
-GANTRY_UI_URL: str = os.getenv("GANTRY_UI_URL", "http://localhost:3000")
+GANTRY_WEB_URL: str = os.getenv(
+    "GANTRY_WEB_URL",
+    os.getenv("GANTRY_UI_URL", "http://localhost:5173"),
+)
+GANTRY_UI_URL: str = GANTRY_WEB_URL  # backward compat
 TEMPORAL_ADDRESS: str = os.getenv("TEMPORAL_ADDRESS", "localhost:7233")
 TEMPORAL_NAMESPACE: str = os.getenv("TEMPORAL_NAMESPACE", "default")
-AGENT_NAME: str = os.getenv("GANTRY_AGENT_NAME", "swarm-factory")
+GANTRY_AGENT_NAME: str = os.getenv("GANTRY_AGENT_NAME", os.getenv("AGENT_NAME", "swarm-factory"))
+AGENT_NAME: str = GANTRY_AGENT_NAME
 
 # Webhook signing secret — generated once, stored in ~/.gantry/webhook_secret
 GANTRY_HOME: Path = Path(os.getenv("GANTRY_HOME", str(Path.home() / ".gantry")))
 KEYS_PATH: Path = GANTRY_HOME / "api_keys.json"
 TASKS_PATH: Path = GANTRY_HOME / "api_tasks.json"
+AUDIT_PATH: Path = GANTRY_HOME / "audit.jsonl"
 WEBHOOK_SECRET_PATH: Path = GANTRY_HOME / "webhook_secret"
 
 GITHUB_WEBHOOK_SECRET: str = os.getenv("GITHUB_WEBHOOK_SECRET", "")
@@ -32,6 +38,13 @@ DATABASE_URL: str = os.getenv("DATABASE_URL", "")
 
 # Bootstrap token — required to create the first API key when GANTRY_BOOTSTRAP_TOKEN is set
 GANTRY_BOOTSTRAP_TOKEN: str = os.getenv("GANTRY_BOOTSTRAP_TOKEN", "")
+
+# Local dev only — accept unauthenticated /v1 requests with a synthetic org key
+GANTRY_DEV_AUTH_BYPASS: bool = os.getenv("GANTRY_DEV_AUTH_BYPASS", "").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 GANTRY_INSTALL_STATE_SECRET: str = os.getenv(
     "GANTRY_INSTALL_STATE_SECRET",

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 
 from api.clients import github as github_client
-from api.config import GANTRY_PUBLIC_URL, GANTRY_UI_URL, GITHUB_APP_WEBHOOK_SECRET, GITHUB_WEBHOOK_SECRET
+from api.config import GANTRY_PUBLIC_URL, GANTRY_WEB_URL, GITHUB_APP_WEBHOOK_SECRET, GITHUB_WEBHOOK_SECRET
 from api.deps import require_scope
 from api.repositories import github_installations as installations_repo
 from api.repositories import projects as projects_repo
@@ -85,7 +85,7 @@ async def github_setup(
     )
 
     log.info("github_app_installed", installation_id=installation_id, org_id=org_id, action=setup_action)
-    return RedirectResponse(url=f"{GANTRY_UI_URL}/agents?github_app=installed", status_code=302)
+    return RedirectResponse(url=f"{GANTRY_WEB_URL}/settings?github_app=installed", status_code=302)
 
 
 @router.get("/installations")

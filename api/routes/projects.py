@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from api.deps import require_any_scope, require_scope
 from api.repositories import projects as projects_repo
+from api.services.project_files import project_root, resolve_project_file, walk_project_files
 
 router = APIRouter(prefix="/v1/projects", tags=["Projects"])
 
@@ -19,6 +21,11 @@ class UpdateProjectRequest(BaseModel):
     github_url: str | None = None
     linear_team_id: str | None = None
     jira_project_key: str | None = None
+
+
+class WriteProjectFileRequest(BaseModel):
+    path: str
+    content: str
 
 
 @router.get("")
@@ -68,6 +75,58 @@ async def update_project(
     if not project:
         raise HTTPException(status_code=404, detail="project not found")
     return {"project": project}
+
+
+@router.get("/{project_id}/files/tree")
+async def project_files_tree(
+    project_id: str,
+    key: dict = Depends(require_any_scope("projects:read", "projects:write")),
+):
+    """Return workspace file paths for a hubspace (local repo_path)."""
+    project = await projects_repo.get_project(project_id, org_id=key["org_id"])
+    if not project:
+        raise HTTPException(status_code=404, detail="project not found")
+    root = project_root(project)
+    return JSONResponse({"files": walk_project_files(root), "source": "workspace"})
+
+
+@router.get("/{project_id}/files/content")
+async def project_files_content(
+    project_id: str,
+    path: str = Query(..., min_length=1),
+    key: dict = Depends(require_any_scope("projects:read", "projects:write")),
+):
+    """Return a single file from the hubspace workspace."""
+    project = await projects_repo.get_project(project_id, org_id=key["org_id"])
+    if not project:
+        raise HTTPException(status_code=404, detail="project not found")
+    target = resolve_project_file(project, path)
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="file not found")
+    try:
+        content = target.read_text(encoding="utf-8", errors="replace")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return JSONResponse({"path": path, "content": content, "source": "workspace"})
+
+
+@router.put("/{project_id}/files/content")
+async def project_files_write(
+    project_id: str,
+    body: WriteProjectFileRequest,
+    key: dict = Depends(require_scope("projects:write")),
+):
+    """Write a file in the hubspace workspace (IDE save)."""
+    project = await projects_repo.get_project(project_id, org_id=key["org_id"])
+    if not project:
+        raise HTTPException(status_code=404, detail="project not found")
+    target = resolve_project_file(project, body.path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        target.write_text(body.content, encoding="utf-8")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return JSONResponse({"path": body.path, "ok": True, "source": "workspace"})
 
 
 @router.get("/{project_id}/memory")

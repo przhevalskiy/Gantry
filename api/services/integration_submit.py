@@ -37,6 +37,10 @@ async def submit_integration_task(
         llm,
     )
     extra.update(llm_params)
+    if project.get("repo_path"):
+        extra["repo_path"] = project["repo_path"]
+    if project.get("github_url"):
+        extra["github_url"] = project["github_url"]
 
     task_id = await agentex_client.submit_task(
         goal=goal,

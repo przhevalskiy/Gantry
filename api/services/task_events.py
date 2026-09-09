@@ -60,7 +60,7 @@ async def emit_task_event(
         )
 
     await tasks_repo.mark_event_fired(task_id, event)
-    log.info("task_event_emitted", task_id=task_id, event=event)
+    log.info("task_event_emitted", task_id=task_id, lifecycle_event=event)
 
 
 async def emit_for_agentex_status(

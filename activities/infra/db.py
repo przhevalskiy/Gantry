@@ -63,3 +63,33 @@ async def db_upsert_build(
     except Exception as exc:
         log.warning("db_upsert_build_error", task_id=task_id, error=str(exc))
         return json.dumps({"ok": False, "reason": str(exc)})
+
+
+@activity.defn(name="db_patch_task_meta")
+async def db_patch_task_meta(task_id: str, patch_json: str) -> str:
+    """Patch task metadata via the Gantry API (track_warnings, pending_hitl).
+
+    Non-fatal — local dev works without the API reachable.
+    """
+    try:
+        patch = json.loads(patch_json) if patch_json else {}
+    except json.JSONDecodeError as exc:
+        return json.dumps({"ok": False, "reason": f"invalid json: {exc}"})
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.patch(
+                f"{_GANTRY_API_URL}/internal/db/tasks/{task_id}/meta",
+                json=patch,
+                headers=_headers(),
+            )
+        if resp.status_code == 404:
+            log.warning("db_patch_task_meta_not_found", task_id=task_id)
+            return json.dumps({"ok": False, "reason": "task not found"})
+        if resp.status_code not in (200, 201):
+            log.warning("db_patch_task_meta_failed", task_id=task_id, status=resp.status_code)
+            return json.dumps({"ok": False, "reason": f"status {resp.status_code}"})
+        return json.dumps({"ok": True})
+    except Exception as exc:
+        log.warning("db_patch_task_meta_error", task_id=task_id, error=str(exc))
+        return json.dumps({"ok": False, "reason": str(exc)})

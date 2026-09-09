@@ -58,11 +58,11 @@ async def fire_webhook(
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(url, content=body, headers=headers)
             if resp.status_code < 300:
-                log.info("webhook_delivered", url=url, event=event, attempt=attempt + 1)
+                log.info("webhook_delivered", url=url, lifecycle_event=event, attempt=attempt + 1)
                 return True
             log.warning("webhook_non_2xx", url=url, status=resp.status_code, attempt=attempt + 1)
         except Exception as exc:
             log.warning("webhook_error", url=url, error=str(exc), attempt=attempt + 1)
 
-    log.error("webhook_failed_all_retries", url=url, event=event)
+    log.error("webhook_failed_all_retries", url=url, lifecycle_event=event)
     return False

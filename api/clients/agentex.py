@@ -56,6 +56,16 @@ async def get_task(task_id: str) -> dict:
         return resp.json()
 
 
+async def list_tasks() -> list[dict]:
+    async with httpx.AsyncClient(base_url=AGENTEX_BASE_URL, timeout=15) as client:
+        resp = await client.get("/tasks")
+        resp.raise_for_status()
+        data = resp.json()
+    if isinstance(data, list):
+        return data
+    return data.get("tasks", [])
+
+
 async def get_messages(task_id: str) -> list[dict]:
     async with httpx.AsyncClient(base_url=AGENTEX_BASE_URL, timeout=15) as client:
         resp = await client.get("/messages", params={"task_id": task_id})
@@ -68,3 +78,29 @@ async def terminate_task(task_id: str) -> None:
     async with httpx.AsyncClient(base_url=AGENTEX_BASE_URL, timeout=15) as client:
         resp = await client.post(f"/tasks/{task_id}/terminate", json={"reason": "terminated via API"})
         resp.raise_for_status()
+
+
+async def send_followup(task_id: str, prompt: str) -> dict:
+    """Send a user follow-up prompt to a running swarm task via Agentex event/send."""
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "event/send",
+        "params": {
+            "task_id": task_id,
+            "content": {
+                "type": "text",
+                "content": prompt,
+                "author": "user",
+            },
+        },
+    }
+
+    async with httpx.AsyncClient(base_url=AGENTEX_BASE_URL, timeout=30) as client:
+        resp = await client.post(f"/agents/name/{AGENT_NAME}/rpc", json=payload)
+        resp.raise_for_status()
+        data = resp.json()
+
+    if data.get("error"):
+        raise RuntimeError(data["error"].get("message", "Agentex RPC error"))
+
+    return data.get("result", {})

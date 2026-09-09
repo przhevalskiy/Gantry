@@ -7,11 +7,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api import db
+from api.config import GANTRY_DEV_AUTH_BYPASS
 from api.middleware import RateLimitMiddleware
 from api.repositories import keys as keys_repo
 from api.routes import (
+    agents,
     audit,
     github,
+    github_browser,
     integrations_jira,
     integrations_linear,
     internal,
@@ -74,8 +77,10 @@ app.include_router(projects_db.router)
 app.include_router(ui_state.router)
 app.include_router(keys.router)
 app.include_router(projects.router)
+app.include_router(agents.router)
 app.include_router(tasks.router)
 app.include_router(github.router)
+app.include_router(github_browser.router)
 app.include_router(secrets.router)
 app.include_router(org_webhooks.router)
 app.include_router(usage.router)
@@ -88,4 +93,7 @@ app.include_router(org_settings.router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "ok": True, "db": db.is_available()}
+    payload = {"status": "ok", "ok": True, "db": db.is_available()}
+    if GANTRY_DEV_AUTH_BYPASS:
+        payload["dev_auth_bypass"] = True
+    return payload

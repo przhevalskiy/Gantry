@@ -1,7 +1,7 @@
 from fastapi import Depends, Header, HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from api.config import GANTRY_BOOTSTRAP_TOKEN
+from api.config import GANTRY_BOOTSTRAP_TOKEN, GANTRY_DEV_AUTH_BYPASS
 from api.repositories import keys as keys_repo
 
 _bearer = HTTPBearer(auto_error=False)
@@ -15,6 +15,12 @@ VALID_SCOPES = frozenset({
     "secrets:read",
     "secrets:write",
 })
+
+DEV_AUTH_KEY: dict = {
+    "id": "dev-bypass",
+    "org_id": "org_dev",
+    "scopes": sorted(VALID_SCOPES),
+}
 
 
 def client_ip(request: Request) -> str | None:
@@ -30,9 +36,13 @@ async def require_api_key(
     credentials: HTTPAuthorizationCredentials | None = Security(_bearer),
 ) -> dict:
     if not credentials:
+        if GANTRY_DEV_AUTH_BYPASS:
+            return DEV_AUTH_KEY
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing API key")
     record = await keys_repo.authenticate(credentials.credentials)
     if not record:
+        if GANTRY_DEV_AUTH_BYPASS:
+            return DEV_AUTH_KEY
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
     return record
 

@@ -1,7 +1,6 @@
-"""DB-backed project + build CRUD — internal routes called by Next.js.
+"""DB-backed project + build CRUD — internal routes called by the worker and ops tooling.
 
 All routes are under /internal/db/ and secured by INTERNAL_API_KEY.
-The user_id comes from the x-user-id header (set by Next.js after Clerk auth).
 Falls back gracefully when DB is unavailable (returns 503).
 """
 from __future__ import annotations
@@ -17,6 +16,7 @@ from pydantic import BaseModel
 import api.db as db
 from api.repositories import builds as builds_repo
 from api.repositories import projects as projects_repo
+from api.repositories import tasks as tasks_repo
 
 log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/internal/db", tags=["DB"])
@@ -184,3 +184,28 @@ async def get_build_for_task(
     if not build:
         raise HTTPException(status_code=404, detail="build not found")
     return {"build": build}
+
+
+class PatchTaskMetaBody(BaseModel):
+    track_warnings: list[str] | None = None
+    pending_hitl_add: dict | None = None
+    pending_hitl_remove: str | None = None
+
+
+@router.patch("/tasks/{task_id}/meta")
+async def patch_task_meta(
+    task_id: str,
+    body: PatchTaskMetaBody,
+    x_internal_key: str | None = Header(default=None),
+):
+    """Worker-only: merge track_warnings / pending_hitl into task metadata."""
+    _check(x_internal_key)
+    ok = await tasks_repo.patch_task_meta(
+        task_id,
+        track_warnings=body.track_warnings,
+        pending_hitl_add=body.pending_hitl_add,
+        pending_hitl_remove=body.pending_hitl_remove,
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="task not found")
+    return {"ok": True, "task_id": task_id}

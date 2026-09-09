@@ -6,25 +6,34 @@ from typing import Optional
 from uuid import uuid4
 
 from api.auth import hash_key, verify_key
-from api.config import KEYS_PATH
 from api import db
 from api.repositories.organizations import DEFAULT_ORG_ID, ensure_default_org
 
 _FILE_ORG_ID = DEFAULT_ORG_ID
 
 
+def _keys_path():
+    """Resolve at call time so tests can isolate GANTRY_HOME (I6)."""
+    import os
+    from pathlib import Path
+    home = Path(os.getenv("GANTRY_HOME", str(Path.home() / ".gantry")))
+    return home / "api_keys.json"
+
+
 def _load_file() -> list[dict]:
-    if not KEYS_PATH.exists():
+    path = _keys_path()
+    if not path.exists():
         return []
     try:
-        return json.loads(KEYS_PATH.read_text())
+        return json.loads(path.read_text())
     except Exception:
         return []
 
 
 def _save_file(keys: list[dict]) -> None:
-    KEYS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    KEYS_PATH.write_text(json.dumps(keys, indent=2))
+    path = _keys_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(keys, indent=2))
 
 
 def _record_to_api(record: dict, include_hash: bool = False) -> dict:
@@ -169,7 +178,7 @@ async def authenticate(plaintext: str) -> Optional[dict]:
 
 
 async def migrate_file_keys_to_db() -> int:
-    if not db.is_available() or not KEYS_PATH.exists():
+    if not db.is_available() or not _keys_path().exists():
         return 0
     org_id = await ensure_default_org()
     existing = await db.fetch_all("SELECT key_hash FROM api_keys")
