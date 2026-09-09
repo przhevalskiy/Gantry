@@ -46,11 +46,17 @@ def test_docs_reachable():
 
 
 def test_tasks_requires_auth():
+    health = httpx.get(f"{BASE}/health", timeout=10)
+    if health.status_code == 200 and health.json().get("dev_auth_bypass"):
+        pytest.skip("GANTRY_DEV_AUTH_BYPASS enabled on server")
     r = httpx.get(f"{BASE}/v1/tasks/nonexistent", timeout=10)
     assert r.status_code in (401, 403)
 
 
 def test_invalid_key_rejected():
+    health = httpx.get(f"{BASE}/health", timeout=10)
+    if health.status_code == 200 and health.json().get("dev_auth_bypass"):
+        pytest.skip("GANTRY_DEV_AUTH_BYPASS enabled on server")
     r = httpx.get(
         f"{BASE}/v1/projects",
         headers={"Authorization": "Bearer gantry_invalid"},

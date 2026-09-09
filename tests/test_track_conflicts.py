@@ -6,7 +6,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from workflows.swarm_orchestrator import _normalise_path, _resolve_track_conflicts
+from workflows.swarm.track_manager import _normalise_path, _resolve_track_conflicts
 
 
 # ── _normalise_path ───────────────────────────────────────────────────────────

@@ -13,7 +13,7 @@ import pytest
 # ── _extract_tracks ───────────────────────────────────────────────────────────
 
 def test_extract_tracks_basic():
-    from workflows.swarm_orchestrator import _extract_tracks
+    from workflows.swarm.track_manager import _extract_tracks
 
     plan = {
         "tracks": [
@@ -27,7 +27,7 @@ def test_extract_tracks_basic():
 
 
 def test_extract_tracks_falls_back_to_steps():
-    from workflows.swarm_orchestrator import _extract_tracks
+    from workflows.swarm.track_manager import _extract_tracks
 
     plan = {"implementation_steps": ["step1", "step2"], "key_files": []}
     tracks = _extract_tracks(plan, max_parallel_tracks=4)
@@ -37,7 +37,7 @@ def test_extract_tracks_falls_back_to_steps():
 
 
 def test_extract_tracks_respects_cap():
-    from workflows.swarm_orchestrator import _extract_tracks
+    from workflows.swarm.track_manager import _extract_tracks
 
     plan = {
         "tracks": [{"label": f"t{i}", "implementation_steps": ["step"], "key_files": []} for i in range(12)]
@@ -48,7 +48,7 @@ def test_extract_tracks_respects_cap():
 
 
 def test_extract_tracks_empty_plan():
-    from workflows.swarm_orchestrator import _extract_tracks
+    from workflows.swarm.track_manager import _extract_tracks
 
     tracks = _extract_tracks({}, max_parallel_tracks=4)
     assert len(tracks) == 1
@@ -102,7 +102,7 @@ def test_step_sanitization_preserves_valid_tracks():
 
 @pytest.mark.asyncio
 async def test_registry_update_file_fallback():
-    """Falls back to file write when the UI is unreachable."""
+    """Falls back to file write when the Gantry API is unreachable."""
     from activities.swarm_activities import swarm_update_project_registry
     import os
 
@@ -115,7 +115,8 @@ async def test_registry_update_file_fallback():
 
         # Point to our temp registry, unreachable UI
         os.environ["GANTRY_FILES_BASE"] = tmp
-        os.environ["GANTRY_UI_URL"] = "http://localhost:19999"  # nothing listening here
+        os.environ["GANTRY_API_URL"] = "http://localhost:19999"
+        os.environ["GANTRY_UI_URL"] = "http://localhost:19999"
 
         result = await swarm_update_project_registry("proj-123", "https://github.com/owner/repo")
 
@@ -126,6 +127,7 @@ async def test_registry_update_file_fallback():
         assert "updated" in result.lower()
 
         del os.environ["GANTRY_FILES_BASE"]
+        del os.environ["GANTRY_API_URL"]
         del os.environ["GANTRY_UI_URL"]
 
 
@@ -139,12 +141,14 @@ async def test_registry_update_missing_project():
         registry.write_text(json.dumps([]))
 
         os.environ["GANTRY_FILES_BASE"] = tmp
+        os.environ["GANTRY_API_URL"] = "http://localhost:19999"
         os.environ["GANTRY_UI_URL"] = "http://localhost:19999"
 
         result = await swarm_update_project_registry("does-not-exist", "https://github.com/x/y")
         assert "not found" in result.lower()
 
         del os.environ["GANTRY_FILES_BASE"]
+        del os.environ["GANTRY_API_URL"]
         del os.environ["GANTRY_UI_URL"]
 
 
@@ -166,7 +170,7 @@ async def test_github_create_repo_rejects_bad_name():
 # ── _order_tracks_by_deps ─────────────────────────────────────────────────────
 
 def test_order_tracks_no_deps():
-    from workflows.swarm_orchestrator import _order_tracks_by_deps
+    from workflows.swarm.track_manager import _order_tracks_by_deps
 
     tracks = [
         {"label": "a", "implementation_steps": ["s1"]},
@@ -179,7 +183,7 @@ def test_order_tracks_no_deps():
 
 
 def test_order_tracks_with_deps():
-    from workflows.swarm_orchestrator import _order_tracks_by_deps
+    from workflows.swarm.track_manager import _order_tracks_by_deps
 
     tracks = [
         {"label": "scaffold", "implementation_steps": ["s1"], "depends_on": []},
