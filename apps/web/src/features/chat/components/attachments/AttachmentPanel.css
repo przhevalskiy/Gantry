@@ -1,0 +1,217 @@
+.attachment-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.attachment-panel {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  z-index: 50;
+  width: 340px;
+  background: white;
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  animation: panelSlideDown 0.2s ease;
+}
+
+@keyframes panelSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.attachment-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.attachment-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.attachment-panel-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.attachment-panel-close:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.attachment-panel-desc {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.attachment-panel-list {
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.attachment-panel-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.attachment-panel-item:hover {
+  background: var(--bg-secondary);
+}
+
+.attachment-panel-item-icon {
+  color: var(--brand-600);
+  flex-shrink: 0;
+}
+
+.attachment-panel-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.attachment-panel-item-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attachment-panel-item-meta {
+  display: block;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.attachment-panel-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+.attachment-panel-item:hover .attachment-panel-action-btn {
+  opacity: 1;
+}
+
+.attachment-panel-action-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.attachment-panel-action-btn.delete:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.attachment-panel-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px;
+  border: 2px dashed var(--border-light);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.attachment-panel-dropzone:hover {
+  border-color: var(--border-medium);
+  background: var(--bg-secondary);
+}
+
+.attachment-panel-dropzone.dragging {
+  border-color: var(--brand-600);
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--brand-600);
+}
+
+.attachment-panel-progress {
+  margin-top: 8px;
+}
+
+.attachment-panel-progress-bar {
+  height: 4px;
+  background: var(--bg-tertiary);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.attachment-panel-progress-fill {
+  height: 100%;
+  background: var(--brand-600);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.attachment-panel-error {
+  margin-top: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #dc2626;
+}
+
+.attachment-panel-error button {
+  margin-left: 8px;
+  background: none;
+  border: none;
+  color: #dc2626;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.attachment-panel-error button:hover {
+  color: #b91c1c;
+}

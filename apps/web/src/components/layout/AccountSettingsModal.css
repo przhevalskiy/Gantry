@@ -1,0 +1,260 @@
+.account-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 8px 0;
+}
+
+/* Sections */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-section + .settings-section {
+  border-top: 1px solid var(--gray-200);
+  padding-top: 24px;
+}
+
+.settings-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0;
+}
+
+/* Fields */
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-500);
+}
+
+.settings-value {
+  font-size: 14px;
+  color: var(--gray-700);
+  margin: 0;
+}
+
+.settings-hint {
+  font-size: 12px;
+  color: var(--gray-400);
+  margin: 4px 0 0;
+}
+
+.settings-error {
+  font-size: 13px;
+  color: var(--color-error);
+  margin: 2px 0 0;
+}
+
+/* Input row */
+.settings-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--gray-900);
+  background: white;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.settings-input:focus {
+  border-color: var(--brand-500);
+}
+
+.settings-save-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: white;
+  background: var(--brand-600);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.settings-save-btn:hover:not(:disabled) {
+  background: var(--brand-700);
+}
+
+.settings-save-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Theme options */
+.settings-theme-options {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-theme-btn {
+  padding: 6px 16px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--gray-600);
+  background: white;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.settings-theme-btn:hover:not(:disabled) {
+  border-color: var(--gray-300);
+  background: var(--gray-50);
+}
+
+.settings-theme-btn.active {
+  border-color: var(--brand-500);
+  color: var(--brand-600);
+  background: var(--brand-50, #f0f5ff);
+  font-weight: 500;
+}
+
+.settings-theme-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Language select */
+.settings-select {
+  padding: 8px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--gray-900);
+  background: white;
+  outline: none;
+  cursor: pointer;
+  max-width: 240px;
+  transition: border-color var(--transition-fast);
+}
+
+.settings-select:focus {
+  border-color: var(--brand-500);
+}
+
+/* Google Translate widget */
+.settings-translate-widget {
+  min-height: 32px;
+}
+
+/* Avatar + preferred name row */
+.settings-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.settings-avatar-field {
+  flex-shrink: 0;
+}
+
+.settings-preferred-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Avatar picker */
+.settings-avatar-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-avatar-current {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--brand-500), var(--brand-700));
+  border-radius: 50%;
+  color: white;
+}
+
+.settings-avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  gap: 4px;
+}
+
+.settings-avatar-option {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: white;
+  color: var(--gray-500);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.settings-avatar-option:hover:not(:disabled) {
+  border-color: var(--gray-300);
+  background: var(--gray-50);
+  color: var(--gray-700);
+}
+
+.settings-avatar-option.active {
+  border-color: var(--brand-500);
+  background: var(--brand-50, #f0f5ff);
+  color: var(--brand-600);
+}
+
+.settings-avatar-option:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ===== MOBILE RESPONSIVE ===== */
+@media (max-width: 640px) {
+  .settings-section {
+    gap: 12px;
+  }
+
+  .settings-field {
+    gap: 6px;
+  }
+
+  .settings-field input {
+    font-size: 16px;  /* Prevents iOS zoom */
+  }
+
+  .settings-actions {
+    padding-top: 16px;
+    gap: 10px;
+  }
+
+  .settings-avatar-row {
+    gap: 12px;
+  }
+
+  .settings-avatar-grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}

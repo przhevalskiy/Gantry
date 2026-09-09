@@ -1,0 +1,147 @@
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+/* Backdrop */
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Modal Container */
+.modal-container {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  animation: slideInUp 0.3s ease-out;
+}
+
+.modal-container.modal-sm {
+  max-width: 500px;
+}
+
+.modal-container.modal-md {
+  max-width: 512px;
+}
+
+.modal-container.modal-lg {
+  max-width: 640px;
+}
+
+.modal-container.modal-xl {
+  max-width: 95vw;
+  width: 1200px;
+  max-height: 90vh;
+  height: 850px;
+}
+
+/* Modal Header */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.modal-header .modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0;
+}
+
+.modal-close-btn {
+  padding: 6px;
+  border-radius: 6px;
+  color: var(--gray-400);
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close-btn:hover {
+  background-color: var(--gray-100);
+  color: var(--gray-700);
+}
+
+/* Modal Content */
+.modal-content {
+  padding: 24px;
+}
+
+.modal-container.modal-xl .modal-content {
+  padding: 8px;
+  height: calc(100% - 65px); /* Subtract header height */
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ===== MOBILE RESPONSIVE ===== */
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: 8px;
+  }
+
+  .modal-container {
+    max-width: 100% !important;  /* Override all size classes */
+    width: 100%;
+    margin: 0;
+  }
+
+  .modal-header {
+    padding: 12px 16px;
+  }
+
+  .modal-header .modal-title {
+    font-size: 16px;
+  }
+
+  .modal-content {
+    padding: 12px;
+  }
+
+  /* XL modals should take full screen on mobile */
+  .modal-container.modal-xl {
+    max-height: 100vh;
+    height: 100%;
+    border-radius: 0;
+  }
+
+  .modal-container.modal-xl .modal-content {
+    height: calc(100% - 57px);
+  }
+}

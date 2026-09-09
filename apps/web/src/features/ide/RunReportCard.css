@@ -1,0 +1,35 @@
+.run-report-card {
+  padding: 12px;
+  background: var(--gray-50);
+  border-radius: 10px;
+  border: 1px solid var(--gray-200);
+}
+
+.run-report-coverage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  border: 1px solid;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.run-report-coverage strong {
+  font-weight: 700;
+}
+
+.run-report-coverage span {
+  color: var(--gray-600);
+}
+
+.run-report-body {
+  margin: 0;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--gray-700);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

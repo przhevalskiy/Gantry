@@ -1,0 +1,85 @@
+.preview-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: #fff;
+}
+
+.preview-pane-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--gray-200);
+  background: var(--gray-50);
+  flex-shrink: 0;
+  color: var(--gray-500);
+}
+
+.preview-pane-input {
+  flex: 1;
+  background: #fff;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+  outline: none;
+}
+
+.preview-pane-input:focus {
+  border-color: var(--brand-500);
+  box-shadow: 0 0 0 3px var(--brand-100);
+}
+
+.preview-pane-reload {
+  border: 1px solid var(--gray-200);
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px;
+  cursor: pointer;
+  color: var(--gray-600);
+}
+
+.preview-pane-reload:hover {
+  background: var(--gray-100);
+}
+
+.preview-pane-frame {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: #fff;
+  min-height: 0;
+}
+
+.preview-pane-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--gray-500);
+  padding: 24px;
+  text-align: center;
+}
+
+.preview-pane-empty svg {
+  opacity: 0.25;
+}
+
+.preview-pane-empty p {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.preview-pane-empty span {
+  font-size: 12px;
+  opacity: 0.55;
+  max-width: 280px;
+  line-height: 1.45;
+}

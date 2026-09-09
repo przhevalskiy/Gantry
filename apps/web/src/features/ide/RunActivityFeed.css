@@ -1,0 +1,70 @@
+.run-activity-feed {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.run-hitl-card {
+  margin: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--brand-200);
+  border-radius: 10px;
+  background: var(--brand-50);
+}
+
+.run-hitl-card strong {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.run-hitl-card p {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--gray-700);
+}
+
+.run-hitl-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.run-hitl-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--brand-500);
+  background: var(--brand-600);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.run-hitl-actions button.reject {
+  background: #fff;
+  color: var(--gray-700);
+  border-color: var(--gray-300);
+}
+
+.run-activity-log {
+  flex: 1;
+  overflow: auto;
+  padding: 10px 12px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.run-activity-line {
+  padding: 2px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--gray-800);
+}
+
+.run-activity-line + .run-activity-line {
+  border-top: 1px solid transparent;
+}

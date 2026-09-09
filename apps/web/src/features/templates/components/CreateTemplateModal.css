@@ -1,0 +1,45 @@
+.create-template-form { display: flex; flex-direction: column; gap: 16px; }
+
+.ct-field { display: flex; flex-direction: column; gap: 6px; }
+
+.ct-label { font-size: 13px; font-weight: 600; color: var(--gray-700); }
+.ct-hint { font-weight: 400; color: var(--gray-400); }
+
+.ct-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--gray-900);
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+}
+
+.ct-input:focus { border-color: var(--brand-500); box-shadow: 0 0 0 3px var(--brand-100); }
+
+.ct-textarea { resize: vertical; font-family: inherit; line-height: 1.5; }
+
+.ct-error { margin: 0; font-size: 13px; color: #dc2626; }
+
+.ct-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+.ct-btn {
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ct-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.ct-btn-secondary { background: #fff; border-color: var(--gray-300); color: var(--gray-700); }
+.ct-btn-secondary:hover:not(:disabled) { background: var(--gray-50); }
+
+.ct-btn-primary { background: var(--brand-600); color: #fff; }
+.ct-btn-primary:hover:not(:disabled) { background: var(--brand-700); }

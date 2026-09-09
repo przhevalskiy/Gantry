@@ -1,0 +1,76 @@
+/* Suggested Questions Container */
+.suggested-questions {
+  margin-top: 32px;
+}
+
+/* Header */
+.suggested-questions-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-700);
+}
+
+.suggested-questions-icon {
+  color: var(--brand-600);
+}
+
+/* Questions Grid */
+.suggested-questions-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr;
+}
+
+/* Question Button */
+.suggested-question-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background-color: white;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--gray-700);
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.suggested-question-text {
+  flex: 1;
+  word-break: break-word;
+}
+
+.suggested-question-arrow {
+  flex-shrink: 0;
+  color: var(--gray-400);
+  transition: all var(--transition-fast);
+}
+
+.suggested-question-btn:hover:not(:disabled) {
+  background-color: var(--brand-50);
+  border-color: var(--brand-300);
+  color: var(--brand-700);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.suggested-question-btn:hover:not(:disabled) .suggested-question-arrow {
+  color: var(--brand-700);
+}
+
+.suggested-question-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.suggested-question-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

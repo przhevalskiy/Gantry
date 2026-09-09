@@ -1,0 +1,67 @@
+.pipeline-tracker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--gray-200);
+  background: var(--gray-50);
+}
+
+.pipeline-stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #fff;
+  border: 1px solid var(--gray-200);
+  color: var(--gray-500);
+}
+
+.pipeline-stage.state-active {
+  border-color: var(--brand-500);
+  color: var(--brand-700);
+  background: var(--brand-50);
+}
+
+.pipeline-stage.state-done {
+  border-color: #86efac;
+  color: #166534;
+  background: #f0fdf4;
+}
+
+.pipeline-stage.state-failed {
+  border-color: #fca5a5;
+  color: #991b1b;
+  background: #fef2f2;
+}
+
+.pipeline-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.7;
+}
+
+.pipeline-stage.state-active .pipeline-dot {
+  animation: pipeline-pulse 1.2s ease-in-out infinite;
+}
+
+.pipeline-tracker.layout-vertical {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  padding: 0;
+  border-bottom: none;
+  background: transparent;
+  gap: 8px;
+}
+
+.pipeline-tracker.layout-vertical .pipeline-stage {
+  justify-content: flex-start;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
