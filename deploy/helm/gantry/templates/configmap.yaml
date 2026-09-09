@@ -7,4 +7,5 @@ metadata:
 data:
   AGENTEX_BASE_URL: {{ .Values.agentex.baseUrl | quote }}
   AGENT_NAME: {{ .Values.agentex.agentName | quote }}
+  GANTRY_AGENT_NAME: {{ .Values.agentex.agentName | quote }}
   TEMPORAL_ADDRESS: {{ .Values.temporal.address | quote }}

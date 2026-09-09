@@ -41,7 +41,7 @@ ingress:
 # External dependencies — point at your Agentex / Temporal stack.
 agentex:
   baseUrl: http://agentex:5003
-  agentName: swarm-orchestrator
+  agentName: swarm-factory
 
 temporal:
   address: temporal:7233

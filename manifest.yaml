@@ -16,16 +16,44 @@ local_development:
     acp: project/acp.py
     worker: worker.py
 
+# C1: single ACP task entry. Child workflows are Temporal-composed by Foreman (I7).
 agent:
   acp_type: agentic
   name: swarm-factory
-  description: "Durable Software Engineering Factory — Architect → Builder → Inspector → Security → DevOps"
+  description: "L5 Durable Software Engineering Factory — Foreman composes PM, Architect, Builder, Inspector, Reviewer, Security, DevOps"
   temporal:
     enabled: true
     workflows:
       - name: swarm-factory
         queue_name: gantry_queue
-        description: "Durable Software Engineering Factory — Architect → Builder → Inspector → Security → DevOps"
+        description: "L5 Foreman — ACP task/create target for a full pipeline run"
+      - name: PMAgent
+        queue_name: gantry_queue
+        description: "gantry-pm — Temporal child"
+      - name: ArchitectAgent
+        queue_name: gantry_queue
+        description: "gantry-architect — Temporal child"
+      - name: BuilderAgent
+        queue_name: gantry_queue
+        description: "gantry-builder — Temporal child (parallel tracks)"
+      - name: InspectorAgent
+        queue_name: gantry_queue
+        description: "gantry-inspector — Temporal child"
+      - name: ReviewerAgent
+        queue_name: gantry_queue
+        description: "gantry-reviewer — Temporal child"
+      - name: SecurityAgent
+        queue_name: gantry_queue
+        description: "gantry-security — Temporal child"
+      - name: DevOpsAgent
+        queue_name: gantry_queue
+        description: "gantry-devops — Temporal child"
+      - name: gantry_approval
+        queue_name: gantry_queue
+        description: "HITL approve/reject checkpoint"
+      - name: gantry_clarification
+        queue_name: gantry_queue
+        description: "HITL PM clarification checkpoint"
 
 deployment:
   image:
@@ -36,7 +64,7 @@ deployment:
   global:
     agent:
       name: "swarm-factory"
-      description: "Durable Software Engineering Factory — Architect → Builder → Inspector → Security → DevOps"
+      description: "L5 Durable Software Engineering Factory — Architect → Builder → Inspector → Security → DevOps"
     replicaCount: 1
     resources:
       requests:

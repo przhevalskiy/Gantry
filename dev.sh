@@ -9,7 +9,7 @@
 #   2. Starts Temporal dev server if not running (:7233)
 #   3. Starts the swarm-factory agent (ACP :8000 + Temporal worker)
 #   4. Starts the Gantry API (:8001)
-#   5. Starts gantry-ui (:3000)
+#   5. Starts apps/web factory UI (Vite :5173)
 #
 # Usage:
 #   ./dev.sh               Start all services
@@ -23,7 +23,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
 AGENTEX_DIR="$ROOT/scale-agentex/agentex"
-UI_DIR="$ROOT/ui"
+UI_DIR="$ROOT/apps/web"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -67,6 +67,7 @@ wait_for_port() {
 
 _stop_all() {
   header "Stopping"
+  kill_port 5173
   kill_port 3000
   kill_port 8000
   kill_port 8001
@@ -78,13 +79,13 @@ _stop_all() {
 
 _show_status() {
   echo ""
-  for svc_port in "Agentex API:5003" "Temporal:7233" "Temporal UI:8080" "Agent ACP:8000" "Gantry API:8001" "gantry-ui:3000" "Redis:6379"; do
+  for svc_port in "Agentex API:5003" "Temporal:7233" "Temporal UI:8080" "Agent ACP:8000" "Gantry API:8001" "apps/web:5173" "Redis:6379"; do
     label="${svc_port%%:*}"; port="${svc_port##*:}"
     printf "  %-20s" "$label (:$port)"
     nc -z localhost "$port" 2>/dev/null && echo -e "${GREEN}running${NC}" || echo -e "${RED}stopped${NC}"
   done
   echo ""
-  echo "  http://localhost:3000       gantry-ui"
+  echo "  http://localhost:5173       apps/web (Gantry UI)"
   echo "  http://localhost:5003/swagger  Agentex API"
   echo "  http://localhost:8080       Temporal UI"
   echo ""
@@ -137,6 +138,7 @@ header "Clearing ports"
 kill_port 8000
 kill_port 8001
 kill_port 8233
+kill_port 5173
 kill_port 3000
 
 # ── Step 2: Temporal dev server (only if Docker Temporal not running) ─────────
@@ -173,6 +175,8 @@ ok "Agent running"
 # ── Step 4: Gantry API ───────────────────────────────────────────────────────
 header "Starting Gantry API"
 
+export GANTRY_DEV_AUTH_BYPASS="${GANTRY_DEV_AUTH_BYPASS:-true}"
+
 .venv/bin/python -m uvicorn api.main:app \
   --host 0.0.0.0 \
   --port 8001 \
@@ -183,17 +187,17 @@ echo "    PID $API_PID — logs: tail -f /tmp/gantry-api.log"
 wait_for_port 8001 "Gantry API" 20
 ok "API running"
 
-# ── Step 5: gantry-ui ────────────────────────────────────────────────────────
-header "Starting gantry-ui"
+# ── Step 5: Factory UI (apps/web) ───────────────────────────────────────────
+header "Starting apps/web"
 
 if [ ! -d "$UI_DIR" ]; then
-  warn "gantry-ui not found at $UI_DIR — skipping"
+  warn "apps/web not found at $UI_DIR — skipping"
 else
   [ ! -d "$UI_DIR/node_modules" ] && (cd "$UI_DIR" && npm install --silent)
-  (cd "$UI_DIR" && npm run dev) >/tmp/gantry-ui.log 2>&1 &
+  (cd "$UI_DIR" && VITE_GANTRY_DEV_AUTH_BYPASS="${VITE_GANTRY_DEV_AUTH_BYPASS:-true}" npm run dev) >/tmp/gantry-ui.log 2>&1 &
   UI_PID=$!
   echo "    PID $UI_PID — logs: tail -f /tmp/gantry-ui.log"
-  wait_for_port 3000 "gantry-ui" 30
+  wait_for_port 5173 "apps/web" 30
   ok "UI running"
 fi
 
@@ -202,7 +206,7 @@ echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  Ready${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo "  http://localhost:3000           gantry-ui"
+echo "  http://localhost:5173           apps/web (Gantry UI)"
 echo "  http://localhost:8001           Gantry API"
 echo "  http://localhost:8001/docs      API docs (Swagger)"
 echo "  http://localhost:5003/swagger   Agentex API"
