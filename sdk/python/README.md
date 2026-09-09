@@ -61,12 +61,22 @@ else:
 
 | Method | Returns |
 |---|---|
-| `submit(goal, project_id, *, branch_prefix, tier, github_token, webhook_url)` | `Task` |
+| `submit(goal, project_id, *, branch_prefix, tier, playbook, github_token, webhook_url)` | `Task` |
+| `bulk(goals, project_id, *, branch_prefix, tier, playbook, github_token, webhook_url)` | `BulkResponse` |
 | `get(task_id)` | `Task` |
 | `wait(task_id, *, timeout, poll_interval)` | `Task` |
 | `messages(task_id)` | `list[dict]` |
 | `terminate(task_id)` | `None` |
 | `approve(task_id)` | `None` |
+| `hitl(task_id, *, checkpoint, workflow_id, approved, payload)` | `dict` |
+| `stream_events(task_id)` | `Iterator[dict]` — SSE until terminal |
+
+### `client.agents`
+
+| Method | Returns |
+|---|---|
+| `list()` | Crew catalog (`swarm-factory`, L2–L5, HITL, ACP invoke) |
+| `get(name)` | One crew identity |
 
 ### `client.projects`
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 import os
 from ._http import HttpClient
-from .resources import Tasks, Projects
+from .resources import Tasks, Projects, Agents
 
 DEFAULT_BASE_URL = "https://api.gantry.dev"
 
@@ -34,3 +34,4 @@ class GantryClient:
         http = HttpClient(base_url=url, api_key=key, timeout=timeout)
         self.tasks = Tasks(http)
         self.projects = Projects(http)
+        self.agents = Agents(http)

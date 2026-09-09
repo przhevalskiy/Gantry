@@ -1,6 +1,7 @@
 from __future__ import annotations
+import json
 import httpx
-from typing import Any
+from typing import Any, Iterator
 
 
 class HttpClient:
@@ -37,3 +38,19 @@ class HttpClient:
         with httpx.Client(timeout=self._timeout) as c:
             r = c.delete(self._url(path), headers=self._headers, **kwargs)
             r.raise_for_status()
+
+    def stream_sse(self, path: str, **kwargs: Any) -> Iterator[dict]:
+        """Yield parsed SSE `data:` JSON payloads from a GET stream."""
+        headers = {**self._headers, "Accept": "text/event-stream", **kwargs.pop("headers", {})}
+        with httpx.Client(timeout=None) as c:
+            with c.stream("GET", self._url(path), headers=headers, **kwargs) as r:
+                r.raise_for_status()
+                buffer = ""
+                for chunk in r.iter_text():
+                    buffer += chunk
+                    while "\n\n" in buffer:
+                        frame, buffer = buffer.split("\n\n", 1)
+                        for line in frame.split("\n"):
+                            if line.startswith("data: "):
+                                yield json.loads(line[6:])
+                                break

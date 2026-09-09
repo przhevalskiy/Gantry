@@ -1,6 +1,6 @@
 from __future__ import annotations
 import time
-from typing import Optional
+from typing import Iterator, Optional
 from .models import Task, Project, BulkResult, BulkResponse
 from ._http import HttpClient
 
@@ -40,6 +40,7 @@ class Tasks:
         *,
         branch_prefix: str = "swarm",
         tier: int = -1,
+        playbook: Optional[str] = None,
         github_token: Optional[str] = None,
         webhook_url: Optional[str] = None,
     ) -> Task:
@@ -49,6 +50,8 @@ class Tasks:
             "branch_prefix": branch_prefix,
             "tier": tier,
         }
+        if playbook:
+            payload["playbook"] = playbook
         if github_token:
             payload["github_token"] = github_token
         if webhook_url:
@@ -92,6 +95,7 @@ class Tasks:
         *,
         branch_prefix: str = "swarm",
         tier: int = -1,
+        playbook: Optional[str] = None,
         github_token: Optional[str] = None,
         webhook_url: Optional[str] = None,
     ) -> BulkResponse:
@@ -102,6 +106,8 @@ class Tasks:
             "branch_prefix": branch_prefix,
             "tier": tier,
         }
+        if playbook:
+            payload["playbook"] = playbook
         if github_token:
             payload["github_token"] = github_token
         if webhook_url:
@@ -128,6 +134,37 @@ class Tasks:
             "workflow_id": workflow_id or task_id,
             "approved": True,
         })
+
+    def hitl(
+        self,
+        task_id: str,
+        *,
+        checkpoint: str,
+        workflow_id: str,
+        approved: Optional[bool] = None,
+        payload: Optional[dict] = None,
+    ) -> dict:
+        body: dict = {"checkpoint": checkpoint, "workflow_id": workflow_id}
+        if payload is not None:
+            body["payload"] = payload
+        elif approved is not None:
+            body["approved"] = approved
+        return self._http.post(f"/v1/tasks/{task_id}/hitl", json=body)
+
+    def stream_events(self, task_id: str) -> Iterator[dict]:
+        """Stream task SSE events until done or error. Yields parsed event dicts."""
+        yield from self._http.stream_sse(f"/v1/tasks/{task_id}/events")
+
+
+class Agents:
+    def __init__(self, http: HttpClient):
+        self._http = http
+
+    def list(self) -> dict:
+        return self._http.get("/v1/agents")
+
+    def get(self, name: str) -> dict:
+        return self._http.get(f"/v1/agents/{name}")
 
 
 class Projects:

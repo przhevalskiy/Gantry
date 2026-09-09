@@ -23,6 +23,7 @@ export class Tasks {
       project_id: projectId,
       branch_prefix: options.branch_prefix ?? 'swarm',
       tier: options.tier ?? -1,
+      ...(options.playbook ? { playbook: options.playbook } : {}),
       ...(options.github_token ? { github_token: options.github_token } : {}),
       ...(options.webhook_url ? { webhook_url: options.webhook_url } : {}),
     });
@@ -64,6 +65,7 @@ export class Tasks {
       tasks: goals.map(goal => ({ goal })),
       branch_prefix: options.branch_prefix ?? 'swarm',
       tier: options.tier ?? -1,
+      ...(options.playbook ? { playbook: options.playbook } : {}),
       ...(options.github_token ? { github_token: options.github_token } : {}),
       ...(options.webhook_url ? { webhook_url: options.webhook_url } : {}),
     });
@@ -78,6 +80,39 @@ export class Tasks {
       workflow_id: workflowId ?? taskId,
       approved: true,
     });
+  }
+
+  async hitl(
+    taskId: string,
+    options: {
+      checkpoint: string;
+      workflowId: string;
+      approved?: boolean;
+      payload?: boolean | Record<string, unknown>;
+    },
+  ): Promise<{ ok: boolean; checkpoint: string; acp_event: string }> {
+    return this.http.post(`/v1/tasks/${taskId}/hitl`, {
+      checkpoint: options.checkpoint,
+      workflow_id: options.workflowId,
+      ...(options.payload !== undefined ? { payload: options.payload } : {}),
+      ...(options.approved !== undefined ? { approved: options.approved } : {}),
+    });
+  }
+
+  async *streamEvents(taskId: string): AsyncGenerator<Record<string, unknown>, void, unknown> {
+    yield* this.http.streamSSE(`/v1/tasks/${encodeURIComponent(taskId)}/events`);
+  }
+}
+
+export class Agents {
+  constructor(private readonly http: HttpClient) {}
+
+  async list(): Promise<unknown> {
+    return this.http.get('/v1/agents');
+  }
+
+  async get(name: string): Promise<unknown> {
+    return this.http.get(`/v1/agents/${name}`);
   }
 }
 

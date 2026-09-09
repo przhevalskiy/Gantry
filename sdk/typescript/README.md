@@ -52,6 +52,15 @@ response.results.forEach(r => {
 });
 ```
 
+## Live SSE stream
+
+```typescript
+for await (const event of client.tasks.streamEvents(task.task_id)) {
+  console.log(event.type, event);
+  if (event.type === 'done' || event.type === 'error') break;
+}
+```
+
 ## GitHub Actions
 
 ```yaml
@@ -90,6 +99,15 @@ response.results.forEach(r => {
 | `messages(taskId)` | `Promise<unknown[]>` |
 | `terminate(taskId)` | `Promise<void>` |
 | `approve(taskId, workflowId?)` | `Promise<void>` |
+| `hitl(taskId, { checkpoint, workflowId, approved?, payload? })` | `Promise<{ ok, checkpoint, acp_event }>` |
+| `streamEvents(taskId)` | `AsyncGenerator` of SSE event objects until `done`/`error` |
+
+### `client.agents`
+
+| Method | Returns |
+|---|---|
+| `list()` | Crew catalog (`swarm-factory`, L2–L5, HITL, ACP invoke) |
+| `get(name)` | One crew identity |
 
 ### `client.projects`
 

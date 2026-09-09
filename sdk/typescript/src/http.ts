@@ -58,4 +58,32 @@ export class HttpClient {
     });
     if (!res.ok) throw new GantryApiError(res.status, await res.json().catch(() => null));
   }
+
+  async *streamSSE(path: string): AsyncGenerator<Record<string, unknown>, void, unknown> {
+    const res = await fetch(this.url(path), {
+      headers: { ...this.headers(), Accept: 'text/event-stream' },
+    });
+    if (!res.ok) throw new GantryApiError(res.status, await res.json().catch(() => null));
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('No response body');
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split('\n\n');
+      buffer = frames.pop() ?? '';
+
+      for (const frame of frames) {
+        const line = frame.split('\n').find(l => l.startsWith('data: '));
+        if (!line) continue;
+        yield JSON.parse(line.slice(6)) as Record<string, unknown>;
+      }
+    }
+  }
 }

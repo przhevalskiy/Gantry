@@ -30,6 +30,7 @@ export interface Project {
 export interface SubmitTaskOptions {
   branch_prefix?: string;
   tier?: number;
+  playbook?: string;
   github_token?: string;
   webhook_url?: string;
 }
@@ -58,6 +59,7 @@ export interface BulkTaskItem {
 export interface BulkSubmitOptions {
   branch_prefix?: string;
   tier?: number;
+  playbook?: string;
   github_token?: string;
   webhook_url?: string;
 }

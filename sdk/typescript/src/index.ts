@@ -1,5 +1,5 @@
 import { HttpClient } from './http';
-import { Tasks, Projects } from './resources';
+import { Tasks, Projects, Agents } from './resources';
 export { verifyWebhookSignature } from './webhooks';
 
 export { GantryApiError } from './http';
@@ -10,6 +10,7 @@ const DEFAULT_BASE_URL = 'https://api.gantry.dev';
 export class GantryClient {
   readonly tasks: Tasks;
   readonly projects: Projects;
+  readonly agents: Agents;
 
   constructor(options: { apiKey?: string; baseUrl?: string } = {}) {
     const apiKey =
@@ -28,5 +29,6 @@ export class GantryClient {
     const http = new HttpClient(baseUrl, apiKey);
     this.tasks = new Tasks(http);
     this.projects = new Projects(http);
+    this.agents = new Agents(http);
   }
 }
