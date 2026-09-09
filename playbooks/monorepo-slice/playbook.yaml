@@ -1,0 +1,5 @@
+# Playbook: monorepo-slice
+
+vertical: V-MONO
+tier_default: 2
+branch_prefix: slice

@@ -2,6 +2,8 @@
 from __future__ import annotations
 import re
 
+from project.schema.crew import TIER_AUTONOMY, autonomy_for_tier
+
 # ── Keyword patterns per tier ─────────────────────────────────────────────────
 
 _TIER3_PATTERNS = [
@@ -36,6 +38,7 @@ TIER_PARAMS: dict[int, dict] = {
 }
 
 TIER_LABELS = {0: "Micro", 1: "Lightweight", 2: "Standard", 3: "Full Crew"}
+TIER_LEVELS = {tier: row["level"] for tier, row in TIER_AUTONOMY.items()}
 
 
 def classify_tier(goal: str) -> int:
@@ -53,4 +56,9 @@ def classify_tier(goal: str) -> int:
 
 
 def params_for_tier(tier: int) -> dict:
-    return dict(TIER_PARAMS.get(tier, TIER_PARAMS[2]))
+    params = dict(TIER_PARAMS.get(tier, TIER_PARAMS[2]))
+    level = autonomy_for_tier(tier)
+    if level:
+        params["autonomy_level"] = level
+        params["tier_label"] = TIER_LABELS.get(tier, TIER_LABELS[2])
+    return params

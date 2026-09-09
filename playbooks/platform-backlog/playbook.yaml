@@ -1,0 +1,5 @@
+# Playbook: platform-backlog
+
+vertical: V-PLAT
+tier_default: 1
+branch_prefix: backlog

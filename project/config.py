@@ -18,7 +18,11 @@ GH_TOKEN: str = os.getenv("GH_TOKEN", os.getenv("GITHUB_TOKEN", ""))
 
 # Next.js UI base URL — used by the worker to call back to the API for project updates.
 # The API is the single authoritative writer for the project registry.
-GANTRY_UI_URL: str = os.getenv("GANTRY_UI_URL", "http://localhost:3000")
+GANTRY_WEB_URL: str = os.getenv(
+    "GANTRY_WEB_URL",
+    os.getenv("GANTRY_UI_URL", "http://localhost:5173"),
+)
+GANTRY_UI_URL: str = GANTRY_WEB_URL  # backward compat
 
 # Mistral — alternative LLM provider. Set MISTRAL_API_KEY and pass a
 # mistral-* model name to any planner activity to use Mistral instead of Claude.
