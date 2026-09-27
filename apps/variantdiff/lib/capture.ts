@@ -27,11 +27,12 @@ export function captureProductFields(): {
     const labelEl = el.id
       ? document.querySelector(`label[for="${CSS.escape(el.id)}"]`)
       : el.closest('label');
+    const placeholder = 'placeholder' in el ? String(el.placeholder || '') : '';
     const labelText =
       (labelEl?.textContent || '').replace(/\s+/g, ' ').trim() ||
       el.getAttribute('aria-label') ||
       name ||
-      el.placeholder ||
+      placeholder ||
       'Field';
     const key = (name || labelText).toLowerCase().slice(0, 80);
     const value = 'value' in el ? String(el.value ?? '') : '';
