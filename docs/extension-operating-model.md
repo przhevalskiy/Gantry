@@ -1,63 +1,97 @@
-# Operating model — top 5 micro extensions
+# Operating model — top 7 review-safe micro extensions
 
-**Active portfolio (ship these):** PayBump · ShopSwitch · ReplyKit · ClientMark · StorePulse  
+**Active portfolio (ship these):** ShopSwitch · StorePulse · ClientMark · PortalSwitch · RefundRadar · VariantDiff · BillGuard  
 
-**Cut / deferred (do not submit to stores):** BidMatch · FormPack · PromptLedger · EvidenceKit · CiteBrowse  
+**Cut / deferred (do not submit):** PayBump · ReplyKit · BidMatch · FormPack · PromptLedger · EvidenceKit · CiteBrowse  
 
 Browser ship order per app: **Chrome → Edge → Firefox**  
 Tooling: [`docs/extension-store-shipping.md`](extension-store-shipping.md) · [`apps/store-kit/`](../apps/store-kit/)
 
 ---
 
+## Why these seven
+
+Selected for **easiest store review** first, then **strongest wedge** on our stack (WXT + React + local `chrome.storage`, no backend).
+
+| Review filter (must pass) | Rule |
+|---------------------------|------|
+| Host access | **Narrow** platform hosts only — never `<all_urls>` |
+| Purpose | Single obvious job in listing + UI |
+| Data | Local-only v1; no accounts, analytics, or remote code |
+| Permissions | Prefer `storage` + `activeTab` / host-limited `scripting` |
+| Surface | No scraping marketplaces at scale, no affiliate injection, no page takeover |
+
+| Wedge filter (must pass) | Rule |
+|--------------------------|------|
+| Buyer | Named B2B role with budget (agency, bookkeeper, ads buyer) |
+| Job | Daily/weekly pain; bookmarks/spreadsheets are the competitor |
+| Maint | Rules + lists + overlays — not model APIs or site reverse-engineering races |
+| Stack fit | Popup + content script on known admin URLs |
+
+---
+
 ## 1. Portfolio
 
-| Priority | App | Path | Customer | Core job | Maintenance load |
-|----------|-----|------|----------|----------|------------------|
-| P0 | **PayBump** | `apps/paybump` | Indie SaaS | Dunning / invoice macros | Very low (copy) |
-| P0 | **ShopSwitch** | `apps/shopswitch` | Shopify agencies | Jump between client admins | Very low (URL list) |
-| P0 | **ReplyKit** | `apps/replykit` | Freelancers | Proposal snippet macros | Very low (copy) |
-| P1 | **ClientMark** | `apps/clientmark` | Ads buyers | Label ads accounts | Low (match rules) |
-| P1 | **StorePulse** | `apps/storepulse` | Shopify agencies | Health scan + client report | Low (scan rules) |
+| Priority | App | Path | Customer | Core job | Hosts | Maint |
+|----------|-----|------|----------|----------|-------|-------|
+| P0 | **ShopSwitch** | `apps/shopswitch` | Shopify agencies | Jump between client admins | Shopify admin | Very low |
+| P0 | **StorePulse** | `apps/storepulse` | Shopify agencies | Health scan + client report | Shopify admin | Low |
+| P0 | **ClientMark** | `apps/clientmark` | Ads buyers | Label Meta/Google Ads accounts | Ads consoles | Low |
+| P1 | **PortalSwitch** | `apps/portalswitch` | Bookkeepers | Jump between QB/Xero clients | QB + Xero | Very low |
+| P1 | **RefundRadar** | `apps/refundradar` | Shopify / DTC ops | Flag refund/return spikes | Shopify admin | Low |
+| P1 | **VariantDiff** | `apps/variantdiff` | Shopify merchants | Diff product/variant before publish | Shopify admin | Low |
+| P1 | **BillGuard** | `apps/billguard` | Ads buyers | Confirm client before billing changes | Ads billing URLs | Low |
 
-### Why this set
-- Tight single purpose → better store review odds  
-- Underserved verticals, not generic AI productivity  
-- **No backend in v1** → low ops cost  
-- Same WXT stack → one playbook for five listings  
+### Clusters (reuse patterns)
+```
+Shopify agency:  ShopSwitch · StorePulse · RefundRadar · VariantDiff
+Ads agency:      ClientMark · BillGuard
+Accounting:      PortalSwitch
+```
+
+### Strongest wedges (rank)
+1. ShopSwitch — daily multi-store hopping  
+2. PortalSwitch — same pattern, underserved vertical  
+3. StorePulse — client-billable health report  
+4. BillGuard — high-stakes “wrong account” mistakes  
+5. ClientMark — constant account mix-ups  
+6. RefundRadar — ops signal on pages they already live in  
+7. VariantDiff — pre-publish mistake prevention  
 
 ### Explicitly cut
 | App | Why cut |
 |-----|---------|
+| PayBump, ReplyKit | Broad hosts + weak uniqueness → harder review, softer wedge |
 | BidMatch, FormPack | Broad `<all_urls>`, higher review + support |
-| PromptLedger, EvidenceKit, CiteBrowse | More UX/support surface; revisit after P0 is live |
-
-Keep their code in repo PRs if useful, but **do not** seed/submit store listings until the top 5 are live.
+| PromptLedger, EvidenceKit, CiteBrowse | More UX/support surface; revisit later |
 
 ---
 
 ## 2. System shape (low overhead)
 
 ```
-shared:  store-kit templates · ship scripts · privacy host · support inbox
+shared:  store-kit · ship scripts · privacy host · support inbox
    │
-   ├── PayBump      (listing)
-   ├── ShopSwitch   (listing)
-   ├── ReplyKit     (listing)
-   ├── ClientMark   (listing)
-   └── StorePulse   (listing)
+   ├── ShopSwitch
+   ├── StorePulse
+   ├── ClientMark
+   ├── PortalSwitch
+   ├── RefundRadar
+   ├── VariantDiff
+   └── BillGuard
 ```
 
-**One system, five store products.**
+**One system, seven store products.**
 
 | Layer | Shared | Per app |
 |-------|--------|---------|
 | Code | WXT + React + Tailwind patterns | Feature logic only |
-| Privacy | One domain, `/privacy/<app>` pages | App-specific data types |
+| Privacy | One domain, `/privacy/<app>` | App-specific data types |
 | Support | One email / form | Tag by app name |
 | Release | `ship-extension.sh` | Version bump + zip |
 | Optional Pro later | Same Lemon Squeezy account | License unlock per app or suite |
 
-**v1 rule:** no servers, no accounts, no analytics. If you add sync later, update privacy and resubmit — don’t put it in the first submission.
+**v1 rule:** no servers, no accounts, no analytics. Sync later = privacy update + resubmit.
 
 ---
 
@@ -70,7 +104,7 @@ shared:  store-kit templates · ship scripts · privacy host · support inbox
 | Eng | You / agent | Bugfix + starter-content updates |
 | Marketing | You | 1 launch post per app; no paid ads until retention known |
 
-Target overhead: **&lt; 2 hours/week** once all five are approved (triage + one small fix batch).
+Target overhead: **&lt; 3 hours/week** once all seven are approved.
 
 ---
 
@@ -83,8 +117,8 @@ Target overhead: **&lt; 2 hours/week** once all five are approved (triage + one 
 4. Public privacy host (GitHub Pages is fine)  
 5. Support email  
 
-### Phase B — P0 apps (one at a time)
-For **PayBump → ShopSwitch → ReplyKit**:
+### Phase B — P0 (code already exists)
+**ShopSwitch → StorePulse → ClientMark**
 
 ```bash
 ./scripts/seed-extension-store.sh <app>
@@ -93,20 +127,16 @@ For **PayBump → ShopSwitch → ReplyKit**:
 ./scripts/ship-extension.sh <app>
 ```
 
-Then:
-1. Upload **Chrome** zip → submit  
-2. After approval (or in parallel if comfortable): **Edge** zip  
-3. Add gecko id → **Firefox** zip → AMO  
+Per app: **Chrome → Edge → Firefox**. Finalize listing/privacy on one before submitting the next to Chrome.
 
-Do **not** submit the next P0 app to Chrome until the previous one’s listing/privacy copy is finalized (reuse the pattern).
-
-### Phase C — P1 apps
-After at least one P0 is live on Chrome: **ClientMark → StorePulse** with the same loop.
+### Phase C — P1 (build then ship)
+**PortalSwitch → RefundRadar → VariantDiff → BillGuard**  
+Same seed → privacy → ship loop. Clone ShopSwitch for PortalSwitch; clone StorePulse patterns for RefundRadar/VariantDiff; clone ClientMark for BillGuard.
 
 ### Phase D — Stabilize
-- Freeze features for 2–4 weeks  
-- Only bugfixes + listing tweaks  
-- Collect 5–10 real user notes before any Pro/sync work  
+- Freeze features 2–4 weeks  
+- Bugfixes + listing tweaks only  
+- Collect 5–10 real user notes before Pro  
 
 ---
 
@@ -114,9 +144,9 @@ After at least one P0 is live on Chrome: **ClientMark → StorePulse** with the 
 
 | Day | Action |
 |-----|--------|
-| Mon | Check store emails + support inbox (15 min) |
-| Wed | One fix or content tweak max across portfolio (45–90 min) |
-| Fri | Version/status note: what’s in review / live / blocked (10 min) |
+| Mon | Store emails + support inbox (15 min) |
+| Wed | One fix or content tweak max (45–90 min) |
+| Fri | Status: in review / live / blocked (10 min) |
 
 **Hard cap:** no new extension ideas until P0 are live on Chrome.
 
@@ -127,6 +157,7 @@ After at least one P0 is live on Chrome: **ClientMark → StorePulse** with the 
 - [ ] `version` bumped in `wxt.config.ts` + `package.json`  
 - [ ] `npm test && npm run compile && npm run build` green  
 - [ ] `./scripts/ship-extension.sh <app>` produced chrome/edge/firefox zips  
+- [ ] Host permissions still narrow and justified in listing  
 - [ ] Privacy URL still live  
 - [ ] Listing “What’s new” filled  
 - [ ] Same version number on all stores when possible  
@@ -139,10 +170,8 @@ After at least one P0 is live on Chrome: **ClientMark → StorePulse** with the 
 |------------|----------|
 | “How do I install?” | Store link only |
 | “Data / privacy?” | Link privacy page; local storage |
-| “Doesn’t work on X page?” | Confirm focus/permissions; known host list |
-| Feature request | Log; don’t build unless it reduces support | 
-
-Canned replies live in a single doc; don’t open a helpdesk product yet.
+| “Doesn’t work on X page?” | Confirm focus; known host list only |
+| Feature request | Log; don’t build unless it reduces support |
 
 ---
 
@@ -151,37 +180,33 @@ Canned replies live in a single doc; don’t open a helpdesk product yet.
 | Metric | Target (first 90 days) |
 |--------|-------------------------|
 | Chrome approvals | 3/3 P0 approved |
-| Installs (all P0) | Traction signal, not vanity — e.g. 50+ combined |
+| Installs (P0) | Traction signal — e.g. 50+ combined |
 | Support load | &lt; 5 tickets/week combined |
-| Crash / 1-star permission anger | Near zero; fix or clarify listing fast |
+| Permission anger / 1-star | Near zero |
 
-Kill or rewrite an app if it causes disproportionate support vs installs.
+Kill or rewrite any app with support load disproportionate to installs.
 
 ---
 
-## 9. Money later (optional, still low ops)
+## 9. Money later (optional)
 
-Only after P0 are stable:
+After P0 stable:
 
-1. Shared “Pro” unlock (Lemon Squeezy) for sync or pack export  
-2. Or a cheap **suite** license covering all five  
+1. Pro unlock (Lemon Squeezy): export packs, multi-seat, sync  
+2. Or suite license across the seven  
 3. Keep free local tier accurate in privacy/listing  
 
-Until then: **distribution + learning**, not billing complexity.
+Push Pro first on **ShopSwitch · PortalSwitch · StorePulse**.
 
 ---
 
 ## 10. Command cheat sheet
 
 ```bash
-# Active portfolio only
-./scripts/ship-all-extensions.sh    # ships catalog activeWave / firstWave
+./scripts/ship-all-extensions.sh    # activeWave only
+./scripts/seed-extension-store.sh shopswitch
+./scripts/ship-extension.sh shopswitch
 
-# Single app
-./scripts/seed-extension-store.sh paybump
-./scripts/ship-extension.sh paybump
-
-# Store consoles
 # Chrome: https://chrome.google.com/webstore/devconsole
 # Edge:   https://partner.microsoft.com/dashboard
 # Firefox:https://addons.mozilla.org/developers/
@@ -191,6 +216,4 @@ Until then: **distribution + learning**, not billing complexity.
 
 ## One-page summary
 
-**Build once (shared kit) → submit five tight listings → Chrome then Edge then Firefox → support async → no backend until revenue justifies it.**  
-
-Cut the broad-host / high-surface apps until that machine is running.
+**Narrow-host, single-purpose, local-first tools for Shopify / ads / bookkeeping → Chrome then Edge then Firefox → async support → Pro only after P0 proves retention.**

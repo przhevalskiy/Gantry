@@ -10,23 +10,25 @@ Shared tooling lives in [`apps/store-kit/`](../apps/store-kit/).
 
 ## Catalog
 
-**Operating model (top 5 + cuts):** [`docs/extension-operating-model.md`](extension-operating-model.md)
+**Operating model (top 7 review-safe):** [`docs/extension-operating-model.md`](extension-operating-model.md)
 
 ### Active (submit to stores)
 
-| Priority | App | Path | One-line pitch |
-|----------|-----|------|----------------|
-| P0 | PayBump | `apps/paybump` | Stripe/invoice dunning macros |
-| P0 | ShopSwitch | `apps/shopswitch` | Multi-store Shopify admin switcher |
-| P0 | ReplyKit | `apps/replykit` | Proposal macros for freelancers |
-| P1 | ClientMark | `apps/clientmark` | Label Meta/Google Ads client accounts |
-| P1 | StorePulse | `apps/storepulse` | Shopify store health checks for agencies |
+| Priority | App | Path | One-line pitch | Hosts |
+|----------|-----|------|----------------|-------|
+| P0 | ShopSwitch | `apps/shopswitch` | Multi-store Shopify admin switcher | Narrow |
+| P0 | StorePulse | `apps/storepulse` | Shopify store health checks for agencies | Narrow |
+| P0 | ClientMark | `apps/clientmark` | Label Meta/Google Ads client accounts | Narrow |
+| P1 | PortalSwitch | `apps/portalswitch` | Jump between QuickBooks/Xero clients | Narrow |
+| P1 | RefundRadar | `apps/refundradar` | Flag refund/return spikes on Shopify | Narrow |
+| P1 | VariantDiff | `apps/variantdiff` | Diff product/variant changes before publish | Narrow |
+| P1 | BillGuard | `apps/billguard` | Confirm client before ads billing changes | Narrow |
 
-Ship P0 first: **PayBump → ShopSwitch → ReplyKit**, then ClientMark + StorePulse.
+Ship P0 first: **ShopSwitch → StorePulse → ClientMark**, then PortalSwitch → RefundRadar → VariantDiff → BillGuard.
 
-### Deferred (do not submit yet)
+### Deferred (do not submit)
 
-BidMatch · FormPack · PromptLedger · EvidenceKit · CiteBrowse — broader hosts or higher support surface.
+PayBump · ReplyKit · BidMatch · FormPack · PromptLedger · EvidenceKit · CiteBrowse — broad hosts and/or weaker review/wedge fit.
 
 ---
 
