@@ -8,22 +8,25 @@ Shared tooling lives in [`apps/store-kit/`](../apps/store-kit/).
 
 ---
 
-## Catalog (10 apps)
+## Catalog
 
-| App | Path | One-line pitch |
-|-----|------|----------------|
-| ReplyKit | `apps/replykit` | Proposal macros for freelancers |
-| StorePulse | `apps/storepulse` | Shopify store health checks for agencies |
-| ClientMark | `apps/clientmark` | Label Meta/Google Ads client accounts |
-| BidMatch | `apps/bidmatch` | RFP/job keyword highlighter |
-| PromptLedger | `apps/promptledger` | AI prompt/output audit log for agencies |
-| EvidenceKit | `apps/evidencekit` | Screenshot + checklist evidence packs |
-| PayBump | `apps/paybump` | Stripe/invoice dunning macros |
-| ShopSwitch | `apps/shopswitch` | Multi-store Shopify admin switcher |
-| CiteBrowse | `apps/citebrowse` | Cite-as-you-browse → BibTeX |
-| FormPack | `apps/formpack` | Niche form autofill packs |
+**Operating model (top 5 + cuts):** [`docs/extension-operating-model.md`](extension-operating-model.md)
 
-Suggested first wave (clearest ROI + simpler stories): **ReplyKit → PayBump → ShopSwitch**, then the rest.
+### Active (submit to stores)
+
+| Priority | App | Path | One-line pitch |
+|----------|-----|------|----------------|
+| P0 | PayBump | `apps/paybump` | Stripe/invoice dunning macros |
+| P0 | ShopSwitch | `apps/shopswitch` | Multi-store Shopify admin switcher |
+| P0 | ReplyKit | `apps/replykit` | Proposal macros for freelancers |
+| P1 | ClientMark | `apps/clientmark` | Label Meta/Google Ads client accounts |
+| P1 | StorePulse | `apps/storepulse` | Shopify store health checks for agencies |
+
+Ship P0 first: **PayBump → ShopSwitch → ReplyKit**, then ClientMark + StorePulse.
+
+### Deferred (do not submit yet)
+
+BidMatch · FormPack · PromptLedger · EvidenceKit · CiteBrowse — broader hosts or higher support surface.
 
 ---
 

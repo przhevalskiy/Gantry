@@ -2,7 +2,9 @@
 
 Templates and helpers for publishing Gantry micro extensions.
 
-**Full process:** [`docs/extension-store-shipping.md`](../../docs/extension-store-shipping.md)
+**Active portfolio (top 5):** PayBump · ShopSwitch · ReplyKit · ClientMark · StorePulse  
+**Operating model:** [`docs/extension-operating-model.md`](../../docs/extension-operating-model.md)  
+**Store process:** [`docs/extension-store-shipping.md`](../../docs/extension-store-shipping.md)
 
 ## Commands
 

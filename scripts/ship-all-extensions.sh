@@ -6,30 +6,24 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 CATALOG="$ROOT/apps/store-kit/catalog.json"
 
-mapfile -t FIRST < <(python3 - <<PY
+# Only active portfolio (top 5). Deferred apps are skipped on purpose.
+mapfile -t ORDER < <(python3 - <<PY
 import json
 from pathlib import Path
 c=json.loads(Path("$CATALOG").read_text())
-print("\n".join(c.get("firstWave", [])))
+active=c.get("activeWave") or [a["id"] for a in c["apps"] if a.get("status")=="active"]
+first=c.get("firstWave") or []
+# firstWave first, then remaining active
+seen=set()
+order=[]
+for i in first + active:
+    if i in seen: continue
+    if i not in active: continue
+    seen.add(i)
+    order.append(i)
+print("\n".join(order))
 PY
 )
-
-mapfile -t ALL < <(python3 - <<PY
-import json
-from pathlib import Path
-c=json.loads(Path("$CATALOG").read_text())
-print("\n".join(a["id"] for a in c["apps"]))
-PY
-)
-
-declare -A SEEN
-ORDER=()
-for id in "${FIRST[@]}" "${ALL[@]}"; do
-  [[ -z "$id" ]] && continue
-  [[ -n "${SEEN[$id]:-}" ]] && continue
-  SEEN["$id"]=1
-  ORDER+=("$id")
-done
 
 failed=()
 built=()
