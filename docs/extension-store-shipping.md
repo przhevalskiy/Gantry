@@ -91,7 +91,7 @@ Do this **per extension**. Templates: `apps/store-kit/templates/`.
 
 Capture tips:
 - Use a clean browser profile
-- Show the real job (e.g. ReplyKit inserting a proposal, ShopSwitch store list)
+- Show the real job (e.g. ShopSwitch store list, StorePulse health report)
 - No fake 5-star overlays or misleading chrome
 
 ### Data / privacy posture (what reviewers want to hear)
@@ -214,16 +214,15 @@ Use language like: *“Used only to X. Data stays in local extension storage. No
 
 | Permission | Apps that need it | Review justification (pattern) |
 |------------|-------------------|--------------------------------|
-| `storage` | All | Save user snippets/settings locally on device |
-| `activeTab` | Most | Run feature on the tab the user invoked via popup/action |
-| `scripting` | Most | Insert text / scan page / highlight when user clicks |
-| `tabs` | ClientMark, ShopSwitch, EvidenceKit | Read active tab URL/title or capture visible tab for user-initiated evidence |
-| `contextMenus` | PromptLedger, CiteBrowse | Explicit right-click “save selection/citation” |
-| Host access (narrow) | StorePulse, ClientMark, ShopSwitch, PayBump | Only on product dashboards named in the description |
-| Host access (`<all_urls>`) | BidMatch, FormPack, CiteBrowse, ReplyKit/PayBump expand | Feature must work on arbitrary sites the user visits; activated by user settings/actions |
+| `storage` | All seven | Save user lists/settings locally on device |
+| `activeTab` | All seven | Run feature on the tab the user invoked via popup/action |
+| `scripting` | StorePulse, ClientMark, RefundRadar, VariantDiff, BillGuard | Scan/label/confirm on named admin pages when user opens them or clicks |
+| `tabs` | ShopSwitch, PortalSwitch, ClientMark | Read URL to switch or label the active client workspace |
+| Host access (narrow only) | All seven | Only Shopify admin, ads consoles, or QB/Xero — named in the listing |
+| `<all_urls>` | **None in active portfolio** | Deferred apps only; do not submit with broad hosts |
 
 **Tighten before submit when you can** (helps review):
-- Prefer match patterns over `<all_urls>`
+- Prefer exact admin match patterns (no `<all_urls>`)
 - Prefer `activeTab` + user gesture over always-on content scripts where UX allows
 
 ---
@@ -253,12 +252,12 @@ Give reviewers a 2-minute path:
 4. Confirm data location (“Application → Extension storage” / local only)
 5. Confirm no account wall
 
-Example (ReplyKit):
+Example (ShopSwitch):
 
-1. Open Gmail or any text box on example.com  
-2. Open ReplyKit → click a starter snippet  
-3. Confirm text inserted  
-4. Type `;intro` + Space → expand  
+1. Open Shopify admin for any store  
+2. Open ShopSwitch → see saved client stores  
+3. Click a store → confirm navigation to that admin  
+4. Confirm store list is local-only (no account)  
 
 ---
 
