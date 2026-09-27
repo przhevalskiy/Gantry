@@ -60,7 +60,7 @@
       "category": "Productivity",
       "hosts": "narrow",
       "status": "active",
-      "priority": "P0",
+      "priority": "P1",
       "permissions": ["storage", "activeTab", "scripting"],
       "geckoId": "storepulse@gantry.local"
     },
