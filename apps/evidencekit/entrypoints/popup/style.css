@@ -1,0 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,600;9..40,700&family=Syne:wght@700;800&display=swap');
+@import 'tailwindcss';
+:root {
+  --ink: #102018; --soft: #3f5a4c; --accent: #3dcaa0; --accent-ink: #06281c;
+  --line: rgba(16,32,24,0.12); font-family: 'DM Sans', system-ui, sans-serif; color: var(--ink);
+}
+html, body { margin: 0; width: 400px; min-height: 560px; }
+body {
+  background: radial-gradient(90% 60% at 100% 0%, #8ee0c4 0%, transparent 50%),
+    linear-gradient(165deg, #eef7f2 0%, #d5e6dd 100%);
+}
+.brand { font-family: 'Syne', sans-serif; letter-spacing: -0.03em; }
+.panel { background: rgba(255,255,255,0.84); border: 1px solid var(--line); backdrop-filter: blur(8px); }
+.btn { background: var(--accent); color: var(--accent-ink); font-weight: 700; border: 1px solid rgba(6,40,28,0.12); }
+.btn-ghost { background: transparent; border: 1px solid var(--line); }
