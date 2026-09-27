@@ -12,7 +12,7 @@ export function scanShopifyPage(): {
   const url = location.href;
   const host = location.hostname;
   const isAdmin = host.includes('admin.shopify.com') || host.includes('myshopify.com');
-  const title = document.title.replace(/\s*[-|].*$/, '').trim() || host;
+  const title = document.title.split(/ [|] /)[0]?.trim() || host;
 
   const checks: {
     id: string;
