@@ -1,0 +1,107 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Syne:wght@600;700;800&display=swap');
+@import 'tailwindcss';
+
+:root {
+  --ink: #0f1c1a;
+  --ink-soft: #2a3f3a;
+  --mist: #e8efe9;
+  --paper: #f4f7f4;
+  --panel: rgba(255, 255, 255, 0.78);
+  --accent: #c8f135;
+  --accent-ink: #1a2e0a;
+  --line: rgba(15, 28, 26, 0.12);
+  --danger: #c23b22;
+  --ok: #1f7a4c;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  color: var(--ink);
+  background: transparent;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 380px;
+  min-height: 520px;
+  max-height: 600px;
+  overflow: hidden;
+}
+
+body {
+  background:
+    radial-gradient(120% 80% at 0% 0%, #d9f0a8 0%, transparent 55%),
+    radial-gradient(90% 70% at 100% 100%, #b8d4cf 0%, transparent 50%),
+    linear-gradient(165deg, #eef4ef 0%, #dfeae3 100%);
+}
+
+#root {
+  min-height: 520px;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.brand {
+  font-family: 'Syne', sans-serif;
+  letter-spacing: -0.03em;
+}
+
+.panel {
+  background: var(--panel);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  border: 1px solid rgba(26, 46, 10, 0.15);
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(26, 46, 10, 0.12);
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.snippet-row {
+  transition: background 120ms ease, transform 120ms ease;
+}
+
+.snippet-row:hover {
+  background: rgba(255, 255, 255, 0.65);
+  transform: translateX(2px);
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rise-in {
+  animation: rise-in 220ms ease both;
+}
