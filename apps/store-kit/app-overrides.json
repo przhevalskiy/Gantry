@@ -1,0 +1,172 @@
+{
+  "replykit": {
+    "audience": "freelancers who send proposals and client replies",
+    "coreJob": "reuse proposal macros with shortcuts and one-click insert",
+    "bullets": [
+      "Save reusable proposal and follow-up snippets",
+      "Insert into the focused field or expand shortcuts like ;intro",
+      "Start from an Upwork-oriented starter pack"
+    ],
+    "dataTypes": "snippets and settings",
+    "activeTabUse": "insert the selected snippet into the focused field",
+    "scriptingUse": "insert or expand text the user selected",
+    "tabsUse": "N/A (remove row if unused)",
+    "contextMenusUse": "N/A (remove row if unused)",
+    "hostJustification": "Optional broad access so shortcut expansion works in text fields on sites the user already works in. Activated by the user’s typing/settings.",
+    "testStep1": "Open a page with a text box, focus it, open ReplyKit, click a starter snippet.",
+    "testStep2": "Type ;intro then Space and confirm expansion."
+  },
+  "storepulse": {
+    "audience": "Shopify agencies and freelancers",
+    "coreJob": "run a quick storefront/admin health scan and copy a client report",
+    "bullets": [
+      "Scan the active Shopify-related tab",
+      "Check images, pixels, policy links, and publish cues",
+      "Copy a markdown client report"
+    ],
+    "dataTypes": "recent scan reports",
+    "activeTabUse": "scan the page the user is viewing",
+    "scriptingUse": "collect on-page health signals after the user clicks Scan",
+    "tabsUse": "N/A",
+    "contextMenusUse": "N/A",
+    "hostJustification": "Limited to Shopify admin/storefront hosts named in the listing so scans run where agencies already work.",
+    "testStep1": "Open a Shopify storefront or admin page and click Scan.",
+    "testStep2": "Copy the client report and confirm checklist rows appear."
+  },
+  "clientmark": {
+    "audience": "media buyers and ads agencies",
+    "coreJob": "label Meta/Google Ads client accounts across tabs",
+    "bullets": [
+      "Save client labels matched by URL substring",
+      "Show a badge and optional tab title prefix",
+      "Draw a color bar on matching ads pages"
+    ],
+    "dataTypes": "client labels and colors",
+    "activeTabUse": "prefill URL match from the current ads tab",
+    "scriptingUse": "update tab title / UI marker on matching ads pages",
+    "tabsUse": "Apply badge text/color on relevant tabs",
+    "contextMenusUse": "N/A",
+    "hostJustification": "Restricted to Google Ads and Meta Ads Manager hosts.",
+    "testStep1": "Save a mark with a URL fragment from an ads page.",
+    "testStep2": "Reload the page and confirm badge/bar/label behavior."
+  },
+  "bidmatch": {
+    "audience": "freelancers, grant writers, and BD folks",
+    "coreJob": "highlight saved keywords on RFP and job pages",
+    "bullets": [
+      "Create colored keyword sets",
+      "Highlight matches on the current page",
+      "Toggle sets and re-run highlighting"
+    ],
+    "dataTypes": "keyword sets and highlight settings",
+    "activeTabUse": "re-highlight the page after the user clicks",
+    "scriptingUse": "wrap matching keywords in mark elements on the page",
+    "tabsUse": "N/A",
+    "contextMenusUse": "N/A",
+    "hostJustification": "Works on arbitrary job/RFP sites the user visits; highlighting only uses keyword sets the user configured.",
+    "testStep1": "Open a page containing a starter keyword (e.g. typescript).",
+    "testStep2": "Open BidMatch and click Re-highlight; confirm highlights."
+  },
+  "promptledger": {
+    "audience": "agencies billing AI-assisted work",
+    "coreJob": "capture prompts/outputs into a client-tagged audit trail",
+    "bullets": [
+      "Save prompts, outputs, and notes",
+      "Capture from selection or context menu",
+      "Export markdown for a client"
+    ],
+    "dataTypes": "audit entries and client tags",
+    "activeTabUse": "capture selected text and source URL/title",
+    "scriptingUse": "read the user’s selection when they click From selection",
+    "tabsUse": "N/A",
+    "contextMenusUse": "Save selected text as prompt/output/note via right-click",
+    "hostJustification": "Selection capture works on AI tool pages and docs the user chooses.",
+    "testStep1": "Select text on a page → right-click → save as prompt.",
+    "testStep2": "Export markdown and confirm the entry appears."
+  },
+  "evidencekit": {
+    "audience": "small teams needing compliance evidence",
+    "coreJob": "capture screenshot + checklist evidence packs",
+    "bullets": [
+      "Capture the visible tab with one click",
+      "Apply accessibility/privacy/launch checklists",
+      "Export an evidence markdown pack"
+    ],
+    "dataTypes": "evidence items, screenshots, checklist state",
+    "activeTabUse": "capture the visible tab the user is reviewing",
+    "scriptingUse": "N/A if unused — otherwise support page context",
+    "tabsUse": "captureVisibleTab for user-initiated evidence screenshots",
+    "contextMenusUse": "N/A",
+    "hostJustification": "User can capture evidence on the page they are auditing after an explicit click.",
+    "testStep1": "Open any page, choose a template, click Capture.",
+    "testStep2": "Tick checklist items and copy the evidence pack."
+  },
+  "paybump": {
+    "audience": "indie SaaS founders doing dunning",
+    "coreJob": "insert failed-payment and invoice follow-up macros",
+    "bullets": [
+      "Starter Stripe/invoice macros",
+      "One-click insert into the focused field",
+      "Shortcut expansion like ;card"
+    ],
+    "dataTypes": "macros and settings",
+    "activeTabUse": "insert the selected macro into the focused field",
+    "scriptingUse": "insert/expand macro text the user chose",
+    "tabsUse": "N/A",
+    "contextMenusUse": "N/A",
+    "hostJustification": "Macros can be inserted into email/support/billing tools the user already uses.",
+    "testStep1": "Focus a text box, open PayBump, click Friendly card update.",
+    "testStep2": "Type ;card then Space and confirm expansion."
+  },
+  "shopswitch": {
+    "audience": "Shopify agencies managing many client shops",
+    "coreJob": "save, label, and jump between Shopify admin stores",
+    "bullets": [
+      "Save admin.shopify.com / myshopify admin URLs",
+      "Color-label client stores",
+      "Open a store admin in one click"
+    ],
+    "dataTypes": "store labels and admin URLs",
+    "activeTabUse": "detect current Shopify admin URL to save quickly",
+    "scriptingUse": "show a color bar on matching Shopify admin pages",
+    "tabsUse": "open the selected store admin tab",
+    "contextMenusUse": "N/A",
+    "hostJustification": "Limited to Shopify admin hosts so agencies can switch client shops they already access.",
+    "testStep1": "Save a store with an admin.shopify.com/store/... URL.",
+    "testStep2": "Click the store to open it; confirm it appears in the list."
+  },
+  "citebrowse": {
+    "audience": "researchers and students",
+    "coreJob": "capture bibliographic metadata and export BibTeX",
+    "bullets": [
+      "Capture citation fields from publisher pages",
+      "Build cite keys automatically",
+      "Copy one entry or export the library as BibTeX"
+    ],
+    "dataTypes": "citations",
+    "activeTabUse": "read citation metadata from the current article page",
+    "scriptingUse": "extract meta tags / DOI-like fields on user capture",
+    "tabsUse": "N/A",
+    "contextMenusUse": "Capture page citation from right-click",
+    "hostJustification": "Researchers capture citations while browsing arbitrary publisher pages.",
+    "testStep1": "Open a publisher page with citation meta tags and click Capture.",
+    "testStep2": "Copy BibTeX for the entry."
+  },
+  "formpack": {
+    "audience": "operators filling shipping, grant, or admin forms",
+    "coreJob": "autofill forms from niche field packs",
+    "bullets": [
+      "Starter shipping/grant/admin profiles",
+      "Map by field name/label hints",
+      "Fill the current page in one click"
+    ],
+    "dataTypes": "form profiles",
+    "activeTabUse": "fill fields on the form the user is viewing",
+    "scriptingUse": "write values into matching inputs after the user clicks a profile",
+    "tabsUse": "N/A",
+    "contextMenusUse": "N/A",
+    "hostJustification": "Autofill must work on the variety of forms users already submit; only runs when the user clicks Fill.",
+    "testStep1": "Open a form page with name/email fields.",
+    "testStep2": "Click a FormPack profile and confirm fields populate."
+  }
+}

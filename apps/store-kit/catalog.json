@@ -1,0 +1,106 @@
+{
+  "shipOrder": ["chrome", "edge", "firefox"],
+  "firstWave": ["replykit", "paybump", "shopswitch"],
+  "apps": [
+    {
+      "id": "replykit",
+      "name": "ReplyKit",
+      "path": "apps/replykit",
+      "pitch": "Proposal macros for freelancers",
+      "category": "Productivity",
+      "hosts": "broad",
+      "permissions": ["storage", "activeTab", "scripting"],
+      "geckoId": "replykit@gantry.local"
+    },
+    {
+      "id": "storepulse",
+      "name": "StorePulse",
+      "path": "apps/storepulse",
+      "pitch": "Shopify store health checks for agencies",
+      "category": "Productivity",
+      "hosts": "narrow",
+      "permissions": ["storage", "activeTab", "scripting"],
+      "geckoId": "storepulse@gantry.local"
+    },
+    {
+      "id": "clientmark",
+      "name": "ClientMark",
+      "path": "apps/clientmark",
+      "pitch": "Label Meta and Google Ads client accounts",
+      "category": "Productivity",
+      "hosts": "narrow",
+      "permissions": ["storage", "tabs", "activeTab", "scripting"],
+      "geckoId": "clientmark@gantry.local"
+    },
+    {
+      "id": "bidmatch",
+      "name": "BidMatch",
+      "path": "apps/bidmatch",
+      "pitch": "RFP and job-board keyword highlighter",
+      "category": "Productivity",
+      "hosts": "broad",
+      "permissions": ["storage", "activeTab", "scripting"],
+      "geckoId": "bidmatch@gantry.local"
+    },
+    {
+      "id": "promptledger",
+      "name": "PromptLedger",
+      "path": "apps/promptledger",
+      "pitch": "AI work audit log for agencies",
+      "category": "Productivity",
+      "hosts": "broad",
+      "permissions": ["storage", "activeTab", "scripting", "contextMenus"],
+      "geckoId": "promptledger@gantry.local"
+    },
+    {
+      "id": "evidencekit",
+      "name": "EvidenceKit",
+      "path": "apps/evidencekit",
+      "pitch": "Compliance evidence packs with screenshot and checklist",
+      "category": "Productivity",
+      "hosts": "broad",
+      "permissions": ["storage", "activeTab", "scripting", "tabs"],
+      "geckoId": "evidencekit@gantry.local"
+    },
+    {
+      "id": "paybump",
+      "name": "PayBump",
+      "path": "apps/paybump",
+      "pitch": "Stripe and invoice dunning macros",
+      "category": "Productivity",
+      "hosts": "broad",
+      "permissions": ["storage", "activeTab", "scripting"],
+      "geckoId": "paybump@gantry.local"
+    },
+    {
+      "id": "shopswitch",
+      "name": "ShopSwitch",
+      "path": "apps/shopswitch",
+      "pitch": "Multi-store Shopify admin switcher for agencies",
+      "category": "Productivity",
+      "hosts": "narrow",
+      "permissions": ["storage", "tabs", "activeTab"],
+      "geckoId": "shopswitch@gantry.local"
+    },
+    {
+      "id": "citebrowse",
+      "name": "CiteBrowse",
+      "path": "apps/citebrowse",
+      "pitch": "Cite-as-you-browse bibliographic capture and BibTeX export",
+      "category": "Productivity",
+      "hosts": "broad",
+      "permissions": ["storage", "activeTab", "scripting", "contextMenus"],
+      "geckoId": "citebrowse@gantry.local"
+    },
+    {
+      "id": "formpack",
+      "name": "FormPack",
+      "path": "apps/formpack",
+      "pitch": "Niche form autofill packs for shipping, grants, and admin",
+      "category": "Productivity",
+      "hosts": "broad",
+      "permissions": ["storage", "activeTab", "scripting"],
+      "geckoId": "formpack@gantry.local"
+    }
+  ]
+}
