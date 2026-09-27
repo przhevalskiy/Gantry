@@ -25,8 +25,17 @@ function removeModal() {
   document.getElementById(MODAL_ID)?.remove();
 }
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function showModal(label: string, color: string, clientId: string, requireTyped: boolean) {
   if (document.getElementById(MODAL_ID)) return;
+  const safeLabel = escapeHtml(label);
   const wrap = document.createElement('div');
   wrap.id = MODAL_ID;
   Object.assign(wrap.style, {
@@ -55,11 +64,11 @@ function showModal(label: string, color: string, clientId: string, requireTyped:
     <p style="margin:8px 0 0;font-size:18px;font-weight:800;color:#0f172a">Confirm billing client</p>
     <p style="margin:8px 0 0;font-size:14px;color:#334155;line-height:1.45">
       This looks like a <strong>billing / payment</strong> page for
-      <strong style="color:${color}">${label}</strong>. Continue only if that is correct.
+      <strong style="color:${color}">${safeLabel}</strong>. Continue only if that is correct.
     </p>
     ${
       requireTyped
-        ? `<input id="billguard-type" placeholder="Type ${label} to confirm" style="margin-top:14px;width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid #cbd5e1;font-size:13px" />`
+        ? `<input id="billguard-type" placeholder="Type client name to confirm" style="margin-top:14px;width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid #cbd5e1;font-size:13px" />`
         : ''
     }
     <div style="display:flex;gap:8px;margin-top:16px">
