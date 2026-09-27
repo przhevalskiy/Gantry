@@ -39,6 +39,12 @@ npm test
 npm run compile
 ```
 
+### Manual load (Chrome 137+)
+
+`--load-extension` is removed from branded Chrome. Use **chrome://extensions → Developer mode → Load unpacked** and pick `.output/chrome-mv3`.
+
+Click-to-insert works on normal pages via `chrome.scripting`. Shortcut expansion (`;intro` + Space) needs the content script — on `file://` demos, enable **Allow access to file URLs** on the extension details page.
+
 ## Monetization path
 
 1. Ship free local-only on Chrome Web Store  
