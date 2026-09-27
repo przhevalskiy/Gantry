@@ -1,6 +1,6 @@
 {
   "name": "replykit",
-  "description": "ReplyKit — niche snippet manager Chrome extension for freelancers",
+  "description": "ReplyKit \u2014 niche snippet manager Chrome extension for freelancers",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -29,5 +29,23 @@
     "vitest": "^3.2.4",
     "web-ext": "^10.5.0",
     "wxt": "^0.21.3"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/przhevalskiy/replykit.git"
+  },
+  "homepage": "https://github.com/przhevalskiy/replykit#readme",
+  "bugs": {
+    "url": "https://github.com/przhevalskiy/replykit/issues"
+  },
+  "author": "Aleksey Przhevalskiy",
+  "license": "MIT",
+  "keywords": [
+    "chrome-extension",
+    "snippets",
+    "freelancers",
+    "upwork",
+    "wxt",
+    "passive-income"
+  ]
 }
