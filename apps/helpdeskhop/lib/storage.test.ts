@@ -9,7 +9,7 @@ describe('parseTargetUrl', () => {
     expect(parseTargetUrl('https://acme.zendesk.com/agent/home')?.handle).toBe('acme');
   });
   it('parses Intercom', () => {
-    expect(parseTargetUrl('https://app.intercom.com/a/apps/abc123')?.handle).toBe('a');
+    expect(parseTargetUrl('https://app.intercom.com/a/apps/abc123')?.handle).toBe('abc123');
   });
   it('rejects other hosts', () => {
     expect(parseTargetUrl('https://example.com')).toBeNull();
