@@ -21,8 +21,8 @@ export function parseTargetUrl(
     if (host === 'app.intercom.com' || host.endsWith('.intercom.io')) {
       const parts = u.pathname.split('/').filter(Boolean);
       const appsIdx = parts.indexOf('apps');
-      const app =
-        appsIdx >= 0 && parts[appsIdx + 1] ? parts[appsIdx + 1] : parts[0] || 'intercom';
+      const fromApps = appsIdx >= 0 ? parts[appsIdx + 1] : undefined;
+      const app = fromApps ?? parts[0] ?? 'intercom';
       return {
         kind: 'intercom',
         handle: app,
