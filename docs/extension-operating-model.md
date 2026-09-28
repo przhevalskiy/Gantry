@@ -8,7 +8,9 @@ ShopSwitch · HelpdeskHop · KlaviyoSwitch · PortalSwitch · StripeMark · Clie
 **Cut / deferred:** PayBump · ReplyKit · BidMatch · FormPack · PromptLedger · EvidenceKit · CiteBrowse  
 
 Browser ship order per app: **Chrome → Edge → Firefox**  
-Tooling: [`docs/extension-store-shipping.md`](extension-store-shipping.md) · [`apps/store-kit/`](../apps/store-kit/)
+**Approval how-to:** [`extension-store-approval-guide.md`](extension-store-approval-guide.md)  
+Architecture: [`extension-architecture.md`](extension-architecture.md)  
+Tooling: [`extension-store-shipping.md`](extension-store-shipping.md) · [`apps/store-kit/`](../apps/store-kit/)
 
 ---
 
