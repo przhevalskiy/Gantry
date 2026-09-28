@@ -1,0 +1,29 @@
+{
+  "name": "shopswitch",
+  "description": "ShopSwitch — multi-store Shopify switcher for agencies",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "zip": "wxt zip",
+    "compile": "tsc --noEmit",
+    "test": "vitest run",
+    "postinstall": "wxt prepare"
+  },
+  "dependencies": {
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.13",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@wxt-dev/module-react": "^1.1.5",
+    "tailwindcss": "^4.1.13",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "wxt": "^0.21.3"
+  }
+}
