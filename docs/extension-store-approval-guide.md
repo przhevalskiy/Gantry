@@ -179,7 +179,7 @@ Every app in this repo follows:
 - Install from the store link (not Load unpacked) for smoke test  
 - Reply to support within 48h  
 - Version bump for every upload  
-- Turn on **per-app** $29 lifetime Pro only after installs exist  
+- Turn on **per-app** Pro ($3.99/mo or $29/yr) only after installs exist  
 - If you add sync/accounts later → update privacy + resubmit  
 
 ---

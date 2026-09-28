@@ -164,13 +164,12 @@ Full steps: [`docs/extension-store-approval-guide.md`](extension-store-approval-
 
 Pick up in order unless the user redirects:
 
-1. **Sync pricing docs** — ensure operating model / catalog say `$3.99/mo` + `$29/yr` (not older $29 lifetime-only language).  
-2. **Store asset pack** — seed `apps/<app>/store/*` for ShopSwitch, PortalSwitch, ClientMark (listing, PRIVACY, PERMISSIONS, REVIEW_NOTES, screenshot checklist).  
-3. **GitHub Pages privacy site** — static pages for all 10 privacy policies + support email placeholders.  
-4. **Firefox gecko ids** — wire `browser_specific_settings` via store-kit snippet for ship script.  
-5. **Lemon Squeezy stub** — optional Pro unlock flag in settings UI (local license key validation) without backend.  
-6. **Do not** expand into `<all_urls>` tools or rebuild deferred apps unless user asks.  
-7. **Do not** submit all 10 to CWS simultaneously on first attempt.
+1. **Store asset pack** — seed `apps/<app>/store/*` for ShopSwitch, PortalSwitch, ClientMark (listing, PRIVACY, PERMISSIONS, REVIEW_NOTES, screenshot checklist).  
+2. **GitHub Pages privacy site** — static pages for all 10 privacy policies + support email placeholders.  
+3. **Firefox gecko ids** — wire `browser_specific_settings` via store-kit snippet for ship script.  
+4. **Lemon Squeezy stub** — optional Pro unlock flag in settings UI (local license key validation) without backend.  
+5. **Do not** expand into `<all_urls>` tools or rebuild deferred apps unless user asks.  
+6. **Do not** submit all 10 to CWS simultaneously on first attempt.
 
 ---
 
