@@ -219,11 +219,11 @@ Use language like: *“Used only to X. Data stays in local extension storage. No
 
 | Permission | Apps that need it | Review justification (pattern) |
 |------------|-------------------|--------------------------------|
-| `storage` | All seven | Save user lists/settings locally on device |
-| `activeTab` | All seven | Run feature on the tab the user invoked via popup/action |
-| `scripting` | StorePulse, ClientMark, RefundRadar, VariantDiff, BillGuard | Scan/label/confirm on named admin pages when user opens them or clicks |
-| `tabs` | ShopSwitch, PortalSwitch, ClientMark | Read URL to switch or label the active client workspace |
-| Host access (narrow only) | All seven | Only Shopify admin, ads consoles, or QB/Xero — named in the listing |
+| `storage` | All ten | Save user lists/settings locally on device |
+| `activeTab` | All ten | Run feature on the tab the user invoked via popup/action |
+| `scripting` | Markers/guards (ClientMark, StripeMark, SlackSpaceMark, BillGuard, TabClient) | Label/confirm on named admin pages |
+| `tabs` | Switchers + TabClient | Read URL to switch or label the active client workspace |
+| Host access (narrow only) | All ten | Named admin hosts only (Shopify, helpdesk, Klaviyo, QB/Xero, Stripe, ads, Slack, HubSpot, allowlisted SaaS) |
 | `<all_urls>` | **None in active portfolio** | Deferred apps only; do not submit with broad hosts |
 
 **Tighten before submit when you can** (helps review):
