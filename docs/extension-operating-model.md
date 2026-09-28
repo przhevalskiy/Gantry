@@ -89,7 +89,7 @@ shared:  store-kit · ship scripts · privacy host · support inbox
 | Privacy | One domain, `/privacy/<app>` | App-specific data types |
 | Support | One email / form | Tag by app name |
 | Release | `ship-extension.sh` | Version bump + zip |
-| Optional Pro later | Same Lemon Squeezy account | License unlock per app or suite |
+| Paid Pro | Same Lemon Squeezy account | **Separate product + license per app** (no suite) |
 
 **v1 rule:** no servers, no accounts, no analytics. Sync later = privacy update + resubmit.
 
