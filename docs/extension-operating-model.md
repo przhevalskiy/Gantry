@@ -31,7 +31,7 @@ Optimized for **Chrome / Edge / AMO store approval** (not star ratings), then do
 | Job | Daily “wrong client / wrong workspace” pain |
 | Buyer | Agency, bookkeeper, support, email, ads, CRM ops |
 | Maint | Lists + labels + switch — not AI or brittle scrapers |
-| Paid | Separate **$29 lifetime Pro** SKU per app (no suite) |
+| Paid | Separate Pro SKU per app (no suite): **$3.99/mo** or **$29/yr** |
 
 ---
 
@@ -180,15 +180,16 @@ Freeze features 2–4 weeks; bugfixes only; then per-app Pro.
 
 ## 9. Pricing — each app is its own paid product
 
-**Rule:** ten separate SKUs. No suite.
+**Rule:** ten separate SKUs. No suite. No ads in the apps.
 
 | Item | Policy |
 |------|--------|
-| Billing | Lemon Squeezy |
-| Price | **$29 lifetime Pro** per app |
+| Billing | Lemon Squeezy (merchant of record) |
+| Monthly | **$3.99/mo** Pro per app |
+| Annual | **$29/yr** Pro per app |
 | Free | Core switch/label/confirm stays free |
 | Pro | Caps / export only — never gate safety core |
-| Ops | License key unlocks **that app only** |
+| Ops | License key unlocks **that app only**; no seats / usage meters |
 
 ---
 

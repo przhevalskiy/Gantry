@@ -26,7 +26,7 @@
   "selectionCriteria": {
     "review": "Chrome/Edge/AMO approval: narrow hosts, single purpose, local-only v1",
     "wedge": "daily wrong-client / wrong-workspace pain for agencies",
-    "pricing": "separate $29 lifetime Pro SKU per app, no suite",
+    "pricing": "separate Pro SKU per app: $3.99/mo or $29/yr; no suite; no in-app ads",
     "stack": "WXT + React + chrome.storage.local"
   },
   "apps": [
