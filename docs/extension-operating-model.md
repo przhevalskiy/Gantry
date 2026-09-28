@@ -188,17 +188,28 @@ Kill or rewrite any app with support load disproportionate to installs.
 
 ---
 
-## 9. Money later (optional)
+## 9. Pricing — each app is its own paid product
 
-After P0 stable:
+**Rule:** seven separate SKUs. No suite, no bundle, no cross-app license.
 
-1. Pro unlock (Lemon Squeezy): export packs, multi-seat, sync  
-2. Or suite license across the seven  
-3. Keep free local tier accurate in privacy/listing  
+| Item | Policy |
+|------|--------|
+| Billing | Lemon Squeezy (merchant of record) |
+| Unit | **One paid product per app** |
+| Default price | **$29 lifetime** per app (or $9/mo if you later prefer recurring — still per app) |
+| Free tier | Core job stays free/local so installs keep flowing |
+| Pro unlock | Soft extras only (higher client/store caps, export packs) — never gate the safety core |
+| Ops | License key → unlock in that app only; no seats, no usage meters |
 
-Push Pro first on **ShopSwitch · PortalSwitch · StorePulse**.
+### Rollout
+1. Ship each app free until it has real users  
+2. Turn on **that app’s** Pro product when ready (start with ShopSwitch, PortalSwitch, StorePulse)  
+3. Repeat per app — separate checkout links, separate license keys  
+
+Keep free-tier claims accurate in each listing/privacy page.
 
 ---
+
 
 ## 10. Command cheat sheet
 
@@ -216,4 +227,4 @@ Push Pro first on **ShopSwitch · PortalSwitch · StorePulse**.
 
 ## One-page summary
 
-**Narrow-host, single-purpose, local-first tools for Shopify / ads / bookkeeping → Chrome then Edge then Firefox → async support → Pro only after P0 proves retention.**
+**Narrow-host, single-purpose, local-first tools → Chrome then Edge then Firefox → each app its own paid Pro SKU → async support → no suite.**
