@@ -10,25 +10,30 @@ Shared tooling lives in [`apps/store-kit/`](../apps/store-kit/).
 
 ## Catalog
 
-**Operating model (top 7 review-safe):** [`docs/extension-operating-model.md`](extension-operating-model.md)
+**Operating model (top 10):** [`docs/extension-operating-model.md`](extension-operating-model.md)
 
-### Active (submit to stores)
+### Active (submit to stores) — wrong-client / workspace magnets
 
-| Priority | App | Path | One-line pitch | Hosts |
-|----------|-----|------|----------------|-------|
-| P0 | ShopSwitch | `apps/shopswitch` | Multi-store Shopify admin switcher | Narrow |
-| P0 | StorePulse | `apps/storepulse` | Shopify store health checks for agencies | Narrow |
-| P0 | ClientMark | `apps/clientmark` | Label Meta/Google Ads client accounts | Narrow |
-| P1 | PortalSwitch | `apps/portalswitch` | Jump between QuickBooks/Xero clients | Narrow |
-| P1 | RefundRadar | `apps/refundradar` | Flag refund/return spikes on Shopify | Narrow |
-| P1 | VariantDiff | `apps/variantdiff` | Diff product/variant changes before publish | Narrow |
-| P1 | BillGuard | `apps/billguard` | Confirm client before ads billing changes | Narrow |
+| # | App | Path | Pitch | Built |
+|---|-----|------|-------|-------|
+| 1 | ShopSwitch | `apps/shopswitch` | Shopify multi-store switcher | Yes |
+| 2 | HelpdeskHop | `apps/helpdeskhop` | Gorgias / Zendesk / Intercom hopper | No |
+| 3 | KlaviyoSwitch | `apps/klaviyoswitch` | Klaviyo multi-account switcher | No |
+| 4 | PortalSwitch | `apps/portalswitch` | QuickBooks / Xero hopper | Yes |
+| 5 | StripeMark | `apps/stripemark` | Label Stripe account | No |
+| 6 | ClientMark | `apps/clientmark` | Label Meta / Google Ads accounts | Yes |
+| 7 | SlackSpaceMark | `apps/slackspacemark` | Label Slack workspace | No |
+| 8 | BillGuard | `apps/billguard` | Confirm client before ads billing | Yes |
+| 9 | HubSpotHop | `apps/hubspothop` | HubSpot portal hopper | No |
+| 10 | TabClient | `apps/tabclient` | Tab color/rename on allowlisted SaaS | No |
 
-Ship P0 first: **ShopSwitch → StorePulse → ClientMark**, then PortalSwitch → RefundRadar → VariantDiff → BillGuard.
+Ship built first: **ShopSwitch → ClientMark → PortalSwitch → BillGuard**, then build/ship the rest. All **narrow hosts** for easiest Chrome/Edge/AMO approval.
 
-### Deferred (do not submit)
+### Secondary (later)
+StorePulse · RefundRadar · VariantDiff
 
-PayBump · ReplyKit · BidMatch · FormPack · PromptLedger · EvidenceKit · CiteBrowse — broad hosts and/or weaker review/wedge fit.
+### Deferred
+PayBump · ReplyKit · BidMatch · FormPack · PromptLedger · EvidenceKit · CiteBrowse
 
 ---
 

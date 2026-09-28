@@ -2,7 +2,7 @@
 
 Templates and helpers for publishing Gantry micro extensions.
 
-**Active portfolio (top 7 review-safe):** ShopSwitch · StorePulse · ClientMark · PortalSwitch · RefundRadar · VariantDiff · BillGuard  
+**Active portfolio (top 10):** ShopSwitch · HelpdeskHop · KlaviyoSwitch · PortalSwitch · StripeMark · ClientMark · SlackSpaceMark · BillGuard · HubSpotHop · TabClient  
 **Operating model:** [`docs/extension-operating-model.md`](../../docs/extension-operating-model.md)  
 **Store process:** [`docs/extension-store-shipping.md`](../../docs/extension-store-shipping.md)
 
