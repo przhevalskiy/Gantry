@@ -278,4 +278,4 @@ Not in the active seven — backlog only after P0 is live. Same filters: **narro
 
 ## One-page summary
 
-**Narrow-host, single-purpose, local-first tools → Chrome then Edge then Firefox → each app its own paid Pro SKU → async support → no suite.**
+**Narrow-host agency context tools → Chrome then Edge then Firefox → each app its own paid Pro SKU → expand only into more named-admin verticals → no suite / no `<all_urls>`.**
