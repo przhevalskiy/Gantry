@@ -210,8 +210,59 @@ Keep free-tier claims accurate in each listing/privacy page.
 
 ---
 
+## 10. Expansion verticals (review-easy candidates)
 
-## 10. Command cheat sheet
+Not in the active seven — backlog only after P0 is live. Same filters: **narrow hosts**, single purpose, local-only, no `<all_urls>`.
+
+### Download magnets (wrong-account / switcher pattern)
+| Vertical | App sketch | Narrow hosts (examples) |
+|----------|------------|-------------------------|
+| Support helpdesk | **HelpdeskHop** | Gorgias, Zendesk, Intercom, Freshdesk |
+| Email ESP | **KlaviyoSwitch** | Klaviyo admin |
+| Payments | **StripeMark** | Dashboard Stripe |
+| CRM | **HubSpotHop** / **SalesforceMark** | HubSpot, Lightning |
+| Project ops | **AsanaMark** / **ClickUpMark** | Asana, ClickUp, Monday |
+| Universal agency | **TabClient** | Allowlisted SaaS hosts only |
+
+### Commerce / marketplace ops
+| Vertical | App sketch | Narrow hosts |
+|----------|------------|--------------|
+| Shopify merch | **PricePin**, **PolicyWatch** | Shopify admin |
+| Amazon seller | **SellerStamp** (label Seller Central marketplace/account) | sellercentral.amazon.* |
+| Etsy seller | **EtsyShopHop** | Etsy seller/shop manager |
+| eBay | **eBaySellerMark** | eBay seller hub |
+| Woo / WordPress admin | **WooStoreHop** | `*/wp-admin*` on known merchant patterns — prefer explicit shop admin hosts if possible |
+
+### Ads / growth (beyond current ClientMark / BillGuard)
+| Vertical | App sketch | Narrow hosts |
+|----------|------------|--------------|
+| LinkedIn Ads | **LiAdsMark** | linkedin.com/campaignmanager |
+| TikTok Ads | **TikAdsMark** | ads.tiktok.com |
+| Pinterest Ads | **PinAdsMark** | ads.pinterest.com |
+| Analytics | **GA4PropertyMark** | analytics.google.com |
+| Affiliate | **ImpactMark** / **PartnerStackMark** | Impact, PartnerStack portals |
+
+### Professional services
+| Vertical | App sketch | Narrow hosts |
+|----------|------------|--------------|
+| Legal practice | **ClioMatterMark** | Clio |
+| Accounting (beyond PortalSwitch) | **FreshBooksHop**, **WaveMark** | FreshBooks, Wave |
+| Recruiting | **LeverMark** / **GreenhouseMark** | Lever, Greenhouse |
+| Real estate CRM | **FollowUpBossMark** | Follow Up Boss |
+| Agencies (design) | **FigmaFileMark** | Figma (file/org URL match) |
+
+### Review-safe rules for any new vertical
+1. Name **exact** admin hosts in the manifest + listing  
+2. One job: switch, label, confirm, or snapshot-diff — not a suite  
+3. No remote code, no scraping marketplaces at scale, no affiliate injection  
+4. Data stays in `chrome.storage.local` for v1  
+5. Separate paid SKU per app ($29 lifetime default)
+
+**Do not expand** into broad autofill, AI wrappers, or `<all_urls>` tools until the narrow-host machine is proven.
+
+---
+
+## 11. Command cheat sheet
 
 ```bash
 ./scripts/ship-all-extensions.sh    # activeWave only
