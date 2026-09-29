@@ -24,6 +24,8 @@ Integrator / apps/web  →  api/ (FastAPI)  →  Agentex  →  Temporal worker (
 
 **Primary interface:** `POST /v1/tasks` on the Gantry API (`:8001`). The API works without the UI.
 
+**Agency browser extensions** (ShopSwitch, ClientMark, etc.) live in a separate repo: [agency-extension-hub](https://github.com/przhevalskiy/agency-extension-hub).
+
 ---
 
 ## What this is not
