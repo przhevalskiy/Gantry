@@ -1,3 +1,5 @@
+import type { SummaryMode } from './types';
+
 /** Page-world article text extractor */
 export function extractPageText(): { title: string; url: string; text: string } {
   const url = location.href;
@@ -12,13 +14,14 @@ export function extractPageText(): { title: string; url: string; text: string } 
   return { title, url, text };
 }
 
-export function buildSummaryPrompt(title: string, text: string): string {
-  return [
-    'Summarize the following web page in 5 short bullet points for a busy reader.',
-    'Be factual. No preamble.',
-    '',
-    `Title: ${title}`,
-    '',
-    text.slice(0, 10000),
-  ].join('\n');
+export function buildSummaryPrompt(title: string, text: string, mode: SummaryMode = 'bullets'): string {
+  const instruction =
+    mode === 'short'
+      ? 'Summarize the following web page in 2–3 short sentences for a busy reader.'
+      : mode === 'eli5'
+        ? 'Explain the following web page simply, as if to a smart 12-year-old. Use short paragraphs. No jargon.'
+        : 'Summarize the following web page in 5 short bullet points for a busy reader.';
+  return [instruction, 'Be factual. No preamble.', '', `Title: ${title}`, '', text.slice(0, 10000)].join(
+    '\n',
+  );
 }

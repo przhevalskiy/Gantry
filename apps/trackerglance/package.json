@@ -1,6 +1,6 @@
 {
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -25,5 +25,5 @@
     "wxt": "^0.21.3"
   },
   "name": "trackerglance",
-  "description": "POC: read-only glance at known tracker scripts on the current page."
+  "description": "See known trackers on any page with a privacy score. Read-only."
 }

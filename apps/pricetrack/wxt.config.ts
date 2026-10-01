@@ -5,10 +5,10 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   vite: () => ({ plugins: [tailwindcss()] }),
   manifest: {
-    name: 'PriceTrack (POC)',
+    name: 'PriceTrack',
     description:
-      'Watch product page prices and keep a local history. POC — no coupon auto-injection.',
-    version: '0.1.0',
+      'Watch product page prices, keep local history, and set a target price. No account. No coupon injection.',
+    version: '0.2.0',
     permissions: ['storage', 'tabs', 'activeTab', 'scripting'],
     host_permissions: ['http://*/*', 'https://*/*'],
     action: { default_title: 'PriceTrack' },

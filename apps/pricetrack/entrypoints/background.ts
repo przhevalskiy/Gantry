@@ -1,3 +1,3 @@
 export default defineBackground(() => {
-  console.info('[PriceTrack] POC ready');
+  console.info('[PriceTrack] ready');
 });

@@ -7,7 +7,11 @@ function empty(): PageSumState {
 export async function loadState(): Promise<PageSumState> {
   const raw = await browser.storage.local.get(STORAGE_KEY);
   const stored = raw[STORAGE_KEY] as PageSumState | undefined;
-  return stored?.version === 1 ? stored : empty();
+  if (stored?.version !== 1) return empty();
+  return {
+    ...stored,
+    settings: { ...DEFAULT_SETTINGS, ...stored.settings },
+  };
 }
 
 export async function saveState(state: PageSumState): Promise<void> {

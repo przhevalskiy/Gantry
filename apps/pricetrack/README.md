@@ -1,9 +1,9 @@
-# PriceTrack (POC)
+# PriceTrack
 
-Mass-use shopping POC: extract a product price from the active tab, store **local history**, optional coupon **note** (no auto-injection).
+Local product price history in the browser. Watch a page, recheck later, set a target. No account, no coupon injection.
 
 ```bash
-npm install && npm test && npm run build
+npm install && npm test && npm run compile && npm run build
 ```
 
-**Review note:** uses broad host access for product pages; for store submit, consider narrowing to major retailers later.
+Load `apps/pricetrack/.output/chrome-mv3` as an unpacked extension.

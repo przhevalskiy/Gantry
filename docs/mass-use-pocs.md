@@ -1,16 +1,16 @@
-# Mass-use POCs (3 prototypes)
+# Mass-use portfolio (primary)
 
 Branch: `cursor/mass-use-pocs-cfb0`
 
-These are **proofs of concept** for consumer mass-use lanes — separate from the agency top-10 portfolio.
+These three consumer extensions are the **active product bet**. Agency switchers (ShopSwitch, ClientMark, etc.) are niche ops tools for a tiny buyer set — parked in [agency-extension-hub](https://github.com/przhevalskiy/agency-extension-hub), not the download path.
 
-| App | Path | Lane | What it does |
-|-----|------|------|----------------|
-| **PriceTrack** | `apps/pricetrack` | Shopping | Extract price on tab, local history, coupon **note** only (no inject) |
-| **TrackerGlance** | `apps/trackerglance` | Privacy | Read-only known-tracker scan |
-| **PageSum** | `apps/pagesum` | AI | Summarize tab with user-supplied API key |
+| App | Path | Lane | Why mass | v0.2 |
+|-----|------|------|----------|------|
+| **PriceTrack** | `apps/pricetrack` | Shopping | Everyone shops; local history + target price, no Honey-style inject | Sparkline, low/high, target price |
+| **TrackerGlance** | `apps/trackerglance` | Privacy | Curiosity on every site; read-only = safer claims than blockers | Auto-scan, ~30 trackers, privacy score |
+| **PageSum** | `apps/pagesum` | AI | Summarize any tab; BYOK so you don’t eat API cost | Bullets / short / simple, copy |
 
-## Run
+## Run / verify
 
 ```bash
 for id in pricetrack trackerglance pagesum; do
@@ -18,13 +18,22 @@ for id in pricetrack trackerglance pagesum; do
 done
 ```
 
-## Review / ops honesty
+## Store / ops
 
-- All three use broad `host_permissions` for “any page” mass use — harder CWS review than the agency ten.
-- PriceTrack deliberately **avoids coupon auto-injection**.
-- TrackerGlance does **not** block trackers (safer claims).
-- PageSum pushes **API cost to the user** (their key) so the POC isn’t burning your tokens.
+- Broad `host_permissions` (any page) → harder CWS review than narrow-host agency tools. Worth it for mass install.
+- PriceTrack: **no coupon auto-injection**.
+- TrackerGlance: **does not block** trackers (glance + score only).
+- PageSum: user pays their own model API; key in `chrome.storage.local`.
+- Pricing (locked earlier): Pro **$3.99/mo** or **$29/yr** per app, no suite, no in-app ads.
+- Ship order: Chrome → Edge → Firefox; submit one lane at a time (PriceTrack first).
 
-## Not a replacement for the top 10
+## Ship priority
 
-Agency switchers remain the leave-alone / easy-review portfolio. These POCs explore mass acquisition.
+1. **PriceTrack** — clearest consumer habit loop (watch → recheck → drop).
+2. **TrackerGlance** — zero API cost, instant “wow” on news/shopping sites.
+3. **PageSum** — requires user API key; smaller install funnel, still real demand.
+
+## Not doing
+
+- Building more agency “wrong-client” switchers.
+- Coupon injection, tracker blocking, or hosted AI that bills you per summarize.

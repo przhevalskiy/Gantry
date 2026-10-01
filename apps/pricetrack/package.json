@@ -1,6 +1,6 @@
 {
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -25,5 +25,5 @@
     "wxt": "^0.21.3"
   },
   "name": "pricetrack",
-  "description": "POC: watch product prices locally and log history (no coupon injection)."
+  "description": "Local product price history and target alerts. No coupon injection."
 }

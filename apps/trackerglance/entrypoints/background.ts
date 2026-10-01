@@ -1,3 +1,3 @@
 export default defineBackground(() => {
-  console.info('[TrackerGlance] POC ready');
+  console.info('[TrackerGlance] ready');
 });

@@ -4,10 +4,20 @@ function empty(): PriceTrackState {
   return { version: 1, items: [], settings: { pro: { enabled: false } } };
 }
 
+function normalizeItem(item: WatchedItem): WatchedItem {
+  return {
+    ...item,
+    note: item.note ?? '',
+    targetPrice: item.targetPrice ?? null,
+    history: item.history ?? [],
+  };
+}
+
 export async function loadState(): Promise<PriceTrackState> {
   const raw = await browser.storage.local.get(STORAGE_KEY);
   const stored = raw[STORAGE_KEY] as PriceTrackState | undefined;
-  return stored?.version === 1 ? stored : empty();
+  if (stored?.version !== 1) return empty();
+  return { ...stored, items: stored.items.map(normalizeItem) };
 }
 
 export async function saveState(state: PriceTrackState): Promise<void> {
@@ -39,11 +49,20 @@ export async function upsertWatch(input: {
     lastCheckedAt: now,
     history: [input.point],
     note: input.note?.trim() ?? '',
+    targetPrice: null,
   };
   state.items.unshift(created);
   state.items = state.items.slice(0, 50);
   await saveState(state);
   return created;
+}
+
+export async function setTargetPrice(id: string, targetPrice: number | null): Promise<void> {
+  const state = await loadState();
+  const item = state.items.find((i) => i.id === id);
+  if (!item) return;
+  item.targetPrice = targetPrice != null && Number.isFinite(targetPrice) && targetPrice > 0 ? targetPrice : null;
+  await saveState(state);
 }
 
 export async function deleteWatch(id: string): Promise<void> {

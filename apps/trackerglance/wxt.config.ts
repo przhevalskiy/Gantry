@@ -5,10 +5,10 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   vite: () => ({ plugins: [tailwindcss()] }),
   manifest: {
-    name: 'TrackerGlance (POC)',
+    name: 'TrackerGlance',
     description:
-      'See which known tracker/analytics scripts appear on this page. Read-only — does not block.',
-    version: '0.1.0',
+      'See known tracker and ads scripts on any page, with a simple privacy score. Read-only — does not block.',
+    version: '0.2.0',
     permissions: ['storage', 'activeTab', 'scripting'],
     host_permissions: ['http://*/*', 'https://*/*'],
     action: { default_title: 'TrackerGlance' },

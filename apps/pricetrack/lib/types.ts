@@ -13,6 +13,8 @@ export interface WatchedItem {
   lastCheckedAt: number;
   history: PricePoint[];
   note: string;
+  /** Alert when latest price is at or below this (local only). */
+  targetPrice: number | null;
 }
 
 export interface PriceTrackState {

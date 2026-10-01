@@ -1,3 +1,3 @@
 export default defineBackground(() => {
-  console.info('[PageSum] POC ready');
+  console.info('[PageSum] ready');
 });

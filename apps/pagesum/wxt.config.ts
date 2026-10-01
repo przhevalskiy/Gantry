@@ -5,10 +5,10 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   vite: () => ({ plugins: [tailwindcss()] }),
   manifest: {
-    name: 'PageSum (POC)',
+    name: 'PageSum',
     description:
-      'Summarize the current page using your own OpenAI-compatible API key. Key stays local.',
-    version: '0.1.0',
+      'Summarize the current page with your own OpenAI-compatible API key. Key stays on your device.',
+    version: '0.2.0',
     permissions: ['storage', 'activeTab', 'scripting'],
     host_permissions: ['http://*/*', 'https://*/*'],
     action: { default_title: 'PageSum' },

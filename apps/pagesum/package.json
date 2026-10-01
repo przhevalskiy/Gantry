@@ -1,6 +1,6 @@
 {
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -25,5 +25,5 @@
     "wxt": "^0.21.3"
   },
   "name": "pagesum",
-  "description": "POC: summarize the current page with your own OpenAI-compatible API key."
+  "description": "Summarize any page with your own API key. Key stays local."
 }

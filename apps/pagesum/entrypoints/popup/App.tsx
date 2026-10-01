@@ -2,7 +2,13 @@ import { useEffect, useState } from 'react';
 import { buildSummaryPrompt, extractPageText } from '@/lib/extract';
 import { summarizeWithOpenAI } from '@/lib/openai';
 import { loadState, saveSettings, saveState } from '@/lib/storage';
-import type { PageSumSettings } from '@/lib/types';
+import type { PageSumSettings, SummaryMode } from '@/lib/types';
+
+const MODES: { id: SummaryMode; label: string }[] = [
+  { id: 'bullets', label: 'Bullets' },
+  { id: 'short', label: 'Short' },
+  { id: 'eli5', label: 'Simple' },
+];
 
 export default function App() {
   const [settings, setSettings] = useState<PageSumSettings | null>(null);
@@ -15,6 +21,7 @@ export default function App() {
     void loadState().then((s) => {
       setSettings(s.settings);
       if (s.lastSummary) setSummary(s.lastSummary.text);
+      if (!s.settings.apiKey.trim()) setShowKey(true);
     });
   }, []);
 
@@ -43,7 +50,7 @@ export default function App() {
       });
       const page = results?.[0]?.result;
       if (!page?.text || page.text.length < 40) throw new Error('Not enough text on this page');
-      const prompt = buildSummaryPrompt(page.title, page.text);
+      const prompt = buildSummaryPrompt(page.title, page.text, settings.mode);
       const text = await summarizeWithOpenAI({
         apiKey: settings.apiKey.trim(),
         baseUrl: settings.baseUrl.trim() || 'https://api.openai.com/v1',
@@ -62,14 +69,43 @@ export default function App() {
     }
   };
 
+  const copy = async () => {
+    if (!summary) return;
+    try {
+      await navigator.clipboard.writeText(summary);
+      flash('Copied');
+    } catch {
+      flash('Copy failed');
+    }
+  };
+
   return (
     <div className="flex min-h-[560px] flex-col gap-3 p-3">
       <header className="panel rounded-2xl px-3.5 py-3">
         <p className="brand text-[1.4rem] font-extrabold">PageSum</p>
         <p className="mt-1 text-[12px] text-[var(--soft)]">
-          POC — summarize this page with your own API key (stored locally).
+          Summarize any page with your own API key. Key stays on this device.
         </p>
       </header>
+
+      <div className="flex gap-1.5">
+        {MODES.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            className={`flex-1 rounded-xl px-2 py-1.5 text-[11px] font-semibold ${
+              settings.mode === m.id ? 'btn' : 'btn-ghost'
+            }`}
+            onClick={() => {
+              const next = { ...settings, mode: m.id };
+              setSettings(next);
+              void saveSettings(next);
+            }}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
 
       <button type="button" className="btn rounded-xl py-2.5 text-[13px]" disabled={busy} onClick={() => void run()}>
         {busy ? 'Summarizing…' : 'Summarize this tab'}
@@ -122,7 +158,14 @@ export default function App() {
 
       <section className="panel min-h-0 flex-1 overflow-y-auto rounded-2xl p-3">
         {summary ? (
-          <pre className="whitespace-pre-wrap font-sans text-[12px] leading-relaxed">{summary}</pre>
+          <>
+            <div className="mb-2 flex justify-end">
+              <button type="button" className="btn-ghost rounded-lg px-2 py-1 text-[10px]" onClick={() => void copy()}>
+                Copy
+              </button>
+            </div>
+            <pre className="whitespace-pre-wrap font-sans text-[12px] leading-relaxed">{summary}</pre>
+          </>
         ) : (
           <p className="py-8 text-center text-[12px] text-[var(--soft)]">
             Add an API key, open an article, then summarize.
