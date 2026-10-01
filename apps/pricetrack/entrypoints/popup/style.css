@@ -1,0 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,600;9..40,700&family=Syne:wght@700;800&display=swap');
+@import 'tailwindcss';
+:root { --ink:#0f172a; --soft:#64748b; --accent:#22c55e; --accent-ink:#052e16; --line:rgba(15,23,42,.12); --fail:#dc2626; font-family:'DM Sans',system-ui,sans-serif; color:var(--ink); }
+html,body{margin:0;width:380px;min-height:520px}
+body{background:radial-gradient(90% 60% at 100% 0%,#86efac 0%,transparent 50%),linear-gradient(165deg,#f0fdf4,#dcfce7)}
+.brand{font-family:'Syne',sans-serif;letter-spacing:-.03em}
+.panel{background:rgba(255,255,255,.88);border:1px solid var(--line);backdrop-filter:blur(8px)}
+.btn{background:var(--accent);color:var(--accent-ink);font-weight:700;border:1px solid rgba(5,46,22,.12)}
+.btn-ghost{background:transparent;border:1px solid var(--line)}
