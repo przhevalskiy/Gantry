@@ -80,3 +80,7 @@ Source of truth for tokens: `apps/web/src/design/tokens.css`, `apps/web/src/inde
 ### Tension to manage
 
 Docs and brand say **factory / firm**. Parts of the web app still *look* chat-shaped. Treat that as **run observability chrome**, and migrate copy/layout toward run-console semantics whenever touching those surfaces.
+
+### Agent / staff visuals
+
+Do **not** use multi-agent chibis or OpenAI-style identity dots as the crew. Use an ordered **staff roster of role seals** with status pips. Full rules: [`frontend-agent-representation.md`](./frontend-agent-representation.md).
