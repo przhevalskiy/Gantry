@@ -95,7 +95,7 @@ Submit an engineering task.
 | `project_id` | ✓ | — | ID of the linked project |
 | `branch_prefix` | | `swarm` | Git branch prefix |
 | `tier` | | `-1` (auto) | Model tier: 0=Haiku, 1=Sonnet, 2=Opus |
-| `playbook` | | — | Vertical overlay: `platform-backlog`, `a11y-remediation`, `monorepo-slice` |
+| `playbook` | | — | Job packet slug: `platform-backlog`, `a11y-remediation`, `monorepo-slice` |
 | `github_token` | | `GH_TOKEN` from env | Override the GitHub token for this task |
 | `webhook_url` | | — | URL to POST when task completes |
 
@@ -103,6 +103,38 @@ Response `201`:
 ```json
 { "task_id": "task_xyz", "status": "queued", "project_id": "proj_abc" }
 ```
+
+### `POST /v1/playbooks/run`
+Convenience submit bound to a playbook (and optional firm pack). Same factory — not a new ACP agent.
+
+```json
+{
+  "pack": "migration-runner@1",
+  "playbook": "a11y-remediation",
+  "goal": "Fix contrast on login",
+  "project_id": "proj_abc"
+}
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `goal` | ✓ | Engineering goal |
+| `project_id` | ✓ | Workspace / project id |
+| `playbook` | one of pack/playbook | Job packet slug |
+| `pack` | one of pack/playbook | Firm pack id or `id@version` (uses pack default playbook if playbook omitted) |
+
+### Firm packs (`/v1/packs`)
+
+Versioned role sets + default playbooks for the one factory (`swe-factory@1`, `migration-runner@1`).
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/v1/packs` | Catalog + org install/enable + per-pack daily quota |
+| `POST` | `/v1/packs/{id}/install` | Install / re-enable; seeds system playbooks |
+| `PATCH` | `/v1/packs/{id}` | `{ "enabled": false, "max_tasks_per_day": 50 }` |
+| `DELETE` | `/v1/packs/{id}` | Remove install row |
+
+UI: `/packs` — thin catalog + run console (not chat).
 
 ### `POST /v1/tasks/bulk`
 Submit up to 50 tasks in parallel. Returns immediately — partial failure is fine.

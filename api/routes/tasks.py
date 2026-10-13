@@ -180,6 +180,15 @@ async def _submit_one(
         token = await _resolve_github_token(org_id, project, github_token or None, github_token_secret)
         try:
             playbook_slug, playbook_spec = await _resolve_playbook(org_id, playbook)
+            if playbook_slug:
+                from api.repositories import firm_packs as packs_repo
+
+                pack_id = await packs_repo.assert_playbook_pack_allowed(
+                    org_id=org_id,
+                    playbook_slug=playbook_slug,
+                )
+                if pack_id:
+                    await packs_repo.assert_pack_quota(org_id=org_id, pack_id=pack_id)
             goal, branch_prefix, tier, pipeline_overlay, playbook_id = resolve_submit_params(
                 goal=goal,
                 branch_prefix=branch_prefix,
@@ -346,7 +355,11 @@ async def submit_task(
 
     if "error" in result:
         err = result["error"]
-        if err.startswith("unknown playbook"):
+        if (
+            err.startswith("unknown playbook")
+            or "firm pack" in err
+            or err.startswith("playbook")
+        ):
             raise HTTPException(status_code=422, detail=err)
         raise HTTPException(status_code=502, detail=f"Agentex error: {err}")
 

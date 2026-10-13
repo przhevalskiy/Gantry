@@ -92,7 +92,7 @@ Pass `tier` and optional `pipeline` overrides on `POST /v1/tasks`:
 }
 ```
 
-**Playbooks** (`playbook: "platform-backlog"`, `a11y-remediation`, `monorepo-slice`) apply vertical presets without forking the engine. See [`docs/verticals/README.md`](docs/verticals/README.md).
+**Playbooks** (`playbook: "platform-backlog"`, `a11y-remediation`, `monorepo-slice`) are job packets — stages, seats, artifact — without forking the engine. **Firm packs** (`swe-factory@1`, `migration-runner@1`) group roles + default playbooks for org install (`GET /v1/packs`, UI `/packs`). Still one ACP citizen. See [`docs/platform/composable-crew-roadmap.md`](docs/platform/composable-crew-roadmap.md).
 
 ---
 

@@ -14,6 +14,7 @@ from api.routes import (
     agents,
     artifacts,
     audit,
+    firm_packs,
     github,
     github_browser,
     integrations_jira,
@@ -90,6 +91,7 @@ app.include_router(keys.router)
 app.include_router(projects.router)
 app.include_router(workspaces.router)
 app.include_router(playbooks.router)
+app.include_router(firm_packs.router)
 app.include_router(artifacts.router)
 app.include_router(agents.router)
 app.include_router(tasks.router)

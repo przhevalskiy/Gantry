@@ -122,6 +122,44 @@ export const gantryClient = {
   deletePlaybook: (id: string) =>
     request<void>(`/v1/playbooks/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
+  listPacks: () =>
+    request<{ packs: Record<string, unknown>[] }>('/v1/packs').then(r => r.packs),
+
+  getPack: (packId: string) =>
+    request<{ pack: Record<string, unknown> }>(`/v1/packs/${encodeURIComponent(packId)}`).then(
+      r => r.pack,
+    ),
+
+  installPack: (packId: string, body?: { version?: string; max_tasks_per_day?: number }) =>
+    request<{ pack: Record<string, unknown> }>(
+      `/v1/packs/${encodeURIComponent(packId)}/install`,
+      { method: 'POST', body: JSON.stringify(body ?? {}) },
+    ).then(r => r.pack),
+
+  updatePack: (
+    packId: string,
+    body: { enabled?: boolean; max_tasks_per_day?: number },
+  ) =>
+    request<{ pack: Record<string, unknown> }>(`/v1/packs/${encodeURIComponent(packId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }).then(r => r.pack),
+
+  uninstallPack: (packId: string) =>
+    request<void>(`/v1/packs/${encodeURIComponent(packId)}`, { method: 'DELETE' }),
+
+  runPlaybook: (body: {
+    goal: string;
+    project_id: string;
+    playbook?: string;
+    pack?: string;
+    tier?: number;
+  }) =>
+    request<{ task_id: string; status: string; playbook?: string; pack?: string }>(
+      '/v1/playbooks/run',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   listWorkspaces: () =>
     request<{ workspaces: GantryWorkspace[] }>('/v1/workspaces').then(r => r.workspaces),
 

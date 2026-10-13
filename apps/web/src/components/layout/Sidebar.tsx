@@ -12,6 +12,7 @@ import {
   FolderKanban,
   LayoutTemplate,
   Bot,
+  Package,
   PlayCircle,
   Globe,
   Check,
@@ -195,6 +196,13 @@ export function Sidebar() {
           <button className="sidebar-nav-link" onClick={() => navigate('/agents')}>
             <Bot size={18} />
             {!isCollapsed && <span>Team</span>}
+          </button>
+          <button
+            className={`sidebar-nav-link ${location.pathname.startsWith('/packs') ? 'active' : ''}`}
+            onClick={() => navigate('/packs')}
+          >
+            <Package size={18} />
+            {!isCollapsed && <span>Packs</span>}
           </button>
         </div>
 

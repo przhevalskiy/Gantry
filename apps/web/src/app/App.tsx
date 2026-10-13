@@ -5,6 +5,7 @@ import { AppPanel } from '@/components/shell/AppPanel';
 import { WorkspacesPage, WorkspaceDetailPage } from '@/features/projects';
 import { TemplatesPage } from '@/features/templates';
 import { AgentsPage } from '@/features/agents';
+import { PacksPage } from '@/features/packs';
 import { DeveloperPage } from '@/features/developer';
 import { RunIdePage, RunsPage } from '@/features/runs';
 import { useAuthStore, AuthModal } from '@/features/auth';
@@ -36,6 +37,7 @@ function AppLayout() {
           <Route path="/starters" element={<TemplatesPage />} />
           <Route path="/templates" element={<Navigate to="/starters" replace />} />
           <Route path="/agents" element={<AgentsPage />} />
+          <Route path="/packs" element={<PacksPage />} />
           <Route path="/developer" element={<DeveloperPage />} />
           <Route path="/runs" element={<RunsPage />} />
           </Routes>

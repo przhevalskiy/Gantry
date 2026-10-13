@@ -79,6 +79,20 @@ for await (const event of client.tasks.streamEvents(task.task_id)) {
     PROJECT_ID: proj_abc
 ```
 
+## Playbooks & firm packs
+
+```typescript
+await client.packs.install('migration-runner@1');
+const task = await client.playbooks.run({
+  pack: 'migration-runner@1',
+  playbook: 'a11y-remediation',
+  goal: 'Fix contrast on login',
+  project_id: projects[0].id,
+});
+```
+
+Packs install into one factory — they are not separately deployable chat bots.
+
 ## Reference
 
 ### `new GantryClient({ apiKey, baseUrl })`

@@ -71,6 +71,22 @@ else:
 | `hitl(task_id, *, checkpoint, workflow_id, approved, payload)` | `dict` |
 | `stream_events(task_id)` | `Iterator[dict]` — SSE until terminal |
 
+### `client.playbooks`
+
+| Method | Returns |
+|---|---|
+| `run(*, goal, project_id, playbook=None, pack=None, ...)` | `Task` — factory submit via job packet / firm pack |
+| `list()` / `get(id)` | Org playbooks |
+
+### `client.packs`
+
+| Method | Returns |
+|---|---|
+| `list()` / `get(id)` | Firm pack catalog + install state |
+| `install(id, *, version, max_tasks_per_day)` | Installed pack |
+| `update(id, *, enabled, max_tasks_per_day)` | Pack |
+| `uninstall(id)` | `None` |
+
 ### `client.agents`
 
 | Method | Returns |

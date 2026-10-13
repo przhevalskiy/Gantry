@@ -1,6 +1,6 @@
 # Composable crew roadmap — playbooks beyond one SWE firm
 
-**Status:** Phase A–D **implemented** (invariant-locked); E deferred  
+**Status:** Phase A–E **implemented** (invariant-locked)  
 **Problem:** Playbooks were overlays on one hardcoded engineering firm.  
 **Goal:** Make playbooks describe **job packets** (seats + artifact) with a data DAG and real Temporal role packs — without chat-bot firms or ACP forks.
 
@@ -12,9 +12,9 @@
 | **B** | Artifact policy in DevOps; include/disable seats; structured `artifact_type` | **Done** |
 | **C** | Foreman DAG interpreter (`stage_graph` + plan loop; heal/HITL metadata; golden default ≡ current) | **Done** |
 | **D** | Role pack contract + `oracle-a11y` Temporal child (`OracleA11yAgent`) | **Done** |
-| **E** | Firm-pack install UX / thin catalog UI | **Not started** (deferred) |
+| **E** | Firm packs (`swe-factory@1`, `migration-runner@1`), org install/quota, SDK `playbooks.run`, `/packs` UI | **Done** |
 
-Deferred on purpose: no firm-pack marketplace UI, no new ACP agents, no Grok-style bot UI.
+Still true: no per-playbook ACP agents, no Grok-style bot marketplace — packs install into one factory.
 
 Related: [`stack-debloat.md`](./stack-debloat.md) · [`agentex-citizen.md`](./agentex-citizen.md) · [`event-model.md`](./event-model.md) · [`../verticals/README.md`](../verticals/README.md) · `PLATFORM_REFACTOR.md` · `schemas/crew.py` · `schemas/playbooks.py`
 
@@ -256,23 +256,23 @@ oracle hooks                  artifact: branch|patch|pr|report
 
 ## 5. What to execute upon now (ordered)
 
-Phases **A–D landed**. Next is **E** only if product wants pack install UX — still not chat bots.
+Phases **A–E landed**. Roadmap complete under current invariants.
 
-### Landed (A–D)
+### Landed (A–E)
 
-1. Roadmap + schema v2 (`artifact`, `stages`) + artifact policy + include/disable  
-2. Foreman interpreter: `workflows/swarm/stage_graph.py` + `interpreter.py`; `pipeline.py` walks the plan  
-3. Golden tests: default stages ≡ classic PM→Architect→build_verify→Security→DevOps  
-4. Role packs: `role_packs/` + `oracle_a11y` → `OracleA11yAgent`; worker/manifest/catalog wired  
-5. `a11y-remediation` playbook stages schedule `oracle_a11y`  
+1. Schema v2 + artifact policy + seat mute  
+2. Foreman stage graph interpreter + heal/HITL metadata  
+3. Role packs: `oracle_a11y` Temporal child  
+4. Firm packs: `schemas/firm_packs.py`, `GET/POST/PATCH /v1/packs`, migration `011_firm_packs.sql`  
+5. SDK: `client.playbooks.run({ pack, playbook, goal, project_id })` + `client.packs.*`  
+6. UI: `/packs` catalog + run console (not chat)  
 
-### Explicitly defer
+### Explicitly never
 
-| Item | Until |
-|------|--------|
-| Firm-pack install / catalog UI | Phase E |
-| Marketplace / bot deploy UX | Never as chat bots; packs only in Phase E |
-| Per-playbook ACP | Never (C1) |
+| Item | Why |
+|------|-----|
+| Per-playbook ACP agents | C1 / I7 |
+| Chat-bot marketplace / Grok-style deploy | P1 / P2 |
 
 ---
 

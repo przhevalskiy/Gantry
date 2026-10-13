@@ -11,6 +11,7 @@ export const DOC_NAV: DocNavItem[] = [
   { id: 'streaming', label: 'Streaming' },
   { id: 'hitl', label: 'Human-in-the-loop' },
   { id: 'playbooks', label: 'Playbooks' },
+  { id: 'packs', label: 'Firm packs' },
   { id: 'agents', label: 'Agents' },
   { id: 'secrets', label: 'Secrets' },
   { id: 'webhooks', label: 'Webhooks' },

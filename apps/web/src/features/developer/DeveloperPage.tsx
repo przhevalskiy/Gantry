@@ -272,25 +272,43 @@ POST /v1/tasks/:id/hitl
 
         <DocSection id="playbooks" title="Playbooks">
           <DocLead>
-            Playbooks (Starters in the UI) are reusable run overlays — goal prefix, default
-            tier, branch prefix, pipeline limits, and oracle instructions for verticals
-            like accessibility remediation.
+            Playbooks are job packets — seats, stages, artifact type, and oracle knobs —
+            not separately deployable bots. Run via tasks or the convenience endpoint.
           </DocLead>
           <DocEndpoint method="GET" path="/v1/playbooks" summary="List org playbooks and system starters." scope="tasks:read" />
           <DocEndpoint method="POST" path="/v1/playbooks" summary="Create a custom playbook." scope="tasks:write" />
           <DocEndpoint method="PATCH" path="/v1/playbooks/:slug" summary="Update playbook config." scope="tasks:write" />
           <DocEndpoint method="DELETE" path="/v1/playbooks/:slug" summary="Delete a custom playbook." scope="tasks:write" />
-          <DocPre>{`POST /v1/tasks
+          <DocEndpoint method="POST" path="/v1/playbooks/run" summary="Submit a task bound to a playbook (optional firm pack)." scope="tasks:write" />
+          <DocPre>{`POST /v1/playbooks/run
 {
+  "pack": "migration-runner@1",
+  "playbook": "a11y-remediation",
   "goal": "Fix contrast on primary buttons",
-  "project_id": "ws_abc",
-  "playbook": "a11y-remediation"
+  "project_id": "ws_abc"
 }`}</DocPre>
           <DocList
             items={[
-              'platform-backlog — general product engineering',
-              'a11y-remediation — WCAG-focused inspector overlay',
-              'monorepo-slice — scoped changes in large repos',
+              'platform-backlog — general product engineering (swe-factory)',
+              'a11y-remediation — WCAG + oracle-a11y (migration-runner)',
+              'monorepo-slice — scoped changes in large repos (swe-factory)',
+            ]}
+          />
+        </DocSection>
+
+        <DocSection id="packs" title="Firm packs">
+          <DocLead>
+            Versioned role sets + default playbooks installed into the one Gantry factory.
+            Not a chat-bot marketplace — compose crews inside swarm-factory.
+          </DocLead>
+          <DocEndpoint method="GET" path="/v1/packs" summary="Catalog with org install/enable state." scope="tasks:read" />
+          <DocEndpoint method="POST" path="/v1/packs/:id/install" summary="Install or re-enable a pack; seed playbooks." scope="projects:write" />
+          <DocEndpoint method="PATCH" path="/v1/packs/:id" summary="Enable/disable or set per-pack daily quota." scope="projects:write" />
+          <DocEndpoint method="DELETE" path="/v1/packs/:id" summary="Remove install row (auto packs fall back to built-in)." scope="projects:write" />
+          <DocList
+            items={[
+              'swe-factory@1 — classic SWE crew; auto-available',
+              'migration-runner@1 — branch-first jobs + OracleA11yAgent',
             ]}
           />
         </DocSection>

@@ -1,0 +1,141 @@
+.packs-page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 40px 32px 64px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.packs-header {
+  margin-bottom: 28px;
+}
+
+.packs-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.packs-subtitle {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--gray-500);
+  max-width: 52rem;
+}
+
+.packs-error {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--danger, #b91c1c) 12%, transparent);
+  color: var(--danger, #b91c1c);
+  font-size: 13px;
+}
+
+.packs-muted {
+  color: var(--gray-500);
+  font-size: 14px;
+}
+
+.packs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.packs-item {
+  display: flex;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--gray-200, #e5e7eb);
+}
+
+.packs-item-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  color: var(--gray-700);
+}
+
+.packs-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.packs-item-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.packs-item-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.packs-item-ref {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+.packs-item-desc {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--gray-600);
+}
+
+.packs-item-meta {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+.packs-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.packs-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--gray-300, #d1d5db);
+  background: transparent;
+  color: var(--gray-800);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.packs-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.packs-btn-primary {
+  background: var(--gray-900, #111);
+  border-color: var(--gray-900, #111);
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .packs-page {
+    padding: 24px 16px 48px;
+  }
+
+  .packs-item {
+    flex-direction: column;
+    gap: 8px;
+  }
+}

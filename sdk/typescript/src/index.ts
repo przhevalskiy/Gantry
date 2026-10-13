@@ -1,5 +1,5 @@
 import { HttpClient } from './http';
-import { Tasks, Projects, Agents } from './resources';
+import { Tasks, Projects, Agents, Playbooks, Packs } from './resources';
 export { verifyWebhookSignature } from './webhooks';
 
 export { GantryApiError } from './http';
@@ -11,6 +11,8 @@ export class GantryClient {
   readonly tasks: Tasks;
   readonly projects: Projects;
   readonly agents: Agents;
+  readonly playbooks: Playbooks;
+  readonly packs: Packs;
 
   constructor(options: { apiKey?: string; baseUrl?: string } = {}) {
     const apiKey =
@@ -30,5 +32,7 @@ export class GantryClient {
     this.tasks = new Tasks(http);
     this.projects = new Projects(http);
     this.agents = new Agents(http);
+    this.playbooks = new Playbooks(http);
+    this.packs = new Packs(http);
   }
 }
