@@ -1,168 +1,221 @@
-# Frontend design guidelines — representing the firm’s staff
+# Frontend design guidelines — Operator identity (silicon firm workplace)
 
 **Audience:** product design + `apps/web`  
 **Brand lock:** [`persona-the-firm.md`](./persona-the-firm.md) · [`voice-and-look.md`](./voice-and-look.md)  
-**Code today:** pipeline stage dots (`PipelineTracker`), lavender role tints (`agentTheme.ts`), pixel-dust blobs (`ChibiAvatar` — name legacy), Lucide role icons (Team page).
+**North-star feeling:** *the future of the workplace for silicon engineering teams* — a retained digital firm whose people show up, take seats, and ship artifacts.  
+**Code today:** pipeline dots, lavender role tints (`agentTheme.ts`), pixel-dust blobs (`ChibiAvatar`), Lucide on Team — **starting point, not the destination**.
 
 ---
 
-## Verdict (choose this)
+## Verdict
 
-| Pattern | Use? | Role |
-|---------|------|------|
-| **Staff marks** (role seals / badges) | **Yes — primary identity** | Who is staffed on the engagement |
-| **Roster sequence** (ordered strip) | **Yes — primary sequence** | Firm staffing order = stage graph |
-| **Status dots / pulses** | **Yes — secondary presence** | Active / waiting / done (not personality) |
-| **OpenAI-style free Dots as agent identity** | **No** | Reads as companion swarm, not a firm |
-| **Multi-agent chibi characters** | **No** (primary UI) | Reads as collectible pets / Muse-Grok energy |
-| **Pixel-dust blobs** | **Legacy / demote** | OK as optional motion texture behind a seal; not the face of the firm |
+We need a real **avatar identity** — memorable Operators who feel like colleagues in a next-gen firm — **not** dry icon tiles, **not** Muse/Grok chibi pets, **not** OpenAI companion Dots.
 
-**One sentence:** Agents under the firm are shown as a **staffed roster of role seals in engagement order**, with quiet status — not a parade of chibis or a constellation of personality dots.
+| Pattern | Use? | Notes |
+|---------|------|--------|
+| **Operator portraits** | **Yes — primary identity** | Crafted role-distinct avatars; the face of the firm’s staff |
+| **Engagement floor / roster sequence** | **Yes — how they appear together** | Who’s in the room for this job, in stage order |
+| **Presence field** (glow, focus ring, desk light) | **Yes — secondary** | Deep work / waiting on you / done |
+| Status pip alone | Support only | Never the whole identity |
+| OpenAI-style free Dots as the agent | **No** | Ambient pets, not workplace identity |
+| Multi-agent chibi / collectible cast | **No** | Toy franchise; wrong register |
+| Lucide-only squircle tiles | **Too thin** | Fine for dense tables; not the brand face |
 
----
-
-## Why not chibis or Dots?
-
-| Approach | What it signals | Conflict with brand |
-|----------|-----------------|---------------------|
-| Multi-agent chibis | Cute cast you collect and befriend | Firm = professional services, not pets |
-| OpenAI Dots (as identity) | Ambient companions / chat presence | Product unit is a **job**, not a conversation |
-| Role seals + roster | Office staffing board / practice roster | Matches “retain a firm, file a work order” |
-
-Dots are fine as **traffic lights on a seal** (pending / active / done). They must not *be* the agent.
+**One sentence:** Each seat is an **Operator** with a crafted portrait; a run shows them as a **staffed engagement floor** — the future workplace of a silicon firm, not a chat zoo.
 
 ---
 
-## Canonical representation: Staff mark
+## Positioning the look
 
-Each Temporal seat (PM, Architect, Builder, …, Oracle A11y, DevOps) gets a **staff mark**:
+### What we’re designing for
+
+Gantry’s UI should feel like walking into the firm’s **engagement floor**:
+
+- You filed a work order (run).
+- The Foreman staffed the room.
+- Operators take their seats in order, work in parallel where the plan allows, pause when they need your sign-off, and leave a deliverable on the table.
+
+Aspiration: **prestige digital workplace** — calm materials, intentional motion, distinctive people — not enterprise grey, not Discord anime squad, not floating orb companions.
+
+### Emotional register
+
+| Want | Avoid |
+|------|--------|
+| Competent colleagues you’ll retain | Cute pets you’ll collect |
+| Presence & focus (“in deep work”) | Bounce / idle dance loops |
+| Craft, material, light | Clip-art icons as the hero |
+| One firm, many specialists | N bot franchises |
+| Future of work | Retro office clipart *or* pure sci-fi HUD clutter |
+
+---
+
+## Canonical identity: the Operator portrait
+
+Every Temporal seat gets a durable **Operator** — a designed avatar, not a generic glyph.
+
+### Portrait anatomy
 
 ```
-┌─────────┐
-│  [icon] │  ← Lucide (or mono glyph), 16–20px
-│   PM    │  ← role short label
-└─────────┘
-   ● idle   ← optional status pip (not the avatar)
+        ╭──────────╮
+       ╱  presence  ╲     ← soft field when active (desk light / focus)
+      │   ┌──────┐   │
+      │   │ bust │   │     ← silhouette + role costume language
+      │   │ +    │   │
+      │   │ tool │   │     ← one signature prop in-frame (not a floating Lucide)
+      │   └──────┘   │
+      │   role name  │     ← always legible nearby in roster
+       ╲  firm rim  ╱     ← shared metal/glass bezel = same employer
+        ╰──────────╯
 ```
 
-### Anatomy
+| Layer | Spec |
+|-------|------|
+| **Bezel** | Shared firm frame (thin glass/metal rim, same radius language) — *same employer* |
+| **Bust** | Stylized upper-body / head+shoulders **silhouette** — humanoid enough to read as a colleague, abstract enough to stay “silicon,” not a cartoon face franchise |
+| **Signature** | One role-defining prop or motif *integrated into the portrait* (plan slate, wrench rail, shield facet, ship chevron, a11y eye-mark…) |
+| **Material** | Soft matte body + subtle refractive edge; lavender firm atmosphere; Foreman slightly richer (deeper rim / denser presence) |
+| **Presence field** | When `active`: quiet luminance behind/around the bezel (“desk light on”). When `blocked` (HITL): amber hold. When `done`: field settles, check etched into rim |
+| **Label** | Role title in roster/stream — portrait alone is not enough in dense UI |
 
-| Part | Spec |
-|------|------|
-| Shape | Squircle / 10–12px radius tile, **not** a face circle as the hero |
-| Icon | Functional Lucide (Clipboard, Layers, Wrench, Shield, …) — same family as Team page |
-| Color | Role tint from a **cohesive firm palette** (lavender family OK); Foreman slightly stronger |
-| Label | Role name always available (tooltip or adjacent text) — never icon-only in primary roster |
-| State | Pip or ring: `pending` · `active` · `blocked` (HITL) · `done` · `skipped` |
-| Motion | Active = soft breath on pip or 1px ring; **no** bounce-idle mascot loops |
+### Distinctiveness rules (identity, not decoration)
 
-### Sizes
+Each Operator must be recognizable **in silhouette at 24px**:
 
-| Context | Mark size | Sequence |
-|---------|-----------|----------|
-| Run rail / Crew panel | 28–32px tile | Vertical roster |
-| Run header / compose chip | 20–24px | Horizontal strip, max ~7 visible + “+N” |
-| Stream row (who spoke) | 18–20px | Single mark + role label |
-| Pack / Team catalog | 32–40px | Grid of seals, not character cards |
+| Seat | Portrait language (direction, not final art) |
+|------|-----------------------------------------------|
+| **Foreman** | Centered, broader rim, “managing partner” stillness — firm emblem in chest/bezel |
+| **PM** | Brief / slate; questioning posture; open stance |
+| **Architect** | Layered planes / blueprint facets; composed profile |
+| **Builder** | Tool rail / constructive geometry; can show `×N` for parallel tracks without cloning faces |
+| **Inspector** | Optic / gauge motif; precise upright |
+| **Reviewer** | Dual-lens / diff motif; evaluative tilt |
+| **Security** | Faceted shield; tighter, denser mass |
+| **DevOps** | Ship chevron / launch rail; forward vector |
+| **Oracle A11y** (pack) | Accessibility mark woven into optic — specialist, still same firm bezel |
+| Future pack roles | New silhouette + signature prop; **same bezel system** so they join the firm, not start a spin-off cartoon |
+
+Art direction may be illustration, 3D stills, or generative-consistent assets — but **one system**, versioned like a design kit (`operator-portraits@1`).
+
+### What an Operator is not
+
+- Not a chibi with big eyes and outfit drops  
+- Not a nameless gradient orb / Dot  
+- Not a bare Lucide icon in a colored circle (except dense secondary UI)  
+- Not a photoreal human stock headshot (wrong “silicon” register)  
+- Not a unique IP character per playbook (playbooks are jobs; Operators are staff)
 
 ---
 
-## Avatar sequence = staffing roster
+## Sequence = engagement floor
 
-The sequence is the **engagement org chart for this run**, aligned with the Foreman stage plan — not a social feed of friends.
+When Operators appear together, they are **who’s on the floor for this engagement** — a living org chart, not a buddy list.
 
-### Default order (classic firm)
-
-```
-Foreman  →  PM  →  Architect  →  [Builders…]  →  Inspector  →  Reviewer  →  (Oracle*)  →  Security  →  DevOps
-```
-
-\* Pack roles (e.g. `oracle_a11y`) insert where the playbook `stages[]` place them.
-
-### Rules
-
-1. **Order follows the execution plan** (stage graph), not alphabetical or “favorites.”
-2. **Collapse the heal core** visually as one group when useful: `Build & verify` containing Builder / Inspector / Reviewer — mirrors `build_verify` in the engine.
-3. **Parallel builders** = one Builder seal + count badge (`×3`), not three chibi twins.
-4. **Skipped / muted seats** = ghosted seal (low opacity), still in roster if the playbook listed them — honesty about staffing.
-5. **Foreman** is the firm mark: first or pinned; never just another peer in a pet lineup.
-6. **Do not** animate the whole roster as a dancing cast when a run starts. Advance state on the active seat only.
-
-### Horizontal strip (compact)
+### Default staffing order
 
 ```
-[Firm]  PM — Arch — Build×2 — Insp — Rev — Sec — DevOps
-              └ active pip
+Foreman → PM → Architect → Builders (wave) → Inspector → Reviewer → [pack specialists] → Security → DevOps
 ```
 
-Use for run headers. Prefer separators / hairlines over chat-bubble stacking.
+### Floor layouts
 
-### Vertical roster (run console)
+**1. Roster rail (run console — primary)**  
+Vertical or horizontal strip of portraits in stage order. Active Operator gets presence field; others dim slightly. Status line under the active seat (“Running oracle checks”, “Waiting on plan approval”).
 
-Preferred in Crew / Agent rail: seal + label + one-line status (“Running tests”, “Waiting plan approval”).
+**2. Engagement header strip**  
+Compact portraits + role short codes; Builder collapses to one portrait + `×3`. Foreman pinned left as firm anchor.
+
+**3. Floor map (optional, aspirational)**  
+A single calm “floor plate” graphic: seats around a worktable / spine. Occupied seats light as the plan advances. Use sparingly (empty state, pack overview) — don’t make every run a video game map.
+
+**4. Stream attribution**  
+Small portrait + role name on each firm event. Presence dust (evolved pixel-dust) may live *inside* the bezel when “speaking” in the log — texture, not a second avatar system.
+
+### Sequence rules
+
+1. Order = execution plan / stage graph.  
+2. Parallel Builders = **one** Builder Operator + count, or a tight stack of bezels with one face — never three unrelated mascots.  
+3. Heal loops don’t spawn new characters; Inspector/Reviewer presence intensifies, Builder returns to the floor.  
+4. Skipped seats: portrait present but desaturated (“not staffed this engagement”).  
+5. HITL: that Operator turns toward the user (hold state) — *they’re waiting on the client*, firm metaphor intact.  
+6. Only **one** primary presence field at a time (plus Foreman always quietly lit).
 
 ---
 
-## Presence vs identity
+## Motion language (workplace, not toys)
 
-| Layer | Visual | Example |
-|-------|--------|---------|
-| **Identity** | Staff mark (icon tile + role) | “Inspector” |
-| **Presence** | Status pip / thin progress | Pulsing pip while inspector child workflow runs |
-| **Voice-of-log** | Optional dust/shimmer **behind** seal | Legacy pixel-dust only as texture, never alone |
+| State | Motion |
+|-------|--------|
+| Idle on floor | Near-still; optional 1–2% material shimmer |
+| Active / deep work | Presence field breathes slowly; micro tool hint |
+| HITL / blocked | Field shifts to hold color; subtle “awaiting client” pulse |
+| Done | Field collapses; rim check |
+| Fail / heal | Brief tighten, then Builder/Inspector re-engage — no comic shake |
 
-Thinking indicators in the log may keep three small dots — that is **system typing**, not an agent persona.
-
----
-
-## Surfaces — what to show where
-
-| Surface | Representation |
-|---------|----------------|
-| **New run / compose** | Optional mini roster preview from selected playbook stages (static seals) |
-| **Active run** | Live roster sequence + active pip; Foreman pinned |
-| **Team page** | Staff directory: seals + role copy + include/mute — **not** character bios |
-| **Packs page** | Practice card lists role **names** (and optional tiny seal row); no mascot squad |
-| **Message / activity feed** | Per-event staff mark + role label; avoid large chibi column |
-| **Marketing / empty states** | One firm mark + short roster silhouette; never “meet the gang” hero |
+Ship **2–3 intentional motions** per surface (presence on, hold, complete) — not a roster of idle dances.
 
 ---
 
-## Explicit anti-patterns
+## Surfaces
 
-1. **Chibi lineup** as the hero of the product (multi-character cast with faces/outfits).
-2. **Dot-only agents** with no role label (OpenAI Dots as the crew).
-3. **Per-playbook cartoon mascot** implying a separate bot firm.
-4. **“Agents deployed” toy language** without firm framing — prefer “Staffed · N of M seats” or “Engagement roster.”
-5. **Random pastel face circles** that could belong to any chat app after removing the wordmark.
-
----
-
-## Migration from current UI
-
-| Current | Direction |
+| Surface | Treatment |
 |---------|-----------|
-| `PipelineTracker` stage dots | Keep as **status pips**; pair each with a staff mark + label |
-| `ChibiAvatar` pixel-dust | Demote to optional active-state texture; rename mentally to “presence dust,” not chibi |
-| `AGENT_ROLE_COLORS` | Keep cohesive lavender firm tints; bind to seals, not blob faces |
-| Team page Lucide icons | **Promote** — this is the closest to the target staff mark |
-| Copy “agents deployed” | Shift to “seats staffed” / “roster” |
+| **New run** | Preview the staffed floor for the selected playbook — portraits at rest |
+| **Active run** | Live engagement floor; Foreman + active Operator emphasized |
+| **Team** | Firm directory: large portraits, role, what they do, mute/include — *employee handbook*, not character wiki |
+| **Packs** | Practice door card + the Operators that practice employs (portrait row) |
+| **Marketing / first paint** | Firm wordmark + Foreman + a short roster silhouette — “your silicon engineering team,” not “meet the bots” |
+| **Dense tables / diffs** | May fall back to mini-portrait or seal; full portrait remains the brand face elsewhere |
+
+---
+
+## Relationship to rejected patterns
+
+| Pattern | Why we reject as *identity* | What we steal (if anything) |
+|---------|-----------------------------|-----------------------------|
+| **Chibis** | Collectible pets; consumer chat | Crafted distinctiveness, role-readable silhouettes |
+| **OpenAI Dots** | Companion presence without workplace | Soft presence fields *around* a portrait |
+| **Lucide seals** | Dry; fails “future workplace” | Clarity of role labeling; use in dense UI only |
+| **Pixel-dust blobs** | Anonymous; no colleague read | Evolve into **in-bezel presence texture** when an Operator is “on mic” in the log |
+
+---
+
+## System requirements (so it stays a firm)
+
+1. **Shared bezel / material system** — every Operator looks employed by Gantry.  
+2. **Role silhouette kit** — new pack roles extend the kit; they don’t invent a new art genre.  
+3. **Portrait asset contract** — `role_id → portrait (svg/webp) + presence color + signature motif`; register next to Temporal role (P3: no fake faces without real seats).  
+4. **Accessibility** — name in text; don’t encode role only in color; respect `prefers-reduced-motion` (static presence OK).  
+5. **No playbook-only mascots** — playbooks change staffing and costumes props, not a separate cartoon company.
+
+---
+
+## Migration path
+
+| Now | Next |
+|-----|------|
+| Lucide Team icons | Interim seals → replace with Operator portraits on Team / Packs first |
+| `PipelineTracker` dots | Become presence pips on / under portraits |
+| `ChibiAvatar` dust | Re-home as in-bezel presence when Operator is active in the feed; stop using as sole face |
+| `AGENT_ROLE_COLORS` | Map to presence fields + signature accents on portraits |
+| Copy “agents deployed” | “On the floor” / “Staffed for this engagement” |
+
+Phase the art: **v0** silhouette+prop portraits (2D), **v1** richer material/light, **v2** optional floor map. Don’t ship chibis as a waypoint.
 
 ---
 
 ## Acceptance checks
 
-A frontend change passes the firm test if:
-
-1. Removing the Gantry wordmark, you still read **staffing board**, not **chat pets**.
-2. A new pack role (e.g. Oracle A11y) gets a seal + roster slot, not a new character franchise.
-3. Parallel builders don’t multiply into a crowd of mascots.
-4. Active work is obvious from **one** highlighted seat, not a party of bouncing avatars.
+1. **Workplace test:** First glance says “digital firm staffed a room,” not “chat app cast” or “settings icon row.”  
+2. **Silhouette test:** At 24px, PM ≠ Builder ≠ Security without reading the label.  
+3. **Employer test:** All portraits share the firm bezel; a new pack role still looks hired, not franchised.  
+4. **Job test:** Sequence matches the engagement plan; deliverable remains the hero outcome.  
+5. **Anti-pet test:** No outfit gacha, no buddy names, no Dot-only identity.
 
 ---
 
 ## Summary
 
-**Represent the firm’s agents as an ordered roster of role seals (staff marks) with quiet status pips.**  
-Use dots for state, Lucide-style icons for role identity, sequence for the engagement plan.  
-**Do not** use multi-agent chibis or OpenAI-style identity dots as the face of the crew.
+**Avatar identity = Operator portraits** — stylized silicon colleagues with role-true silhouettes, signature props, and a shared firm bezel.  
+**Sequence = engagement floor** — who’s staffed, in plan order, with workplace presence (desk light / hold / done).  
+
+That is the future-of-work face of Gantry: **a firm’s people showing up to do the job** — richer than icon tiles, more serious than chibis, more human than Dots.

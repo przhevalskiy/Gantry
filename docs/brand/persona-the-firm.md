@@ -64,6 +64,10 @@ End users may author and edit playbooks (config). They may not invent new specia
 | Composed | One firm, clear staffing | Swarm-of-pets energy |
 | Direct | Job in → deliverable out | Endless companion chat |
 
+## Visual persona (Operators)
+
+Staff are **Operators** — stylized silicon colleagues with role-true portraits and a shared firm bezel. A run is an **engagement floor**: who’s staffed, who’s in deep work, who’s waiting on the client. See [`frontend-agent-representation.md`](./frontend-agent-representation.md).
+
 ## Elevator (persona)
 
 > Gantry is a silicon engineering firm with one front desk. You put practices on retainer, file a work order with an engagement brief, and get a change artifact when the job closes — not a collection of chatbots to befriend.

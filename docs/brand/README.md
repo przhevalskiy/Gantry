@@ -9,7 +9,7 @@
 | [`persona-the-firm.md`](./persona-the-firm.md) | Metaphor: professional-services firm ↔ product concepts |
 | [`voice-and-look.md`](./voice-and-look.md) | Tone of voice, UI look + feel, do / don’t |
 | [`messaging.md`](./messaging.md) | Taglines, one-liners, forbidden phrases |
-| [`frontend-agent-representation.md`](./frontend-agent-representation.md) | How staff/agents look in UI — seals + roster, not chibis/Dots |
+| [`frontend-agent-representation.md`](./frontend-agent-representation.md) | Operator portraits + engagement floor — future workplace identity (not chibis/Dots/dry icons) |
 
 ### North star (brand + product)
 

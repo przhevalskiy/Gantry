@@ -83,4 +83,4 @@ Docs and brand say **factory / firm**. Parts of the web app still *look* chat-sh
 
 ### Agent / staff visuals
 
-Do **not** use multi-agent chibis or OpenAI-style identity dots as the crew. Use an ordered **staff roster of role seals** with status pips. Full rules: [`frontend-agent-representation.md`](./frontend-agent-representation.md).
+**Operator portraits** on an **engagement floor** — future workplace for silicon teams. Not chibis, not OpenAI Dots, not dry Lucide tiles as the brand face. Full rules: [`frontend-agent-representation.md`](./frontend-agent-representation.md).
