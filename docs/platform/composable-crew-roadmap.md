@@ -302,3 +302,5 @@ Phases **A–E landed**. Roadmap complete under current invariants.
 ## 8. One-sentence north star
 
 **Gantry is a durable factory that runs org-defined playbooks: data-composed Temporal crews producing structured change artifacts — one ACP citizen, many job packets, no chat-bot marketplace.**
+
+Brand framing (professional-services firm, not chat pets): [`../brand/README.md`](../brand/README.md).
