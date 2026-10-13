@@ -27,6 +27,8 @@ SYSTEM_PLAYBOOKS: dict[str, dict[str, Any]] = {
         "tier_default": 2,
         "branch_prefix": "a11y",
         "goal_prefix": "WCAG 2.1 AA remediation — ",
+        # Phase B: runner should honor artifact (branch-first migration job).
+        "artifact": {"type": "branch"},
         "pipeline": {
             "max_heal_cycles": 2,
             "max_parallel_tracks": 2,
@@ -79,7 +81,23 @@ def spec_from_row(spec: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+# Known Temporal crew roles (schemas/crew.py). Stage graphs may only reference these
+# until Phase D role packs register additional workflow identities (C2 / P3).
+KNOWN_CREW_ROLES = frozenset({
+    "pm",
+    "architect",
+    "builder",
+    "inspector",
+    "reviewer",
+    "security",
+    "devops",
+})
+
+ARTIFACT_TYPES = frozenset({"pr", "branch", "patch", "report"})
+
+
 def validate_playbook_config(config: dict[str, Any]) -> None:
+    """Validate playbook config. Additive fields (artifact, stages) are Phase A/B schema."""
     pipeline = config.get("pipeline") or {}
     if not isinstance(pipeline, dict):
         raise ValueError("pipeline must be an object")
@@ -92,6 +110,47 @@ def validate_playbook_config(config: dict[str, Any]) -> None:
     tier = config.get("tier_default", 1)
     if int(tier) < 0 or int(tier) > 3:
         raise ValueError("tier_default must be 0–3")
+
+    for key in ("disable_agents", "include_agents"):
+        agents = pipeline.get(key)
+        if agents is None:
+            continue
+        if not isinstance(agents, list):
+            raise ValueError(f"pipeline.{key} must be an array")
+        for name in agents:
+            if str(name).lower() not in KNOWN_CREW_ROLES:
+                raise ValueError(
+                    f"pipeline.{key}: unknown role {name!r} "
+                    f"(known: {', '.join(sorted(KNOWN_CREW_ROLES))})"
+                )
+
+    artifact = config.get("artifact")
+    if artifact is not None:
+        if isinstance(artifact, str):
+            artifact_type = artifact.lower()
+        elif isinstance(artifact, dict):
+            artifact_type = str(artifact.get("type", "pr")).lower()
+        else:
+            raise ValueError("artifact must be a string type or {type: ...} object")
+        if artifact_type not in ARTIFACT_TYPES:
+            raise ValueError(
+                f"artifact.type must be one of: {', '.join(sorted(ARTIFACT_TYPES))}"
+            )
+
+    stages = config.get("stages")
+    if stages is not None:
+        if not isinstance(stages, list) or not stages:
+            raise ValueError("stages must be a non-empty array")
+        for i, stage in enumerate(stages):
+            if not isinstance(stage, dict):
+                raise ValueError(f"stages[{i}] must be an object")
+            role = str(stage.get("role", "")).lower()
+            if role not in KNOWN_CREW_ROLES:
+                raise ValueError(
+                    f"stages[{i}].role unknown {role!r} "
+                    f"(Foreman DAG interpreter lands in Phase C; "
+                    f"roles must be known Temporal crew ids)"
+                )
 
 
 def _resolve_spec(playbook_id: str | None, playbook_spec: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -134,7 +193,18 @@ def resolve_submit_params(
 
     merged_pipeline: dict[str, Any] = dict(spec.get("pipeline") or {})
     if pipeline:
-        merged_pipeline.update(pipeline)
+        # Request body wins on scalar keys; agent lists are unioned carefully below.
+        body_disable = pipeline.get("disable_agents")
+        body_include = pipeline.get("include_agents")
+        merged_pipeline.update({k: v for k, v in pipeline.items() if k not in ("disable_agents", "include_agents")})
+        if body_disable is not None:
+            merged_pipeline["disable_agents"] = list(body_disable)
+        if body_include is not None:
+            merged_pipeline["include_agents"] = list(body_include)
+
+    # Carry artifact policy into pipeline envelope for the worker (Phase B runtime).
+    if "artifact" in spec and "artifact" not in merged_pipeline:
+        merged_pipeline["artifact"] = deepcopy(spec["artifact"])
 
     resolved_id = playbook_id or spec.get("slug") or spec.get("label")
     return merged_goal, merged_branch, merged_tier, merged_pipeline or None, resolved_id

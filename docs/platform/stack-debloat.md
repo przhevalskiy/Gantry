@@ -26,6 +26,9 @@ Cut accidental weight without changing the factory engine (I7) or API-first inva
 - Dual SDK surface (thin; API-first)
 - Agentex as the ACP/Temporal host for the worker
 
+Playbook/crew evolution (composable firm packs without becoming chat bots):
+[`composable-crew-roadmap.md`](./composable-crew-roadmap.md).
+
 ---
 
 ## Agentex separation — correct vs current

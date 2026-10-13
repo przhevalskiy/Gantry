@@ -62,7 +62,7 @@ Heal cycles retry Builder from a git snapshot. If the plan was wrong, Architect 
 
 Crew catalog (read-only): `GET /v1/agents`. Only **`swarm-factory`** accepts ACP `task/create`.
 
-Details: [`docs/platform/oracle-tiers.md`](docs/platform/oracle-tiers.md), [`docs/platform/agentex-citizen.md`](docs/platform/agentex-citizen.md), [`docs/platform/event-model.md`](docs/platform/event-model.md), [`docs/platform/stack-debloat.md`](docs/platform/stack-debloat.md)
+Details: [`docs/platform/oracle-tiers.md`](docs/platform/oracle-tiers.md), [`docs/platform/agentex-citizen.md`](docs/platform/agentex-citizen.md), [`docs/platform/event-model.md`](docs/platform/event-model.md), [`docs/platform/stack-debloat.md`](docs/platform/stack-debloat.md), [`docs/platform/composable-crew-roadmap.md`](docs/platform/composable-crew-roadmap.md)
 
 ---
 

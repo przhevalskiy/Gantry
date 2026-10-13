@@ -10,6 +10,7 @@ from project.schema.playbooks import (
     inspector_prompt_overlay,
     playbook_oracle_qa_commands,
     resolve_submit_params,
+    validate_playbook_config,
 )
 
 
@@ -100,3 +101,48 @@ def test_monorepo_architect_overlay():
 def test_platform_backlog_has_no_oracle_overlay():
     assert inspector_prompt_overlay("platform-backlog") is None
     assert architect_prompt_overlay("platform-backlog") is None
+
+
+def test_validate_artifact_and_stages_additive():
+    validate_playbook_config({
+        "tier_default": 2,
+        "artifact": {"type": "branch"},
+        "pipeline": {
+            "max_parallel_tracks": 2,
+            "max_heal_cycles": 1,
+            "disable_agents": ["pm", "security"],
+        },
+        "stages": [
+            {"role": "architect"},
+            {"role": "builder"},
+            {"role": "inspector"},
+        ],
+    })
+
+
+def test_validate_rejects_unknown_role_in_stages():
+    with pytest.raises(ValueError, match="unknown"):
+        validate_playbook_config({
+            "pipeline": {"max_parallel_tracks": 1, "max_heal_cycles": 0},
+            "stages": [{"role": "grok-bot"}],
+        })
+
+
+def test_validate_rejects_unknown_artifact():
+    with pytest.raises(ValueError, match="artifact"):
+        validate_playbook_config({
+            "pipeline": {"max_parallel_tracks": 1, "max_heal_cycles": 0},
+            "artifact": "chat",
+        })
+
+
+def test_a11y_merges_artifact_into_pipeline():
+    _, _, _, pipeline, _ = resolve_submit_params(
+        goal="Fix contrast",
+        branch_prefix="swarm",
+        tier=-1,
+        playbook_id="a11y-remediation",
+        pipeline=None,
+    )
+    assert pipeline is not None
+    assert pipeline.get("artifact") == {"type": "branch"}
