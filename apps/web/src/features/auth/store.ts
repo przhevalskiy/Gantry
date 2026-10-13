@@ -1,12 +1,11 @@
 import { create } from 'zustand';
-import type { User } from '@supabase/supabase-js';
 import { useDiscussionStore } from '@/features/discussions';
 import { GANTRY_DEV_AUTH_BYPASS } from '@/shared/services/gantry/config';
 import { clearApiKey, hasApiKey, setApiKey } from '@/shared/services/gantry/apiKeyStore';
-import { gantryGuestUser } from '@/shared/services/gantry/gantryGuestUser';
+import { gantryGuestUser, type AuthUser } from '@/shared/types/authUser';
 
 interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   session: null;
   isInitializing: boolean;
   isLoading: boolean;

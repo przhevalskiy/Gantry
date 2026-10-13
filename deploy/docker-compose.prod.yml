@@ -1,4 +1,6 @@
-# Monolift — production Agentex platform
+# Agentex dependency stack (not Gantry microservices).
+# Gantry attaches as a citizen: API + worker talk to Agentex :5003 / Temporal :7233.
+# Prefer an existing Agentex cluster when available (docs/platform/agentex-cluster.md).
 # Paths use GANTRY_HOME (default /opt/gantry). setup.sh clones agentex there.
 # Usage: docker compose -f /opt/gantry/deploy/docker-compose.prod.yml up -d
 

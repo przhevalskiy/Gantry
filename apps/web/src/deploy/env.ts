@@ -6,8 +6,6 @@ export type DeployEnv = {
   gantryApiUrl: string;
   /** Local-only — never set on Vercel production/preview. */
   devAuthBypass: boolean;
-  supabaseUrl: string | undefined;
-  supabaseAnonKey: string | undefined;
 };
 
 function trimOrigin(value: string | undefined): string {
@@ -28,8 +26,6 @@ export function resolveDeployEnv(): DeployEnv {
     isProd,
     gantryApiUrl,
     devAuthBypass,
-    supabaseUrl: import.meta.env.VITE_SUPABASE_URL as string | undefined,
-    supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined,
   };
 }
 
