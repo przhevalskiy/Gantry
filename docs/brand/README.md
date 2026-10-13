@@ -9,8 +9,12 @@
 | [`persona-the-firm.md`](./persona-the-firm.md) | Metaphor: professional-services firm ↔ product concepts |
 | [`voice-and-look.md`](./voice-and-look.md) | Tone of voice, UI look + feel, do / don’t |
 | [`messaging.md`](./messaging.md) | Taglines, one-liners, forbidden phrases |
-| [`frontend-agent-representation.md`](./frontend-agent-representation.md) | Operator portraits + engagement floor — future workplace identity (not chibis/Dots/dry icons) |
+| [`frontend-agent-representation.md`](./frontend-agent-representation.md) | Operator portraits + engagement floor — future workplace identity |
+| [`research-muse.md`](./research-muse.md) | Meta Muse brand + full-stack architecture research |
+| [`frontend-greenfield.md`](./frontend-greenfield.md) | Greenfield UI: Muse-like experience × L5 firm backend |
 
 ### North star (brand + product)
 
 **Gantry is a durable engineering firm you hire through an API: one front desk, practice areas (packs), engagement types (playbooks), specialists on staff (Temporal roles), deliverables when the job closes (artifacts) — not a cast of chatbots you collect.**
+
+**Visual identity:** Operators — crafted silicon-colleague portraits on an engagement floor (see [`frontend-agent-representation.md`](./frontend-agent-representation.md)).
