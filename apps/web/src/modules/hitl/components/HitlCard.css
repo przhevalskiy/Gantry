@@ -1,0 +1,81 @@
+.hitl-card {
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: linear-gradient(180deg, #fffbeb 0%, #ffffff 100%);
+  border-radius: 16px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: hitl-hold 0.4s ease-out;
+  box-shadow: 0 8px 24px rgba(180, 120, 20, 0.08);
+}
+
+.hitl-card__eyebrow {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #b45309;
+}
+
+.hitl-card__title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.hitl-card__meta {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  font-family: ui-monospace, monospace;
+}
+
+.hitl-card__error {
+  color: var(--color-error);
+  font-size: 0.85rem;
+}
+
+.hitl-card__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.hitl-card__approve {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 18px;
+  background: var(--cta-primary-bg);
+  color: var(--cta-primary-fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hitl-card__reject {
+  border: 1px solid var(--gray-300);
+  border-radius: 999px;
+  padding: 10px 18px;
+  background: white;
+  color: var(--gray-700);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.hitl-card__approve:disabled,
+.hitl-card__reject:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes hitl-hold {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

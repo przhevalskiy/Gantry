@@ -167,10 +167,12 @@ Atomic unit of the feed: **EngagementEvent** (may render as bubble). Not `ChatMe
 
 | Phase | Ship |
 |-------|------|
-| **G0** | Home composer + Engagement (thread + Floor + HITL cards + artifact) on real `/v1/tasks` |
-| **G1** | Matters list, Practices, Briefs, proactive job events |
+| **G0** | Home composer + Engagement (thread + Floor + HITL cards + artifact) on real `/v1/tasks` — **landed** (legacy FE dropped) |
+| **G1** | Matters list, Practices, Briefs, People, Workspaces — **landed** (SSE proactive polish ongoing) |
 | **G2** | Stage (diff/preview), Operator portrait kit v1, presence polish |
 | **G3** | Ideas (playbook/pack suggestions), org Foreman styling within kit |
+
+**Layout lock:** Muse-like L5 engagement theater (thread + floor + cards + artifact) — **not** a job console / ops sidebar.
 
 ---
 

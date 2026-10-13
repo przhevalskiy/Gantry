@@ -1,67 +1,25 @@
-import { useEffect, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
-import { Sidebar } from '@/components/layout/Sidebar';
-import { AppPanel } from '@/components/shell/AppPanel';
-import { WorkspacesPage, WorkspaceDetailPage } from '@/features/projects';
-import { TemplatesPage } from '@/features/templates';
-import { AgentsPage } from '@/features/agents';
-import { PacksPage } from '@/features/packs';
-import { DeveloperPage } from '@/features/developer';
-import { RunIdePage, RunsPage } from '@/features/runs';
-import { useAuthStore, AuthModal } from '@/features/auth';
+import { useEffect } from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { AuthGate, useAuthStore } from '@/modules/kernel';
+import { FirmShell } from './FirmShell';
+import { HomePage } from './pages/HomePage';
+import { EngagementPage } from './pages/EngagementPage';
+import { MattersPage } from './pages/MattersPage';
+import { PracticesPage } from './pages/PracticesPage';
+import { BriefsPage } from './pages/BriefsPage';
+import { PeoplePage } from './pages/PeoplePage';
+import { WorkspacesPage } from './pages/WorkspacesPage';
+import { DevelopPage } from './pages/DevelopPage';
 import './App.css';
 
-function RedirectLegacyWorkspace() {
-  const { workspaceId, projectId } = useParams<{ workspaceId?: string; projectId?: string }>();
-  const id = workspaceId ?? projectId ?? '';
-  return <Navigate to={`/workspaces/${id}`} replace />;
-}
-
-function AppLayout() {
-  return (
-    <div className="app-layout">
-      <Sidebar />
-      <main className="app-main">
-        <AppPanel>
-          <Routes>
-          <Route path="/" element={<Navigate to="/runs/new" replace />} />
-          <Route path="/runs/new" element={<RunIdePage />} />
-          <Route path="/runs/:taskId" element={<RunIdePage />} />
-          <Route path="/workspaces" element={<WorkspacesPage />} />
-          <Route path="/workspaces/:workspaceId" element={<WorkspaceDetailPage />} />
-          <Route path="/hubspaces" element={<Navigate to="/workspaces" replace />} />
-          <Route path="/hubspaces/:projectId" element={<RedirectLegacyWorkspace />} />
-          <Route path="/projects/:projectId" element={<RedirectLegacyWorkspace />} />
-          <Route path="/chat" element={<Navigate to="/runs/new" replace />} />
-          <Route path="/chat/:discussionId" element={<Navigate to="/runs/new" replace />} />
-          <Route path="/starters" element={<TemplatesPage />} />
-          <Route path="/templates" element={<Navigate to="/starters" replace />} />
-          <Route path="/agents" element={<AgentsPage />} />
-          <Route path="/packs" element={<PacksPage />} />
-          <Route path="/developer" element={<DeveloperPage />} />
-          <Route path="/runs" element={<RunsPage />} />
-          </Routes>
-        </AppPanel>
-      </main>
-    </div>
-  );
-}
-
-function App() {
+export default function App() {
   const { user, isInitializing, initialize } = useAuthStore();
-  const [isProcessingAuth, setIsProcessingAuth] = useState(false);
 
   useEffect(() => {
-    initialize();
+    void initialize();
   }, [initialize]);
 
-  useEffect(() => {
-    if (user && isProcessingAuth) {
-      setIsProcessingAuth(false);
-    }
-  }, [user, isProcessingAuth]);
-
-  if (isInitializing || isProcessingAuth) {
+  if (isInitializing) {
     return (
       <div className="auth-loading">
         <div className="spinner" />
@@ -72,11 +30,27 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/*" element={<AppLayout />} />
+        <Route element={<FirmShell />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/jobs" element={<MattersPage />} />
+          <Route path="/jobs/:jobId" element={<EngagementPage />} />
+          <Route path="/practices" element={<PracticesPage />} />
+          <Route path="/briefs" element={<BriefsPage />} />
+          <Route path="/people" element={<PeoplePage />} />
+          <Route path="/workspaces" element={<WorkspacesPage />} />
+          <Route path="/develop" element={<DevelopPage />} />
+          {/* Legacy redirects — old frontend dropped */}
+          <Route path="/runs/*" element={<Navigate to="/jobs" replace />} />
+          <Route path="/packs" element={<Navigate to="/practices" replace />} />
+          <Route path="/agents" element={<Navigate to="/people" replace />} />
+          <Route path="/starters" element={<Navigate to="/briefs" replace />} />
+          <Route path="/templates" element={<Navigate to="/briefs" replace />} />
+          <Route path="/chat/*" element={<Navigate to="/" replace />} />
+          <Route path="/developer" element={<Navigate to="/develop" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
       </Routes>
-      <AuthModal isOpen={!user} />
+      <AuthGate isOpen={!user} />
     </BrowserRouter>
   );
 }
-
-export default App;

@@ -1,1 +1,0 @@
-export { DeveloperPage } from './DeveloperPage';

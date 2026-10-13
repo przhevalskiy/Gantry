@@ -1,6 +1,0 @@
-.run-followup {
-  flex-shrink: 0;
-  padding: 10px 14px 14px;
-  border-top: 1px solid var(--gray-100);
-  background: var(--panel-bg);
-}

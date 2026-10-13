@@ -20,4 +20,4 @@ Import **only** from `@/modules/<name>` barrels. Do not deep-import another modu
 | `stage` | files / preview | Stage |
 | `home` | composes above | Home first paint |
 
-Legacy `features/*` remains until G0–G2 cutover.
+Legacy `features/*` has been removed. Pages live in `app/pages/*` and compose these modules.

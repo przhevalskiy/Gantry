@@ -1,0 +1,45 @@
+.artifact-card {
+  border-radius: 16px;
+  padding: 16px 18px;
+  background: linear-gradient(180deg, #f3efff 0%, #ffffff 70%);
+  border: 1px solid rgba(139, 124, 246, 0.28);
+  animation: artifact-land 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.artifact-card__eyebrow {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-700);
+}
+
+.artifact-card__title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.artifact-card__detail {
+  font-size: 0.8rem;
+  color: var(--gray-600);
+  font-family: ui-monospace, monospace;
+  margin: 6px 0 10px;
+  word-break: break-all;
+}
+
+.artifact-card a {
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+@keyframes artifact-land {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

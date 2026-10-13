@@ -8,3 +8,7 @@ export type {
   CrewAgent,
   AutonomyTier,
 } from './api';
+export { useAuthStore } from './auth';
+export { AuthGate } from './AuthGate';
+export { subscribeTaskEvents } from './sse';
+export type { TaskSseEvent } from './sse';

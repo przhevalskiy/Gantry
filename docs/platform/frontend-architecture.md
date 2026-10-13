@@ -4,7 +4,7 @@
 **Product direction:** [`../brand/frontend-greenfield.md`](../brand/frontend-greenfield.md)  
 **Brand / identity:** [`../brand/README.md`](../brand/README.md) · [`../brand/frontend-agent-representation.md`](../brand/frontend-agent-representation.md)  
 **Backend lock:** Phases A–E ([`composable-crew-roadmap.md`](./composable-crew-roadmap.md)) — I1, I7, I8, C1, P1–P4  
-**Code scaffold:** `apps/web/src/modules/*` (additive; legacy `features/*` remains until cutover)
+**Code:** `apps/web/src/modules/*` + `apps/web/src/app/*` — **legacy `features/*` dropped** (Muse-like L5 theater cutover)
 
 ---
 
@@ -108,7 +108,7 @@ pages / app shell
 | `home` → public barrels of matters, practices, briefs, operators | Cross-import of another module’s `store.ts` or private files |
 | Legacy `features/*` may call modules | New greenfield code must not deepen `features/chat` debt |
 
-Legacy `features/*` remains until G0–G2 cutover. New greenfield surfaces **import from `@/modules/*` barrels only**.
+Legacy `features/*` has been **removed**. All surfaces import from `@/modules/*` barrels and `app/pages/*`.
 
 ### Naming alignment (brand SoR)
 
@@ -343,21 +343,17 @@ User action (composer / HITL / install pack)
 
 ---
 
-## 8. Migration from `features/*`
+## 8. Cutover status
 
-| Legacy | Target module | Cutover note |
-|--------|---------------|--------------|
-| `features/chat/*` | `engagement` | Replace ChatMessage domain with EngagementEvent |
-| `features/ide/CrewPanel`, AgentRail | `operators` + `engagement` | Portraits replace dots/chibis |
-| `features/ide/*` editor/preview | `stage` | Keep file adapters; restyle later |
-| `features/runs/*` | `matters` + EngagementPage | Routes `/runs` → `/jobs` |
-| `features/packs/*` | `practices` | Rename IA labels |
-| `features/templates/*` | `briefs` (partial) | Starters → brief ideas |
-| `features/agents/*` | `operators` People | Handbook, not bot shop |
-| `features/compose/*` | `engagement` JobComposer | File / amend job |
-| `shared/services/gantry/*` | `kernel` gradually | Keep working during scaffold |
-
-**Rule for this scaffold phase:** add modules + barrels; do not delete legacy pages. G0 wires Home + Engagement on real APIs while `/runs/*` still works.
+| Area | Status |
+|------|--------|
+| Home / Engagement / Matters / Practices / Briefs / People / Workspaces / Develop | **Shipped (G0/G1 shell)** |
+| Operator portraits (CSS kit v0) + Floor + HITL cards + Artifact dock | **Shipped** |
+| Real `/v1/tasks` submit, SSE, HITL, packs, playbooks, agents, workspaces | **Wired** |
+| Stage (diff/preview) | **Stub module** — G2 |
+| Portrait art kit v1 / presence polish | **G2** |
+| Legacy `features/*` chat/IDE/console | **Deleted** |
+| Legacy routes (`/runs`, `/packs`, `/chat`, …) | Redirect to greenfield IA |
 
 ---
 
@@ -388,7 +384,8 @@ User action (composer / HITL / install pack)
 - [x] This document  
 - [x] `apps/web/src/modules/*` barrels + domain READMEs  
 - [x] Links from brand greenfield + brand README + crew roadmap  
-- [ ] G0 page assemblers (`HomePage`, `EngagementPage`) — next implementation slice  
+- [x] G0/G1 page assemblers + FirmShell (legacy frontend dropped)  
+- [ ] Stage / portrait kit v1 (G2)  
 - [ ] ESLint boundary rule (`modules/*` public barrel only) — follow-up  
 
 ---
