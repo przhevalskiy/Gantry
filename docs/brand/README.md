@@ -1,0 +1,15 @@
+# Gantry brand guides
+
+**Status:** Canonical brand strategy for product, docs, UI copy, and partner messaging.  
+**Architecture lock:** Aligns with [`../platform/composable-crew-roadmap.md`](../platform/composable-crew-roadmap.md) (one factory, playbooks, firm packs — not chat bots).
+
+| Guide | Use when |
+|-------|----------|
+| [`positioning.md`](./positioning.md) | Category, buyer, differentiation, competitive frame |
+| [`persona-the-firm.md`](./persona-the-firm.md) | Metaphor: professional-services firm ↔ product concepts |
+| [`voice-and-look.md`](./voice-and-look.md) | Tone of voice, UI look + feel, do / don’t |
+| [`messaging.md`](./messaging.md) | Taglines, one-liners, forbidden phrases |
+
+### North star (brand + product)
+
+**Gantry is a durable engineering firm you hire through an API: one front desk, practice areas (packs), engagement types (playbooks), specialists on staff (Temporal roles), deliverables when the job closes (artifacts) — not a cast of chatbots you collect.**

@@ -16,7 +16,7 @@
 
 Still true: no per-playbook ACP agents, no Grok-style bot marketplace — packs install into one factory.
 
-Related: [`stack-debloat.md`](./stack-debloat.md) · [`agentex-citizen.md`](./agentex-citizen.md) · [`event-model.md`](./event-model.md) · [`../verticals/README.md`](../verticals/README.md) · `PLATFORM_REFACTOR.md` · `schemas/crew.py` · `schemas/playbooks.py`
+Related: [`stack-debloat.md`](./stack-debloat.md) · [`agentex-citizen.md`](./agentex-citizen.md) · [`event-model.md`](./event-model.md) · [`../verticals/README.md`](../verticals/README.md) · [`../brand/README.md`](../brand/README.md) (firm positioning) · `PLATFORM_REFACTOR.md` · `schemas/crew.py` · `schemas/playbooks.py`
 
 ---
 
