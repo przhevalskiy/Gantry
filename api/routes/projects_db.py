@@ -17,6 +17,7 @@ import api.db as db
 from api.repositories import builds as builds_repo
 from api.repositories import projects as projects_repo
 from api.repositories import tasks as tasks_repo
+from api.services import task_sync
 
 log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/internal/db", tags=["DB"])
@@ -124,12 +125,14 @@ async def upsert_build(
     body: UpsertBuildBody,
     x_internal_key: str | None = Header(default=None),
 ):
+    """Persist structured result + push terminal lifecycle (works with or without Postgres)."""
     _check(x_internal_key)
-    _require_db()
 
     project = await projects_repo.get_project(body.project_id)
-    if not project:
+    if db.is_available() and not project:
         raise HTTPException(status_code=404, detail="project not found")
+    # File-only mode may lack project rows; still allow lifecycle push (I6).
+    org_id = (project or {}).get("org_id")
 
     structured_result = body.result or (
         {"pr_url": body.pr_url, "branch": body.branch}
@@ -140,7 +143,7 @@ async def upsert_build(
     build = await builds_repo.upsert_build(
         task_id=body.task_id,
         project_id=body.project_id,
-        org_id=project.get("org_id"),
+        org_id=org_id,
         user_id=body.user_id,
         branch=body.branch,
         pr_url=body.pr_url,
@@ -152,10 +155,20 @@ async def upsert_build(
         result=structured_result,
     )
 
-    if body.pr_url or body.branch:
+    # Push-primary lifecycle: structured write also drives status + org webhooks.
+    status = (body.status or "completed").lower()
+    if status == "completed" or status in task_sync.TERMINAL_STATUSES:
+        await task_sync.apply_status_update(
+            body.task_id,
+            status if status in task_sync.TERMINAL_STATUSES else "completed",
+            pr_url=body.pr_url,
+            branch=body.branch,
+            result=structured_result,
+        )
+    elif body.pr_url or body.branch:
         await tasks_repo.update_task_status(
             body.task_id,
-            status=(body.status or "completed").lower(),
+            status=status,
             pr_url=body.pr_url,
             branch=body.branch,
         )
@@ -209,6 +222,13 @@ class PatchTaskMetaBody(BaseModel):
     pending_hitl_remove: str | None = None
 
 
+class TaskStatusBody(BaseModel):
+    status: str
+    pr_url: str | None = None
+    branch: str | None = None
+    result: dict | None = None
+
+
 @router.patch("/tasks/{task_id}/meta")
 async def patch_task_meta(
     task_id: str,
@@ -226,3 +246,25 @@ async def patch_task_meta(
     if not ok:
         raise HTTPException(status_code=404, detail="task not found")
     return {"ok": True, "task_id": task_id}
+
+
+@router.post("/tasks/{task_id}/status")
+async def push_task_status(
+    task_id: str,
+    body: TaskStatusBody,
+    x_internal_key: str | None = Header(default=None),
+):
+    """Worker push path for lifecycle status (primary; poller is fallback)."""
+    _check(x_internal_key)
+    meta = await tasks_repo.get_task_meta(task_id)
+    if not meta:
+        raise HTTPException(status_code=404, detail="task not found")
+    updated = await task_sync.apply_status_update(
+        task_id,
+        body.status,
+        meta=meta,
+        pr_url=body.pr_url,
+        branch=body.branch,
+        result=body.result,
+    )
+    return {"ok": True, "task_id": task_id, "status": body.status, "meta": updated}

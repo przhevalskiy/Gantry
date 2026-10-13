@@ -1,6 +1,6 @@
 # Gantry — Deployment Checklist
 
-Production stack: **Vercel** (UI, free) + **Hetzner CX22** (API, worker, Agentex, Temporal — $4.50/mo)
+Production stack: **Vercel** (UI) + **VPS** (Gantry API + worker) + **Agentex cluster** (Temporal/Redis/PG/Mongo — bundled on the same VPS or external).
 
 **Planning:** phased checklist and env matrix → [`docs/hosting/PLAN.md`](docs/hosting/PLAN.md)
 
@@ -67,7 +67,7 @@ The script will:
 - Create `gantry` system user
 - Clone the repo to `/opt/gantry`
 - Set up Python virtualenv and install dependencies
-- Start Agentex Docker stack (Temporal, Redis, Postgres, MongoDB)
+- Start Agentex dependency stack (`deploy/agentex/`, unless `AGENTEX_MODE=external`)
 - Install and enable `gantry-api` and `gantry-worker` systemd services
 - Configure nginx with SSL via Let's Encrypt
 - Enable UFW firewall (SSH + HTTPS only)
@@ -191,7 +191,7 @@ curl -X POST https://api.gantry.dev/tasks \
 ```bash
 sudo journalctl -u gantry-api -f
 sudo journalctl -u gantry-worker -f
-docker compose -f /opt/gantry/deploy/docker-compose.prod.yml logs -f agentex
+docker compose -f /opt/gantry/deploy/agentex/docker-compose.yml logs -f agentex
 ```
 
 ### Deploy a new version
@@ -209,7 +209,7 @@ sudo systemctl restart gantry-api gantry-worker
 
 ```bash
 ssh gantry@<SERVER_IP>
-docker compose -f /opt/gantry/deploy/docker-compose.prod.yml restart
+docker compose -f /opt/gantry/deploy/agentex/docker-compose.yml restart
 ```
 
 ### Renew SSL (auto via cron, but manually if needed)

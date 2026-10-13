@@ -17,7 +17,7 @@ Integrator / apps/web  →  api/ (FastAPI)  →  Agentex  →  Temporal worker (
 | Layer | Role |
 |-------|------|
 | **`workflows/` + `activities/` + `worker.py`** | The engine. One Agentex entry agent (`swarm-factory`) runs a Temporal Foreman workflow that composes child workflows (PM, Architect, Builder, Inspector, Reviewer, Security, DevOps). LLM planner activities call repo tools (read/write/patch, git, tests, symbol index). |
-| **`api/`** | The control plane. Org-scoped API keys, projects, task metadata, quotas, audit, webhooks, HITL routing. Submits work to Agentex via ACP `task/create` and polls Agentex for status. Does not execute agent logic itself. |
+| **`api/`** | The control plane. Org-scoped API keys, projects, task metadata, quotas, audit, webhooks, HITL routing. Submits work to Agentex via ACP `task/create`; the worker pushes status/results back (poller is a slow fallback). Does not execute agent logic itself. |
 | **`apps/web/`** | An optional operator UI. Submits tasks through `/v1/tasks`, streams run output from `/v1/tasks/{id}/events`, and surfaces HITL checkpoints. Chat layout is legacy UX; the wire protocol is task-based. |
 
 **Primary artifact:** a **task run** (with optional `result.pr_url`, `result.branch`), not a conversation thread.

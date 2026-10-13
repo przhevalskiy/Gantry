@@ -11,6 +11,9 @@ REPO_URL="${REPO_URL:-https://github.com/przhevalskiy/Gantry.git}"
 DOMAIN_API="${DOMAIN_API:-api.gantry.dev}"
 DOMAIN_PLATFORM="${DOMAIN_PLATFORM:-platform.gantry.dev}"
 EMAIL_CERTBOT="${EMAIL_CERTBOT:-ops@gantry.dev}"
+# bundle = start deploy/agentex compose on this host (default CX22 path)
+# external = attach to an existing Agentex cluster (set AGENTEX_BASE_URL + TEMPORAL_ADDRESS)
+AGENTEX_MODE="${AGENTEX_MODE:-bundle}"
 
 log() { echo -e "\n\033[1;34m==>\033[0m $*"; }
 
@@ -81,23 +84,26 @@ else
     sudo -u "$GANTRY_USER" git -C "$GANTRY_HOME" pull
 fi
 
-# ── Clone Agentex (Scale AI middleware) ───────────────────────────────────────
-log "Cloning Agentex platform"
+# ── Agentex source (needed for bundled compose image build) ───────────────────
 AGENTEX_DIR="$GANTRY_HOME/scale-agentex/agentex"
-if [ ! -d "$AGENTEX_DIR" ]; then
-    sudo -u "$GANTRY_USER" mkdir -p "$GANTRY_HOME/scale-agentex"
-    sudo -u "$GANTRY_USER" git clone \
-        https://github.com/scaleapi/agentex.git "$AGENTEX_DIR"
+if [ "$AGENTEX_MODE" = "bundle" ]; then
+    log "Cloning Agentex platform (dependency stack — AGENTEX_MODE=bundle)"
+    if [ ! -d "$AGENTEX_DIR" ]; then
+        sudo -u "$GANTRY_USER" mkdir -p "$GANTRY_HOME/scale-agentex"
+        sudo -u "$GANTRY_USER" git clone \
+            https://github.com/scaleapi/agentex.git "$AGENTEX_DIR"
+    fi
+else
+    log "AGENTEX_MODE=external — skipping Agentex clone; will attach to existing cluster"
 fi
 
-# ── Python virtualenv ─────────────────────────────────────────��───────────────
+# ── Python virtualenv ─────────────────────────────────────────────────────────
 log "Creating Python virtualenv at $GANTRY_HOME/.venv"
 sudo -u "$GANTRY_USER" bash -c "
     cd $GANTRY_HOME
     uv venv .venv --python python3.12
     source .venv/bin/activate
-    uv pip install -e '.[api]' --quiet
-    uv pip install -e '$AGENTEX_DIR' --quiet
+    uv sync --extra dev --quiet
 "
 
 # ── Gantry data directories ───────────────────────────────────────────────────
@@ -124,12 +130,13 @@ cp "$GANTRY_HOME/deploy/gantry-worker.service" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable gantry-api gantry-worker
 
-# ── Temporal dynamic config ───────────────────────────────────────────────────
-log "Ensuring Temporal dynamic config exists"
-DYNCONF_DIR="$AGENTEX_DIR/temporal/dynamicconfig"
-mkdir -p "$DYNCONF_DIR"
-if [ ! -f "$DYNCONF_DIR/development-sql.yaml" ]; then
-    cat > "$DYNCONF_DIR/development-sql.yaml" <<'EOF'
+# ── Agentex runtime ───────────────────────────────────────────────────────────
+if [ "$AGENTEX_MODE" = "bundle" ]; then
+    log "Ensuring Temporal dynamic config exists"
+    DYNCONF_DIR="$AGENTEX_DIR/temporal/dynamicconfig"
+    mkdir -p "$DYNCONF_DIR"
+    if [ ! -f "$DYNCONF_DIR/development-sql.yaml" ]; then
+        cat > "$DYNCONF_DIR/development-sql.yaml" <<'EOF'
 limit.maxIDLength:
   - value: 255
     constraints: {}
@@ -137,25 +144,36 @@ system.forceSearchAttributesCacheRefreshOnRead:
   - value: true
     constraints: {}
 EOF
-fi
-chown -R "$GANTRY_USER:$GANTRY_USER" "$AGENTEX_DIR/temporal"
-
-# ── Docker Compose (Agentex stack) ────────────────────────────────────────────
-log "Starting Agentex Docker stack"
-echo "GANTRY_HOME=$GANTRY_HOME" > "$GANTRY_HOME/deploy/.env"
-sudo -u "$GANTRY_USER" docker compose \
-    --env-file "$GANTRY_HOME/deploy/.env" \
-    -f "$GANTRY_HOME/deploy/docker-compose.prod.yml" \
-    up -d --build
-
-log "Waiting for Agentex to be healthy (up to 120s)..."
-for i in $(seq 1 24); do
-    if curl -sf http://localhost:5003/health &>/dev/null; then
-        log "Agentex is up"
-        break
     fi
-    sleep 5
-done
+    chown -R "$GANTRY_USER:$GANTRY_USER" "$AGENTEX_DIR/temporal"
+
+    log "Starting Agentex dependency stack (deploy/agentex — not Gantry services)"
+    echo "GANTRY_HOME=$GANTRY_HOME" > "$GANTRY_HOME/deploy/.env"
+    sudo -u "$GANTRY_USER" docker compose \
+        --env-file "$GANTRY_HOME/deploy/.env" \
+        -f "$GANTRY_HOME/deploy/agentex/docker-compose.yml" \
+        up -d --build
+
+    log "Waiting for Agentex to be healthy (up to 120s)..."
+    for i in $(seq 1 24); do
+        if curl -sf http://localhost:5003/health &>/dev/null; then
+            log "Agentex is up"
+            break
+        fi
+        sleep 5
+    done
+else
+    log "External Agentex — require AGENTEX_BASE_URL and TEMPORAL_ADDRESS in $GANTRY_HOME/.env"
+    if [ -f "$GANTRY_HOME/.env" ]; then
+        # shellcheck disable=SC1090
+        set -a; source "$GANTRY_HOME/.env"; set +a
+    fi
+    if [ -z "${AGENTEX_BASE_URL:-}" ] || [ -z "${TEMPORAL_ADDRESS:-}" ]; then
+        echo "ERROR: AGENTEX_MODE=external requires AGENTEX_BASE_URL and TEMPORAL_ADDRESS"
+        exit 1
+    fi
+    log "Will attach gantry-api/worker to $AGENTEX_BASE_URL / $TEMPORAL_ADDRESS"
+fi
 
 # ── Nginx ─────────────────────────────────────────────────────────────────────
 log "Configuring Nginx"

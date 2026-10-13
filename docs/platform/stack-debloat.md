@@ -17,7 +17,7 @@ Cut accidental weight without changing the factory engine (I7) or API-first inva
 | **P3** | Trim web: remove `recharts`, `papaparse`, `html-to-image`, `html2canvas`, `@supabase/supabase-js`; local `AuthUser` | Done (this PR) |
 | **P4** | Ops: prefer one deploy path doc (compose/systemd primary; Helm secondary); no new packaging | Doc only (this PR) |
 | **P5** | Freeze `apps/web` feature growth; treat as run console (I8) | Policy — ongoing |
-| **P6** | Replace Agentex status poller with Agentex → Gantry webhook | Follow-up (event-model.md) |
+| **P6** | Worker push status/lifecycle; demote Agentex poller to 60s fallback | Done |
 
 ## What we are not changing
 
@@ -73,8 +73,8 @@ Invariants from [`agentex-citizen.md`](./agentex-citizen.md): **C1** one ACP ent
 | Control plane submits via Agentex HTTP RPC | Yes | `api/clients/agentex.py` |
 | Structured results via `db_upsert_build` into Gantry DB | Yes | I3 preferred path |
 | Separate Gantry `DATABASE_URL` from Agentex Postgres | Yes | Two DBs is **correct separation**, not duplicate product state |
-| `deploy/docker-compose.prod.yml` vendors full Agentex stack | Blur | Fine for bootstrap/self-host; Agentex is still a **dependency cluster**, not Gantry services. Prefer attaching to an existing cluster ([`agentex-cluster.md`](./agentex-cluster.md)) when one exists |
-| API polls Agentex every ~10s for status/SSE | Interim | Should become Agentex → Gantry webhook ([`event-model.md`](./event-model.md)) |
+| `deploy/agentex/` vendors Agentex for bootstrap | OK (labeled) | Bundle vs `AGENTEX_MODE=external` attach; see [`agentex/README.md`](../../deploy/agentex/README.md) |
+| Worker push + slow fallback poller | Yes | Primary: `db_notify_task_status` / `db_upsert_build`; poller 60s safety net ([`event-model.md`](./event-model.md)) |
 | Direct deps `playwright` / `tavily` / `bs4` / `scale-gp` | Wrong | Unused; `scale-gp` already transitive via `agentex-sdk` |
 | Optional UI ~16k LOC + Supabase types | Overbuilt | Auth is API-key; UI should stay a thin run console |
 
@@ -89,7 +89,7 @@ Invariants from [`agentex-citizen.md`](./agentex-citizen.md): **C1** one ACP ent
 ### Target attachment modes
 
 1. **Shared Agentex cluster (preferred at scale):** Point `AGENTEX_BASE_URL` / `TEMPORAL_ADDRESS` at existing platform; run only `gantry-api` + `gantry-worker` (+ Gantry DB). See [`agentex-cluster.md`](./agentex-cluster.md).
-2. **Bundled self-host (CX22 path):** `deploy/docker-compose.prod.yml` brings Agentex up for convenience — document as “Agentex dependency stack,” not “Gantry microservices.”
+2. **Bundled self-host (CX22 path):** `deploy/agentex/docker-compose.yml` brings Agentex up for convenience (`AGENTEX_MODE=bundle`).
 
 ---
 

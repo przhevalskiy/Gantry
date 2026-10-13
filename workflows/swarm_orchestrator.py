@@ -88,6 +88,16 @@ class SwarmOrchestrator(BaseWorkflow):
                 retry_policy=RetryPolicy(maximum_attempts=2),
             )
 
+        try:
+            await workflow.execute_activity(
+                "db_notify_task_status",
+                args=[task_id, "running"],
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            )
+        except Exception:
+            pass
+
         task_queue = environment_variables.WORKFLOW_TASK_QUEUE or "gantry_queue"
         repo_path = params.params.get("repo_path", ".") if params.params else "."
         branch_prefix = params.params.get("branch_prefix", "swarm") if params.params else "swarm"
@@ -123,6 +133,15 @@ class SwarmOrchestrator(BaseWorkflow):
             post_message=_post_repo_message,
         )
         if repo_error:
+            try:
+                await workflow.execute_activity(
+                    "db_notify_task_status",
+                    args=[task_id, "failed"],
+                    start_to_close_timeout=timedelta(seconds=10),
+                    retry_policy=RetryPolicy(maximum_attempts=2),
+                )
+            except Exception:
+                pass
             return repo_error
 
         explicit_tier = int(params.params.get("tier", -1)) if params.params else -1
@@ -288,6 +307,15 @@ class SwarmOrchestrator(BaseWorkflow):
                 content=build_approval_request_content(checkpoint, action, approval_wf_id),
             ),
         )
+        try:
+            await workflow.execute_activity(
+                "db_notify_task_status",
+                args=[task_id, "waiting_approval"],
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            )
+        except Exception:
+            pass
 
         result: str = await workflow.execute_child_workflow(
             ApprovalWorkflow.run,
@@ -300,6 +328,15 @@ class SwarmOrchestrator(BaseWorkflow):
 
         approved = result == "Approved"
         await self._sync_task_meta(task_id, {"pending_hitl_remove": approval_wf_id})
+        try:
+            await workflow.execute_activity(
+                "db_notify_task_status",
+                args=[task_id, "running" if approved else "failed"],
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            )
+        except Exception:
+            pass
         await adk.messages.create(
             task_id=task_id,
             content=TextContent(

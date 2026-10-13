@@ -2,7 +2,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from api.services.poller import _handle_github_callback
+from api.services.task_sync import handle_github_callback
 
 
 @pytest.mark.asyncio
@@ -16,13 +16,13 @@ async def test_github_callback_posts_pr_link_with_token():
         "source": "github_issues",
     }
 
-    with patch("api.services.poller.projects_repo.get_project", new_callable=AsyncMock) as mock_project:
-        with patch("api.services.poller.github_tokens.resolve_token", new_callable=AsyncMock) as mock_token:
-            with patch("api.services.poller.github_client.post_issue_comment", new_callable=AsyncMock) as mock_comment:
+    with patch("api.services.task_sync.projects_repo.get_project", new_callable=AsyncMock) as mock_project:
+        with patch("api.services.task_sync.github_tokens.resolve_token", new_callable=AsyncMock) as mock_token:
+            with patch("api.services.task_sync.github_client.post_issue_comment", new_callable=AsyncMock) as mock_comment:
                 mock_project.return_value = {"id": "proj-1", "github_owner": "acme", "github_repo": "api"}
                 mock_token.return_value = "ghs_installation_token"
 
-                await _handle_github_callback(
+                await handle_github_callback(
                     "task_abc",
                     meta,
                     "completed",

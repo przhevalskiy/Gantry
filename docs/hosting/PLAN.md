@@ -10,9 +10,13 @@ Step-by-step plan for this repo. Ops runbook: [`DEPLOYMENT.md`](../../DEPLOYMENT
 |---------|-----------|------|------------|
 | **UI** | `apps/web` → `dist/` | **Vercel** (static SPA) | `https://app.<domain>` |
 | **API** | `api/` + systemd | **VPS** (nginx → :8001) | `https://api.<domain>` |
-| **Agentex** | Docker (`deploy/docker-compose.prod.yml`) | **Same VPS** (internal :5003) | optional `https://platform.<domain>` |
-| **Worker** | `worker.py` + systemd | **Same VPS** | — |
-| **Temporal / Postgres / Redis / Mongo** | Docker on VPS | **Same VPS** | internal only |
+| **Worker** | `worker.py` + systemd | **VPS** | — |
+| **Gantry Postgres** (optional) | `DATABASE_URL` | **VPS or managed** | internal only |
+| **Agentex cluster** | `deploy/agentex/` *or external* | **Same VPS (bundle) or shared cluster** | optional `https://platform.<domain>` |
+
+Agentex owns Temporal / Redis / Agentex Postgres / Mongo. Gantry does **not** treat those as product microservices — see [`docs/platform/stack-debloat.md`](../platform/stack-debloat.md).
+
+**Modes:** `AGENTEX_MODE=bundle` (default CX22) starts `deploy/agentex/docker-compose.yml`. `AGENTEX_MODE=external` skips compose and attaches via `AGENTEX_BASE_URL` + `TEMPORAL_ADDRESS`.
 
 **Never on Vercel:** API, worker, Temporal, Agentex, secrets, SSE proxy.
 
@@ -38,7 +42,7 @@ Do this before provisioning servers.
 |------|---------|
 | `DEPLOYMENT.md` | Full bootstrap + ops |
 | `deploy/setup.sh` | Hetzner one-shot install |
-| `deploy/docker-compose.prod.yml` | Agentex stack |
+| `deploy/agentex/docker-compose.yml` | Agentex dependency stack (bundle mode) |
 | `deploy/nginx.conf` | TLS reverse proxy template |
 | `.env.production.example` | VPS env template |
 | `apps/web/.env.example` | Vercel env template |
