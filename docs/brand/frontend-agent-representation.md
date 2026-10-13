@@ -9,7 +9,7 @@
 
 ## Verdict
 
-We need a real **avatar identity** — memorable Operators who feel like colleagues in a next-gen firm — **not** dry icon tiles, **not** Muse/Grok chibi pets, **not** OpenAI companion Dots.
+We need a real **avatar identity** — memorable Operators who feel like colleagues in a next-gen firm — **not** dry icon tiles, **not** a single personal Muse pet that hides the L5 crew, **not** OpenAI companion Dots. Muse-level *presence* is welcome; Muse *companion identity* is not ([`research-muse.md`](./research-muse.md)).
 
 | Pattern | Use? | Notes |
 |---------|------|--------|

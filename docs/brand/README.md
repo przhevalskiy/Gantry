@@ -18,3 +18,5 @@
 **Gantry is a durable engineering firm you hire through an API: one front desk, practice areas (packs), engagement types (playbooks), specialists on staff (Temporal roles), deliverables when the job closes (artifacts) — not a cast of chatbots you collect.**
 
 **Visual identity:** Operators — crafted silicon-colleague portraits on an engagement floor (see [`frontend-agent-representation.md`](./frontend-agent-representation.md)).
+
+**Frontend north star:** Muse-grade engagement theater on an L5 factory backend ([`frontend-greenfield.md`](./frontend-greenfield.md) · research [`research-muse.md`](./research-muse.md)).
