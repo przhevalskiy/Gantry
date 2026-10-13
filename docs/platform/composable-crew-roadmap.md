@@ -1,8 +1,20 @@
 # Composable crew roadmap — playbooks beyond one SWE firm
 
-**Status:** architectural plan (invariant-locked)  
-**Problem:** Playbooks today tune **one** hardcoded engineering firm. They are not independently deployable “silicon companies,” and the crew graph is not data-driven.  
-**Goal:** Make playbooks describe **firm composition + job packets** without violating Agentex citizen rules or forking the orchestrator.
+**Status:** Phase A + B **implemented** (invariant-locked); C–E deferred  
+**Problem:** Playbooks were overlays on one hardcoded engineering firm.  
+**Goal:** Make playbooks describe **job packets** (seats + artifact) now; data DAG / role packs later — without chat-bot firms or ACP forks.
+
+### Execution status (no feature drift)
+
+| Phase | Scope | Status |
+|-------|--------|--------|
+| **A** | Truth, schema (`artifact`/`stages` validate), catalog copy, `artifact_type` on results | **Done** |
+| **B** | Artifact policy in DevOps; include/disable seats; structured `artifact_type` | **Done** |
+| **C** | Foreman DAG interpreter | **Not started** (deferred) |
+| **D** | New Temporal role packs | **Not started** (deferred) |
+| **E** | Firm-pack install UX / thin catalog UI | **Not started** (deferred) |
+
+Deferred on purpose: no DAG rewrite, no new ACP agents, no Grok-style bot UI.
 
 Related: [`stack-debloat.md`](./stack-debloat.md) · [`agentex-citizen.md`](./agentex-citizen.md) · [`event-model.md`](./event-model.md) · [`../verticals/README.md`](../verticals/README.md) · `PLATFORM_REFACTOR.md` · `schemas/crew.py` · `schemas/playbooks.py`
 

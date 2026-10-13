@@ -132,15 +132,22 @@ class DevOpsAgent:
         build_summary: str = "",
         changed_files: list[str] | None = None,
         build_report: dict | None = None,
+        artifact_type: str = "pr",
     ) -> str:
         log = logger.bind(parent_task_id=parent_task_id, branch=branch_name)
-        log.info("devops_started")
+        artifact_type = (artifact_type or "pr").lower().strip()
+        if artifact_type not in {"pr", "branch", "patch", "report"}:
+            artifact_type = "pr"
+        log.info("devops_started", artifact_type=artifact_type)
 
         await adk.messages.create(
             task_id=parent_task_id,
             content=TextContent(
                 author="agent",
-                content=f"[DevOps] Staging changes on branch '{branch_name}'...",
+                content=(
+                    f"[DevOps] Staging changes on branch '{branch_name}' "
+                    f"(artifact={artifact_type})..."
+                ),
             ),
         )
 
@@ -159,31 +166,71 @@ class DevOpsAgent:
             )
 
         _pr_description = _format_pr_description(build_report) if build_report else ""
-        _pr_instruction = (
-            "6. Create a pull request with create_pull_request. "
-            "Use the following as the PR body VERBATIM — do not rewrite or summarise it:\n"
-            f"<pr_body>\n{_pr_description}\n</pr_body>\n"
-            if _pr_description
-            else "6. Optionally create a pull request with create_pull_request.\n"
-        )
+        if artifact_type == "pr":
+            _pr_instruction = (
+                "6. Create a pull request with create_pull_request. "
+                "Use the following as the PR body VERBATIM — do not rewrite or summarise it:\n"
+                f"<pr_body>\n{_pr_description}\n</pr_body>\n"
+                if _pr_description
+                else "6. Create a pull request with create_pull_request.\n"
+            )
+            _finish = (
+                "7. Optionally run run_migration if the build added new migrations.\n"
+                "8. Do NOT deploy unless explicitly required.\n"
+                "9. Call report_devops with the branch, commit SHA, PR URL, and summary.\n"
+            )
+        elif artifact_type in {"branch", "patch"}:
+            _pr_instruction = (
+                "6. Do NOT call create_pull_request. "
+                f"Artifact policy is '{artifact_type}' — push the branch only.\n"
+            )
+            _finish = (
+                "7. Optionally run run_migration if the build added new migrations.\n"
+                "8. Do NOT deploy.\n"
+                "9. Call report_devops with the branch, commit SHA, empty PR URL, "
+                f"and summary noting artifact_type={artifact_type}.\n"
+            )
+        else:  # report
+            _pr_instruction = (
+                "6. Do NOT create a branch, push, or open a PR. "
+                "Artifact policy is 'report' — no git publish.\n"
+            )
+            _stage_instruction = (
+                "3. Do NOT stage or commit files. Skip git_add / git_commit / git_push.\n"
+            )
+            _finish = (
+                "7. Call report_devops with branch='', empty PR URL, success=true, "
+                "and a short summary of what was built on disk.\n"
+            )
 
-        task_prompt = (
-            f"You are the DevOps agent. Your goal:\n{goal}\n\n"
-            f"Repository root: {repo_path}\n"
-            f"Target branch: {branch_name}\n"
-            f"Build summary: {build_summary}\n\n"
-            "Instructions:\n"
-            "1. Run git_status to see what changed.\n"
-            "2. Create the branch with git_create_branch.\n"
-            f"{_stage_instruction}"
-            "4. Commit with a descriptive conventional commit message.\n"
-            "5. Push the branch with git_push.\n"
-            f"{_pr_instruction}"
-            "7. Optionally run run_migration if the build added new migrations.\n"
-            "8. Optionally deploy if a platform token is configured (use deploy with platform='auto').\n"
-            f"9. Call report_devops with the branch, commit SHA, PR URL, and summary.\n\n"
-            f"For memory_read use repo_path='{repo_path}'."
-        )
+        if artifact_type == "report":
+            task_prompt = (
+                f"You are the DevOps agent. Artifact policy: report (no git publish).\n"
+                f"Goal:\n{goal}\n\n"
+                f"Repository root: {repo_path}\n"
+                f"Build summary: {build_summary}\n\n"
+                "Instructions:\n"
+                "1. Do not modify git state.\n"
+                f"{_finish}"
+                f"For memory_read use repo_path='{repo_path}'."
+            )
+        else:
+            task_prompt = (
+                f"You are the DevOps agent. Your goal:\n{goal}\n\n"
+                f"Repository root: {repo_path}\n"
+                f"Target branch: {branch_name}\n"
+                f"Build summary: {build_summary}\n"
+                f"Artifact policy: {artifact_type}\n\n"
+                "Instructions:\n"
+                "1. Run git_status to see what changed.\n"
+                "2. Create the branch with git_create_branch.\n"
+                f"{_stage_instruction}"
+                "4. Commit with a descriptive conventional commit message.\n"
+                "5. Push the branch with git_push.\n"
+                f"{_pr_instruction}"
+                f"{_finish}\n"
+                f"For memory_read use repo_path='{repo_path}'."
+            )
 
         context: list[dict] = []
 
@@ -202,14 +249,29 @@ class DevOpsAgent:
                     "role": "user",
                     "content": [{"type": "tool_result", "tool_use_id": tool_use_id, "content": "DevOps recorded."}],
                 }]
-                log.info("devops_done", branch=devops_data.get("branch"), pr=devops_data.get("pr_url"))
+                devops_data = dict(devops_data)
+                devops_data["artifact_type"] = artifact_type
+                if artifact_type != "pr":
+                    # Enforce policy even if the model opened a PR.
+                    devops_data["pr_url"] = ""
+                log.info(
+                    "devops_done",
+                    branch=devops_data.get("branch"),
+                    pr=devops_data.get("pr_url"),
+                    artifact_type=artifact_type,
+                )
                 await adk.messages.create(
                     task_id=parent_task_id,
                     content=TextContent(
                         author="agent",
                         content=(
-                            f"[DevOps] ✓ Branch '{devops_data.get('branch')}' pushed. "
-                            + (f"PR: {devops_data.get('pr_url')}" if devops_data.get("pr_url") else "")
+                            f"[DevOps] ✓ artifact={artifact_type} "
+                            f"branch='{devops_data.get('branch')}'"
+                            + (
+                                f", PR: {devops_data.get('pr_url')}"
+                                if devops_data.get("pr_url")
+                                else ""
+                            )
                         ),
                     ),
                 )
@@ -232,6 +294,33 @@ class DevOpsAgent:
                     "role": "user",
                     "content": [{"type": "tool_result", "tool_use_id": tool_use_id,
                                  "content": f"Unknown tool '{tool_name}'."}],
+                }]
+                continue
+
+            if tool_name == "create_pull_request" and artifact_type != "pr":
+                context = context + [{
+                    "role": "user",
+                    "content": [{
+                        "type": "tool_result",
+                        "tool_use_id": tool_use_id,
+                        "content": (
+                            f"Blocked: artifact policy is '{artifact_type}'. "
+                            "Do not open a PR. Call report_devops without pr_url."
+                        ),
+                    }],
+                }]
+                continue
+
+            if artifact_type == "report" and tool_name in {
+                "git_create_branch", "git_add", "git_commit", "git_push", "create_pull_request",
+            }:
+                context = context + [{
+                    "role": "user",
+                    "content": [{
+                        "type": "tool_result",
+                        "tool_use_id": tool_use_id,
+                        "content": "Blocked: artifact policy is 'report' — no git publish.",
+                    }],
                 }]
                 continue
 

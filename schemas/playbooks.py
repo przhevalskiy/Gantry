@@ -95,6 +95,34 @@ KNOWN_CREW_ROLES = frozenset({
 
 ARTIFACT_TYPES = frozenset({"pr", "branch", "patch", "report"})
 
+# Seats that may be muted without inventing a new DAG (Phase B). Architect/Builder stay required.
+MUTABLE_CREW_ROLES = frozenset({"pm", "inspector", "reviewer", "security", "devops"})
+
+
+def normalize_artifact_type(artifact: Any) -> str:
+    """Return canonical artifact type; default pr for back-compat."""
+    if artifact is None:
+        return "pr"
+    if isinstance(artifact, str):
+        value = artifact.lower().strip()
+    elif isinstance(artifact, dict):
+        value = str(artifact.get("type", "pr")).lower().strip()
+    else:
+        return "pr"
+    return value if value in ARTIFACT_TYPES else "pr"
+
+
+def effective_disable_agents(pipeline: dict[str, Any] | None) -> list[str]:
+    """Merge disable_agents with include_agents (include = allowlist of seats)."""
+    pipeline = pipeline or {}
+    disabled = {str(x).lower() for x in (pipeline.get("disable_agents") or [])}
+    include = pipeline.get("include_agents")
+    if include is not None:
+        include_set = {str(x).lower() for x in include}
+        # Only mute mutable seats not listed; never auto-disable architect/builder.
+        disabled |= MUTABLE_CREW_ROLES - include_set
+    return sorted(disabled)
+
 
 def validate_playbook_config(config: dict[str, Any]) -> None:
     """Validate playbook config. Additive fields (artifact, stages) are Phase A/B schema."""
@@ -203,8 +231,15 @@ def resolve_submit_params(
             merged_pipeline["include_agents"] = list(body_include)
 
     # Carry artifact policy into pipeline envelope for the worker (Phase B runtime).
-    if "artifact" in spec and "artifact" not in merged_pipeline:
+    if "artifact" not in merged_pipeline and "artifact" in spec:
         merged_pipeline["artifact"] = deepcopy(spec["artifact"])
+
+    # Normalize seat mute list so worker sees a single disable_agents source of truth.
+    merged_pipeline["disable_agents"] = effective_disable_agents(merged_pipeline)
+    if "include_agents" in merged_pipeline:
+        merged_pipeline["include_agents"] = [
+            str(x).lower() for x in (merged_pipeline.get("include_agents") or [])
+        ]
 
     resolved_id = playbook_id or spec.get("slug") or spec.get("label")
     return merged_goal, merged_branch, merged_tier, merged_pipeline or None, resolved_id

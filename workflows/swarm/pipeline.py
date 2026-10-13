@@ -44,9 +44,9 @@ from project.schema.complexity import TIER_LABELS
 from project.schema.playbooks import (
     architect_prompt_overlay,
     inspector_prompt_overlay,
+    normalize_artifact_type,
     playbook_oracle_qa_commands,
 )
-
 log = structlog.get_logger(__name__)
 
 PM_TIMEOUT = timedelta(hours=50)
@@ -102,11 +102,14 @@ async def run_swarm_pipeline(
     task_params: dict | None = None,
 ) -> str:
     branch = branch_name(f"{task_id}-r{iteration}", branch_prefix)
-    disabled = disable_agents or set()
+    disabled = {str(x).lower() for x in (disable_agents or set())}
     playbook_spec = (task_params or {}).get("playbook_spec") if task_params else None
     architect_overlay = architect_prompt_overlay(playbook, playbook_spec)
     inspector_overlay = inspector_prompt_overlay(playbook, playbook_spec)
     playbook_qa = playbook_oracle_qa_commands(playbook, playbook_spec)
+    artifact_type = normalize_artifact_type(
+        (task_params or {}).get("artifact") if task_params else None
+    )
 
     await adk.messages.create(
         task_id=task_id,
@@ -967,8 +970,8 @@ async def run_swarm_pipeline(
     )
 
     # ── Step 4: DevOps ────────────────────────────────────────────────────
-    # HITL checkpoint 3: deployment approval (Full Crew only)
-    if tier >= 3:
+    # HITL checkpoint 3: deployment approval (Full Crew + PR artifact only)
+    if tier >= 3 and artifact_type == "pr" and "devops" not in disabled:
         action = (
             f"Build and QA complete. Approve creating branch '{branch}' "
             f"and opening a pull request?"
@@ -998,18 +1001,11 @@ async def run_swarm_pipeline(
                 quality_score=None,
             )
 
-    await adk.messages.create(
-        task_id=task_id,
-        content=TextContent(author="agent", content=f"[Foreman] Dispatching DevOps — branch: {branch}"),
-    )
-
     # Union actual writes (from Builder edits) with Architect plan key_files.
-    # Edits are authoritative — key_files may be stale after heal/reviewer cycles.
     _edited_paths = sorted({e.get("path", "") for e in build_result.get("edits", []) if e.get("path")})
     _plan_key_files = sorted({kf for t in tracks for kf in t.get("key_files", []) if kf})
     all_key_files = sorted(set(_edited_paths) | set(_plan_key_files))
 
-    # ── Build report: assemble structured audit trail for PR description ──
     _prior_episode_count: int = 0
     _active_facts: str = ""
     try:
@@ -1066,32 +1062,70 @@ async def run_swarm_pipeline(
         },
         "active_facts": _active_facts,
         "explicit_exclusions": architect_plan.get("out_of_scope", []),
+        "artifact_type": artifact_type,
     }
 
-    devops_json: str = await workflow.execute_child_workflow(
-        DevOpsAgent.run,
-        args=[goal, repo_path, branch, task_id, build_result.get("summary", ""), all_key_files or None, _build_report],
-        id=f"{task_id}-r{iteration}-devops",
-        task_queue=task_queue,
-        execution_timeout=DEVOPS_TIMEOUT,
-    )
-
-    try:
-        devops_result = json.loads(devops_json)
-    except (json.JSONDecodeError, ValueError):
-        devops_result = {"branch": branch, "success": False, "summary": devops_json}
-
-    pr_url = devops_result.get("pr_url", "")
-    await adk.messages.create(
-        task_id=task_id,
-        content=TextContent(
-            author="agent",
-            content=(
-                f"[DevOps] ✓ done — branch '{devops_result.get('branch', branch)}' pushed"
-                + (f", PR: {pr_url}" if pr_url else "")
+    if "devops" in disabled:
+        devops_result = {
+            "branch": "" if artifact_type == "report" else branch,
+            "success": True,
+            "summary": "DevOps skipped — pipeline.disable_agents",
+            "pr_url": "",
+            "artifact_type": artifact_type,
+        }
+        await adk.messages.create(
+            task_id=task_id,
+            content=TextContent(
+                author="agent",
+                content=f"[Foreman] DevOps skipped — artifact={artifact_type}",
             ),
-        ),
-    )
+        )
+    else:
+        await adk.messages.create(
+            task_id=task_id,
+            content=TextContent(
+                author="agent",
+                content=f"[Foreman] Dispatching DevOps — branch: {branch} artifact={artifact_type}",
+            ),
+        )
+        devops_json: str = await workflow.execute_child_workflow(
+            DevOpsAgent.run,
+            args=[
+                goal,
+                repo_path,
+                branch,
+                task_id,
+                build_result.get("summary", ""),
+                all_key_files or None,
+                _build_report,
+                artifact_type,
+            ],
+            id=f"{task_id}-r{iteration}-devops",
+            task_queue=task_queue,
+            execution_timeout=DEVOPS_TIMEOUT,
+        )
+        try:
+            devops_result = json.loads(devops_json)
+        except (json.JSONDecodeError, ValueError):
+            devops_result = {"branch": branch, "success": False, "summary": devops_json}
+        devops_result["artifact_type"] = artifact_type
+        if artifact_type != "pr":
+            devops_result["pr_url"] = ""
+
+        pr_url = devops_result.get("pr_url", "")
+        await adk.messages.create(
+            task_id=task_id,
+            content=TextContent(
+                author="agent",
+                content=(
+                    f"[DevOps] ✓ done — artifact={artifact_type} "
+                    f"branch '{devops_result.get('branch', branch)}'"
+                    + (f", PR: {pr_url}" if pr_url else "")
+                ),
+            ),
+        )
+
+    pr_url = devops_result.get("pr_url", "") if artifact_type == "pr" else ""
 
     # ── Quality scoring — Phase 5 (#15) ──────────────────────────────────
     # Run a lightweight Haiku eval after DevOps to score the build 0–10.
@@ -1158,13 +1192,14 @@ async def run_swarm_pipeline(
                     task_id,
                     project_id,
                     "system",
-                    resolved_branch,
+                    resolved_branch if artifact_type != "report" else "",
                     pr_url,
                     quality_score.get("score") if quality_score else None,
                     "COMPLETED",
                     tier,
                     heal_cycles,
                     files_changed,
+                    artifact_type,
                 ],
                 start_to_close_timeout=timedelta(seconds=20),
                 retry_policy=RetryPolicy(maximum_attempts=3),

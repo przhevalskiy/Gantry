@@ -220,6 +220,14 @@ async def _submit_one(
         if playbook_id:
             task_meta["playbook"] = playbook_id
         task_meta["goal"] = goal
+        if pipeline and getattr(pipeline, "artifact", None) is not None:
+            from schemas.playbooks import normalize_artifact_type
+
+            task_meta["artifact_type"] = normalize_artifact_type(pipeline.artifact)
+        elif extra_params and extra_params.get("artifact"):
+            from schemas.playbooks import normalize_artifact_type
+
+            task_meta["artifact_type"] = normalize_artifact_type(extra_params["artifact"])
         await tasks_repo.save_task(
             task_id=task_id,
             org_id=org_id,

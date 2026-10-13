@@ -244,6 +244,17 @@ def catalog_payload(*, agentex_base_url: str = "http://localhost:5003") -> dict[
     return {
         "acp_agent": FOREMAN_ACP_NAME,
         "orchestration": "temporal_children",
+        "product": {
+            "model": "one_factory",
+            "summary": (
+                "Gantry is one engineering factory (swarm-factory). "
+                "Playbooks are job packets that tune seats, oracles, and artifacts — "
+                "not separately deployable bot firms. "
+                "Crew identities below are Temporal children composed by the Foreman (C1/I7)."
+            ),
+            "playbooks": "GET/POST /v1/playbooks — org-scoped job packets",
+            "artifacts": ["pr", "branch", "patch", "report"],
+        },
         "agents": [dict(a) for a in CREW_AGENTS],
         "autonomy": [dict(v) for v in TIER_AUTONOMY.values()],
         "hitl": [dict(c) for c in HITL_CHECKPOINTS],

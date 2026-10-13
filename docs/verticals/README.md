@@ -1,6 +1,8 @@
 # Vertical playbooks (M4)
 
-Verticals are **config overlays** on the same Foreman pipeline — no workflow forks. Playbooks (Skills) are **org-scoped** via `GET/POST /v1/playbooks`; built-in examples are seeded, not hardcoded in the worker. Submit with `playbook: "<slug>"` on `POST /v1/tasks`.
+Verticals are **job packets** on the same Foreman pipeline — no workflow forks, not separate bot firms. Playbooks are **org-scoped** via `GET/POST /v1/playbooks`; built-ins are seeded. Submit with `playbook: "<slug>"` on `POST /v1/tasks`.
+
+Artifact policy (Phase B): playbooks may set `artifact: { type: pr|branch|patch|report }`. Example: `a11y-remediation` defaults to `branch` (no PR). See [`../platform/composable-crew-roadmap.md`](../platform/composable-crew-roadmap.md).
 
 ## Horizontal matrix
 

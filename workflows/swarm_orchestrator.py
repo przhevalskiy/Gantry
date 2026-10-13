@@ -179,7 +179,16 @@ class SwarmOrchestrator(BaseWorkflow):
         lightweight_mode = bool(params.params.get("lightweight_mode", tp["lightweight_mode"])) if params.params else tp["lightweight_mode"]
         max_heal = int(params.params.get("max_heal_cycles", tp["max_heal_cycles"])) if params.params else tp["max_heal_cycles"]
         max_parallel_tracks = int(params.params.get("max_parallel_tracks", tp["max_parallel_tracks"])) if params.params else tp["max_parallel_tracks"]
-        disable_agents = set(params.params.get("disable_agents") or []) if params.params else set()
+        from project.schema.playbooks import effective_disable_agents
+
+        _pipe = {
+            "disable_agents": list(params.params.get("disable_agents") or []) if params.params else [],
+            "include_agents": list(params.params.get("include_agents") or []) if params.params else [],
+        }
+        # include_agents is an allowlist of mutable seats; merge into disable_agents (Phase B).
+        if not _pipe["include_agents"]:
+            _pipe.pop("include_agents")
+        disable_agents = set(effective_disable_agents(_pipe))
 
         tier_label = TIER_LABELS.get(tier, f"Tier {tier}")
         tier_details = []

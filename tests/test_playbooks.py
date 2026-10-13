@@ -146,3 +146,41 @@ def test_a11y_merges_artifact_into_pipeline():
     )
     assert pipeline is not None
     assert pipeline.get("artifact") == {"type": "branch"}
+
+
+def test_include_agents_expands_disable_list():
+    from project.schema.playbooks import effective_disable_agents
+
+    disabled = effective_disable_agents({
+        "include_agents": ["builder", "architect", "inspector"],
+    })
+    assert "pm" in disabled
+    assert "devops" in disabled
+    assert "builder" not in disabled
+    assert "architect" not in disabled
+
+
+def test_normalize_artifact_type():
+    from project.schema.playbooks import normalize_artifact_type
+
+    assert normalize_artifact_type(None) == "pr"
+    assert normalize_artifact_type("branch") == "branch"
+    assert normalize_artifact_type({"type": "patch"}) == "patch"
+    assert normalize_artifact_type("chat") == "pr"
+
+
+def test_pipeline_config_passes_artifact():
+    from api.schemas.pipeline import PipelineConfig
+
+    params = PipelineConfig(artifact={"type": "branch"}, disable_agents=["pm"]).to_agentex_params()
+    assert params["artifact"]["type"] == "branch"
+    assert params["disable_agents"] == ["pm"]
+
+
+def test_catalog_states_one_factory_not_bot_firms():
+    from schemas.crew import catalog_payload
+
+    payload = catalog_payload()
+    assert payload["product"]["model"] == "one_factory"
+    assert "bot" in payload["product"]["summary"].lower() or "not separately" in payload["product"]["summary"]
+    assert "pr" in payload["product"]["artifacts"]

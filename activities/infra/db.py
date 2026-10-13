@@ -33,17 +33,20 @@ async def db_upsert_build(
     tier: int | None = None,
     heal_cycles: int | None = None,
     files_changed: int | None = None,
+    artifact_type: str = "pr",
 ) -> str:
     """Upsert a structured build record via the Gantry API (Invariant I3).
 
     This is the primary path for task results and terminal lifecycle events.
     The Agentex poller is only a slow safety net when this push fails.
     """
+    artifact = (artifact_type or "pr").lower().strip() or "pr"
     structured_result = {
         k: v
         for k, v in {
-            "pr_url": pr_url or None,
-            "branch": branch or None,
+            "artifact_type": artifact,
+            "pr_url": pr_url or None if artifact == "pr" else None,
+            "branch": branch or None if artifact != "report" else None,
             "quality_score": quality_score,
             "tier": tier,
             "heal_cycles": heal_cycles,
