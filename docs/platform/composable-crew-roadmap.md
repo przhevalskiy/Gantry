@@ -16,7 +16,7 @@
 
 Still true: no per-playbook ACP agents, no Grok-style bot marketplace — packs install into one factory.
 
-Related: [`stack-debloat.md`](./stack-debloat.md) · [`agentex-citizen.md`](./agentex-citizen.md) · [`event-model.md`](./event-model.md) · [`../verticals/README.md`](../verticals/README.md) · [`../brand/README.md`](../brand/README.md) (firm positioning) · `PLATFORM_REFACTOR.md` · `schemas/crew.py` · `schemas/playbooks.py`
+Related: [`stack-debloat.md`](./stack-debloat.md) · [`agentex-citizen.md`](./agentex-citizen.md) · [`event-model.md`](./event-model.md) · [`frontend-architecture.md`](./frontend-architecture.md) · [`../verticals/README.md`](../verticals/README.md) · [`../brand/README.md`](../brand/README.md) (firm positioning) · `PLATFORM_REFACTOR.md` · `schemas/crew.py` · `schemas/playbooks.py`
 
 ---
 
@@ -303,4 +303,5 @@ Phases **A–E landed**. Roadmap complete under current invariants.
 
 **Gantry is a durable factory that runs org-defined playbooks: data-composed Temporal crews producing structured change artifacts — one ACP citizen, many job packets, no chat-bot marketplace.**
 
-Brand framing (professional-services firm, not chat pets): [`../brand/README.md`](../brand/README.md).
+Brand framing (professional-services firm, not chat pets): [`../brand/README.md`](../brand/README.md).  
+Greenfield FE modules over this backend: [`frontend-architecture.md`](./frontend-architecture.md) · [`../brand/frontend-greenfield.md`](../brand/frontend-greenfield.md).

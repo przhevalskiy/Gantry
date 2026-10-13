@@ -3,6 +3,7 @@
 **Status:** Consolidated direction after Muse research.  
 **Research:** [`research-muse.md`](./research-muse.md)  
 **Brand:** [`positioning.md`](./positioning.md) · [`persona-the-firm.md`](./persona-the-firm.md) · [`frontend-agent-representation.md`](./frontend-agent-representation.md)  
+**Technical architecture:** [`../platform/frontend-architecture.md`](../platform/frontend-architecture.md) · code scaffold `apps/web/src/modules/*`  
 **Backend lock:** Gantry API + Temporal Foreman (`swarm-factory`) + playbooks/packs — C1/I7/P1.
 
 ---
@@ -133,15 +134,20 @@ Muse’s lesson: conversation + identity presence + goals/artifacts/HITL. Gantry
 
 ## Component kit (greenfield)
 
-1. **FirmChat** — engagement thread (bubbles OK for out-of-order / proactive, per Muse)  
-2. **ForemanPresence** — avatar slot + live work snippet → ActivitySheet  
-3. **EngagementFloor** — Operator portraits in stage order  
-4. **HitlCard** — deterministic approve/reject (Gantry HITL)  
-5. **ArtifactCard / ArtifactDock**  
-6. **MatterList** — Goals-tab analogue  
-7. **PracticeCard / BriefCard**  
-8. **JobComposer** — file job / amend brief  
-9. **Stage** — diff / preview when the work product matters  
+Owned by modular packages (`apps/web/src/modules/*`) — see [`frontend-architecture.md`](../platform/frontend-architecture.md).
+
+| Component | Module |
+|-----------|--------|
+| **FirmChat** / Engagement thread | `engagement` |
+| **ForemanPresence** → ActivitySheet | `operators` |
+| **EngagementFloor** | `operators` |
+| **HitlCard** | `hitl` |
+| **ArtifactCard / ArtifactDock** | `artifacts` |
+| **MatterList** | `matters` |
+| **PracticeCard / BriefCard** | `practices` / `briefs` |
+| **JobComposer** | `engagement` |
+| **Stage** | `stage` |
+| Home first paint | `home` |
 
 Atomic unit of the feed: **EngagementEvent** (may render as bubble). Not `ChatMessage` as the domain model.
 

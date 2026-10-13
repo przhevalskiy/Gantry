@@ -12,6 +12,7 @@
 | [`frontend-agent-representation.md`](./frontend-agent-representation.md) | Operator portraits + engagement floor — future workplace identity |
 | [`research-muse.md`](./research-muse.md) | Meta Muse brand + full-stack architecture research |
 | [`frontend-greenfield.md`](./frontend-greenfield.md) | Greenfield UI: Muse-like experience × L5 firm backend |
+| [`../platform/frontend-architecture.md`](../platform/frontend-architecture.md) | Modular FE architecture mapped to `/v1/*` + Operator kit |
 
 ### North star (brand + product)
 
@@ -19,4 +20,4 @@
 
 **Visual identity:** Operators — crafted silicon-colleague portraits on an engagement floor (see [`frontend-agent-representation.md`](./frontend-agent-representation.md)).
 
-**Frontend north star:** Muse-grade engagement theater on an L5 factory backend ([`frontend-greenfield.md`](./frontend-greenfield.md) · research [`research-muse.md`](./research-muse.md)).
+**Frontend north star:** Muse-grade engagement theater on an L5 factory backend ([`frontend-greenfield.md`](./frontend-greenfield.md) · research [`research-muse.md`](./research-muse.md) · architecture [`../platform/frontend-architecture.md`](../platform/frontend-architecture.md)).
