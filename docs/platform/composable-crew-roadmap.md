@@ -1,8 +1,8 @@
 # Composable crew roadmap — playbooks beyond one SWE firm
 
-**Status:** Phase A + B **implemented** (invariant-locked); C–E deferred  
+**Status:** Phase A–D **implemented** (invariant-locked); E deferred  
 **Problem:** Playbooks were overlays on one hardcoded engineering firm.  
-**Goal:** Make playbooks describe **job packets** (seats + artifact) now; data DAG / role packs later — without chat-bot firms or ACP forks.
+**Goal:** Make playbooks describe **job packets** (seats + artifact) with a data DAG and real Temporal role packs — without chat-bot firms or ACP forks.
 
 ### Execution status (no feature drift)
 
@@ -10,11 +10,11 @@
 |-------|--------|--------|
 | **A** | Truth, schema (`artifact`/`stages` validate), catalog copy, `artifact_type` on results | **Done** |
 | **B** | Artifact policy in DevOps; include/disable seats; structured `artifact_type` | **Done** |
-| **C** | Foreman DAG interpreter | **Not started** (deferred) |
-| **D** | New Temporal role packs | **Not started** (deferred) |
+| **C** | Foreman DAG interpreter (`stage_graph` + plan loop; heal/HITL metadata; golden default ≡ current) | **Done** |
+| **D** | Role pack contract + `oracle-a11y` Temporal child (`OracleA11yAgent`) | **Done** |
 | **E** | Firm-pack install UX / thin catalog UI | **Not started** (deferred) |
 
-Deferred on purpose: no DAG rewrite, no new ACP agents, no Grok-style bot UI.
+Deferred on purpose: no firm-pack marketplace UI, no new ACP agents, no Grok-style bot UI.
 
 Related: [`stack-debloat.md`](./stack-debloat.md) · [`agentex-citizen.md`](./agentex-citizen.md) · [`event-model.md`](./event-model.md) · [`../verticals/README.md`](../verticals/README.md) · `PLATFORM_REFACTOR.md` · `schemas/crew.py` · `schemas/playbooks.py`
 
@@ -256,23 +256,21 @@ oracle hooks                  artifact: branch|patch|pr|report
 
 ## 5. What to execute upon now (ordered)
 
-Do **not** start at D/E. Execute **A → B** on the current branch of work; C only after B exit criteria.
+Phases **A–D landed**. Next is **E** only if product wants pack install UX — still not chat bots.
 
-### Immediate execution set (Phase A + B slice)
+### Landed (A–D)
 
-1. **Land this roadmap** in `docs/platform/` and link from README / stack-debloat  
-2. **Playbook config schema v2** (additive): `artifact`, optional `stages` (validated, not yet interpreted)  
-3. **Artifact policy in DevOps path** — smallest runtime win that changes product shape away from “must be Devin/PR”  
-4. **Submit-time merge** of playbook `disable_agents` / include list  
-5. **Tests**: back-compat default = today’s PR path; `artifact: branch` skips `create_pull_request`  
-6. **Copy fix**: README/thesis one-liners → “playbook runner / job packets” alongside factory language  
+1. Roadmap + schema v2 (`artifact`, `stages`) + artifact policy + include/disable  
+2. Foreman interpreter: `workflows/swarm/stage_graph.py` + `interpreter.py`; `pipeline.py` walks the plan  
+3. Golden tests: default stages ≡ classic PM→Architect→build_verify→Security→DevOps  
+4. Role packs: `role_packs/` + `oracle_a11y` → `OracleA11yAgent`; worker/manifest/catalog wired  
+5. `a11y-remediation` playbook stages schedule `oracle_a11y`  
 
 ### Explicitly defer
 
 | Item | Until |
 |------|--------|
-| Generic DAG interpreter | Phase C (after artifact + include/exclude proven) |
-| New Temporal role packs | Phase D (after interpreter) |
+| Firm-pack install / catalog UI | Phase E |
 | Marketplace / bot deploy UX | Never as chat bots; packs only in Phase E |
 | Per-playbook ACP | Never (C1) |
 

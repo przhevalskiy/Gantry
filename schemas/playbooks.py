@@ -29,6 +29,17 @@ SYSTEM_PLAYBOOKS: dict[str, dict[str, Any]] = {
         "goal_prefix": "WCAG 2.1 AA remediation — ",
         # Phase B: runner should honor artifact (branch-first migration job).
         "artifact": {"type": "branch"},
+        # Phase C/D: data DAG — classic build_verify + oracle_a11y pack role.
+        "stages": [
+            {"role": "pm", "min_tier": 1},
+            {"role": "architect", "hitl": "architect_plan", "hitl_min_tier": 2},
+            {"role": "builder", "parallel": True},
+            {"role": "inspector", "heal": True},
+            {"role": "reviewer", "heal": True, "skip_lightweight": True},
+            {"role": "oracle_a11y", "skip_lightweight": True},
+            {"role": "security", "skip_lightweight": True},
+            {"role": "devops", "hitl": "devops", "hitl_min_tier": 3},
+        ],
         "pipeline": {
             "max_heal_cycles": 2,
             "max_parallel_tracks": 2,
@@ -81,9 +92,8 @@ def spec_from_row(spec: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-# Known Temporal crew roles (schemas/crew.py). Stage graphs may only reference these
-# until Phase D role packs register additional workflow identities (C2 / P3).
-KNOWN_CREW_ROLES = frozenset({
+# Classic SWE seats. Phase D packs extend via role_packs.registry.all_known_roles().
+_BASE_CREW_ROLES = frozenset({
     "pm",
     "architect",
     "builder",
@@ -93,10 +103,29 @@ KNOWN_CREW_ROLES = frozenset({
     "devops",
 })
 
+
+def _known_crew_roles() -> frozenset[str]:
+    try:
+        from role_packs.registry import all_known_roles
+
+        return all_known_roles()
+    except Exception:
+        return _BASE_CREW_ROLES
+
+
+KNOWN_CREW_ROLES = _known_crew_roles()
+
 ARTIFACT_TYPES = frozenset({"pr", "branch", "patch", "report"})
 
-# Seats that may be muted without inventing a new DAG (Phase B). Architect/Builder stay required.
-MUTABLE_CREW_ROLES = frozenset({"pm", "inspector", "reviewer", "security", "devops"})
+# Seats that may be muted without inventing a new DAG (Phase B/D). Architect/Builder stay required.
+MUTABLE_CREW_ROLES = frozenset({
+    "pm",
+    "inspector",
+    "reviewer",
+    "security",
+    "devops",
+    "oracle_a11y",
+})
 
 
 def normalize_artifact_type(artifact: Any) -> str:
@@ -173,11 +202,11 @@ def validate_playbook_config(config: dict[str, Any]) -> None:
             if not isinstance(stage, dict):
                 raise ValueError(f"stages[{i}] must be an object")
             role = str(stage.get("role", "")).lower()
-            if role not in KNOWN_CREW_ROLES:
+            known = _known_crew_roles()
+            if role not in known:
                 raise ValueError(
                     f"stages[{i}].role unknown {role!r} "
-                    f"(Foreman DAG interpreter lands in Phase C; "
-                    f"roles must be known Temporal crew ids)"
+                    f"(known Temporal crew / pack roles: {', '.join(sorted(known))})"
                 )
 
 

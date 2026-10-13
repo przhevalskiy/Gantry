@@ -1,0 +1,9 @@
+# Human-readable mirror of pack.py (source of truth is pack.py — no YAML runtime dep).
+id: oracle-a11y
+label: Accessibility oracle pack
+version: "1"
+roles:
+  - id: oracle_a11y
+    workflow: OracleA11yAgent
+    module: workflows.agents.oracle_a11y
+    class: OracleA11yAgent

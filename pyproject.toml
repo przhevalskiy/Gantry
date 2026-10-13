@@ -32,7 +32,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["project", "activities", "workflows", "schemas"]
+packages = ["project", "activities", "workflows", "schemas", "role_packs"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

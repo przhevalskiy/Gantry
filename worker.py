@@ -21,6 +21,7 @@ from workflows.agents.reviewer import ReviewerAgent
 from workflows.agents.security import SecurityAgent
 from workflows.agents.devops import DevOpsAgent
 from workflows.child_workflow import ApprovalWorkflow, ClarificationWorkflow
+from role_packs.registry import load_pack_workflows
 
 from activities.swarm_activities import (
     swarm_list_directory,
@@ -181,6 +182,7 @@ async def main():
             SecurityAgent,
             DevOpsAgent,
             ApprovalWorkflow,
+            *load_pack_workflows(),
         ],
     )
 

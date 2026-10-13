@@ -138,6 +138,9 @@ def test_workflow_defn_names_match_catalog_and_worker():
         "ClarificationWorkflow",
     ):
         assert cls in worker
+    # Phase D packs register via load_pack_workflows() (OracleA11yAgent, …).
+    assert "load_pack_workflows" in worker
+    assert "OracleA11yAgent" in (ROOT / "manifest.yaml").read_text()
 
 
 def test_i7_foreman_composes_temporal_children_not_acp():

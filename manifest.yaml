@@ -48,6 +48,9 @@ agent:
       - name: DevOpsAgent
         queue_name: gantry_queue
         description: "gantry-devops — Temporal child"
+      - name: OracleA11yAgent
+        queue_name: gantry_queue
+        description: "gantry-oracle-a11y — Temporal child (role pack oracle-a11y)"
       - name: gantry_approval
         queue_name: gantry_queue
         description: "HITL approve/reject checkpoint"
