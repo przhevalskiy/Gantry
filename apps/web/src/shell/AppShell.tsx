@@ -1,3 +1,5 @@
+import { PanelLeftOpen } from "lucide-react";
+import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Atmosphere } from "./Atmosphere";
 import { Sidebar } from "./Sidebar";
@@ -13,6 +15,8 @@ const groovePane = {
 
 /** Wireframe geometry: atmosphere with grooved sidebar + center stage. */
 export function AppShell() {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
   return (
     <div
       style={{
@@ -31,7 +35,28 @@ export function AppShell() {
             gap: "var(--stage-inset)",
           }}
         >
-          <Sidebar style={groovePane} />
+          {sidebarOpen ? (
+            <Sidebar style={groovePane} onCollapse={() => setSidebarOpen(false)} />
+          ) : (
+            <button
+              type="button"
+              aria-label="Open sidebar"
+              onClick={() => setSidebarOpen(true)}
+              style={{
+                ...groovePane,
+                width: 48,
+                flexShrink: 0,
+                display: "grid",
+                placeItems: "center",
+                alignSelf: "stretch",
+                background: "var(--sidebar-bg)",
+                color: "var(--text-secondary)",
+                cursor: "pointer",
+              }}
+            >
+              <PanelLeftOpen size={18} strokeWidth={1.75} aria-hidden />
+            </button>
+          )}
           <main
             className="stage-pane"
             style={{

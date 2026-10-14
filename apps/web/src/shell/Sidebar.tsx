@@ -1,11 +1,17 @@
-import { FolderPlus, Hexagon } from "lucide-react";
+import { FolderPlus, PanelLeftClose } from "lucide-react";
 import type { CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { paths } from "../lib/paths";
 import { SidebarNav } from "./SidebarNav";
 import { UserChip } from "./UserChip";
 
-export function Sidebar({ style }: { style?: CSSProperties }) {
+export function Sidebar({
+  style,
+  onCollapse,
+}: {
+  style?: CSSProperties;
+  onCollapse: () => void;
+}) {
   return (
     <aside
       className="sidebar-pane"
@@ -23,37 +29,37 @@ export function Sidebar({ style }: { style?: CSSProperties }) {
         style={{
           display: "flex",
           alignItems: "center",
+          justifyContent: "space-between",
           gap: 10,
-          padding: "16px 16px 12px",
+          padding: "14px 12px 12px 16px",
         }}
       >
         <Link
           to={paths.home}
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
             fontWeight: 700,
             fontSize: 18,
             letterSpacing: "-0.02em",
           }}
         >
-          <span
-            aria-hidden
-            style={{
-              width: 22,
-              height: 22,
-              borderRadius: 6,
-              background: "var(--cta-primary-bg)",
-              display: "grid",
-              placeItems: "center",
-              color: "var(--accent-400)",
-            }}
-          >
-            <Hexagon size={12} strokeWidth={2.25} />
-          </span>
           Gantry
         </Link>
+        <button
+          type="button"
+          aria-label="Collapse sidebar"
+          onClick={onCollapse}
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            display: "grid",
+            placeItems: "center",
+            color: "var(--text-secondary)",
+            flexShrink: 0,
+          }}
+        >
+          <PanelLeftClose size={18} strokeWidth={1.75} aria-hidden />
+        </button>
       </div>
 
       <SidebarNav />
