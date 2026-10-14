@@ -9,7 +9,7 @@
 #   2. Starts Temporal dev server if not running (:7233)
 #   3. Starts the swarm-factory agent (ACP :8000 + Temporal worker)
 #   4. Starts the Gantry API (:8001)
-#   5. Starts apps/web factory UI (Vite :5173)
+#   5. (UI removed — apps/web not in-tree)
 #
 # Usage:
 #   ./dev.sh               Start all services
@@ -85,7 +85,6 @@ _show_status() {
     nc -z localhost "$port" 2>/dev/null && echo -e "${GREEN}running${NC}" || echo -e "${RED}stopped${NC}"
   done
   echo ""
-  echo "  http://localhost:5173       apps/web (Gantry UI)"
   echo "  http://localhost:5003/swagger  Agentex API"
   echo "  http://localhost:8080       Temporal UI"
   echo ""
@@ -188,18 +187,11 @@ echo "    PID $API_PID — logs: tail -f /tmp/gantry-api.log"
 wait_for_port 8001 "Gantry API" 20
 ok "API running"
 
-# ── Step 5: Factory UI (apps/web) ───────────────────────────────────────────
-header "Starting apps/web"
-
-if [ ! -d "$UI_DIR" ]; then
-  warn "apps/web not found at $UI_DIR — skipping"
+# ── Step 5: UI (removed) ────────────────────────────────────────────────────
+if [ -d "$UI_DIR" ]; then
+  warn "apps/web present but unsupported in this branch — not starting"
 else
-  [ ! -d "$UI_DIR/node_modules" ] && (cd "$UI_DIR" && npm install --silent)
-  (cd "$UI_DIR" && VITE_GANTRY_DEV_AUTH_BYPASS="${VITE_GANTRY_DEV_AUTH_BYPASS:-true}" npm run dev) >/tmp/gantry-ui.log 2>&1 &
-  UI_PID=$!
-  echo "    PID $UI_PID — logs: tail -f /tmp/gantry-ui.log"
-  wait_for_port 5173 "apps/web" 30
-  ok "UI running"
+  ok "No apps/web (API-first; FE rebuild deferred)"
 fi
 
 # ── Ready ─────────────────────────────────────────────────────────────────────
@@ -207,14 +199,12 @@ echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  Ready${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo "  http://localhost:5173           apps/web (Gantry UI)"
 echo "  http://localhost:8001           Gantry API"
 echo "  http://localhost:8001/docs      API docs (Swagger)"
 echo "  http://localhost:5003/swagger   Agentex API"
 echo "  http://localhost:8080           Temporal UI"
 echo "  tail -f /tmp/gantry-api.log"
 echo "  tail -f /tmp/gantry-agent.log"
-echo "  tail -f /tmp/gantry-ui.log"
 echo "  ./dev.sh --stop   to tear down"
 echo ""
 

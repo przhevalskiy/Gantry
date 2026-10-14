@@ -304,4 +304,4 @@ Phases **A–E landed**. Roadmap complete under current invariants.
 **Gantry is a durable factory that runs org-defined playbooks: data-composed Temporal crews producing structured change artifacts — one ACP citizen, many job packets, no chat-bot marketplace.**
 
 Brand framing (professional-services firm, not chat pets): [`../brand/README.md`](../brand/README.md).  
-Greenfield FE modules over this backend: [`frontend-architecture.md`](./frontend-architecture.md) · [`../brand/frontend-greenfield.md`](../brand/frontend-greenfield.md).
+Frontend deferred (`apps/web` removed); restart notes: [`frontend-architecture.md`](./frontend-architecture.md) · [`../brand/frontend-greenfield.md`](../brand/frontend-greenfield.md).

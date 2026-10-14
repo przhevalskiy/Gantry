@@ -216,13 +216,13 @@ class BuilderAgent:
             genuine reasoning: understanding the repo at the start, and evaluating
             build results at the end.
             """
-            if _model != CLAUDE_SONNET_MODEL:
+            if _model != _CLAUDE_SONNET_MODEL:
                 return _model  # respect explicit model override (e.g. Mistral)
             if turn <= 1:
-                return CLAUDE_SONNET_MODEL   # planning / context loading
+                return _CLAUDE_SONNET_MODEL   # planning / context loading
             if turns_left <= 2:
-                return CLAUDE_SONNET_MODEL   # verify_build + finish_build
-            return CLAUDE_HAIKU_MODEL        # mechanical execution turns
+                return _CLAUDE_SONNET_MODEL   # verify_build + finish_build
+            return _CLAUDE_HAIKU_MODEL        # mechanical execution turns
 
         for turn in range(MAX_BUILDER_TURNS):
             turns_left = MAX_BUILDER_TURNS - turn - 1

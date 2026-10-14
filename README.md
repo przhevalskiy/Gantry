@@ -2,7 +2,7 @@
 
 **Async code-agent platform with a tenant control plane.**
 
-Gantry runs software engineering tasks as durable, orchestrated agent workflows. You submit a goal against a GitHub-linked project; a Temporal pipeline plans the work, writes code in parallel tracks, verifies it, and opens a pull request. Integrators use the REST API, webhooks, and SDKs. The web UI is optional — a run console, not the product core.
+Gantry runs software engineering tasks as durable, orchestrated agent workflows. You submit a goal against a GitHub-linked project; a Temporal pipeline plans the work, writes code in parallel tracks, verifies it, and opens a pull request. Integrators use the REST API, webhooks, and SDKs. There is **no in-repo web UI** today — the product core is the API + worker (I8). Brand guides for a future client live under `docs/brand/`.
 
 ---
 
@@ -11,14 +11,14 @@ Gantry runs software engineering tasks as durable, orchestrated agent workflows.
 Gantry is three systems wired together:
 
 ```
-Integrator / apps/web  →  api/ (FastAPI)  →  Agentex  →  Temporal worker (workflows + activities)
+Integrator (SDK / curl / future UI)  →  api/ (FastAPI)  →  Agentex  →  Temporal worker (workflows + activities)
 ```
 
 | Layer | Role |
 |-------|------|
 | **`workflows/` + `activities/` + `worker.py`** | The engine. One Agentex entry agent (`swarm-factory`) runs a Temporal Foreman workflow that composes child workflows (PM, Architect, Builder, Inspector, Reviewer, Security, DevOps). LLM planner activities call repo tools (read/write/patch, git, tests, symbol index). |
 | **`api/`** | The control plane. Org-scoped API keys, projects, task metadata, quotas, audit, webhooks, HITL routing. Submits work to Agentex via ACP `task/create`; the worker pushes status/results back (poller is a slow fallback). Does not execute agent logic itself. |
-| **`apps/web/`** | An optional operator UI. Submits tasks through `/v1/tasks`, streams run output from `/v1/tasks/{id}/events`, and surfaces HITL checkpoints. Chat layout is legacy UX; the wire protocol is task-based. |
+| **UI** | Not in-tree. Future optional client of `/v1/*` only — see `docs/brand/` + `docs/platform/frontend-architecture.md`. |
 
 **Primary artifact:** a **task run** (with optional `result.pr_url`, `result.branch`), not a conversation thread.
 
@@ -36,7 +36,7 @@ Integrator / apps/web  →  api/ (FastAPI)  →  Agentex  →  Temporal worker (
 | Unit of work | Durable pipeline run → PR | Interactive edit session |
 | Where it runs | Agentex + Temporal worker on your infra | Local IDE / CLI |
 
-The web UI still *looks* like a chat app (discussions, message bubbles, streaming text). Under the hood each message submits a factory task and renders Agentex output. Treat chat as **run observability**, not the domain model.
+Brand framing (professional-services firm, not chat pets): [`docs/brand/README.md`](docs/brand/README.md).
 
 ---
 
@@ -152,25 +152,9 @@ Full reference: [`docs/api.md`](docs/api.md)
 
 ---
 
-## Web UI (`apps/web`)
+## Web UI
 
-Static Vite + React app. Deployed separately (e.g. Vercel); talks to the Gantry API only.
-
-```
-Browser (:5173)  →  Gantry API (:8001)  →  Agentex (:5003)  →  worker
-```
-
-| Server-backed | Client-local (browser) |
-|---------------|------------------------|
-| Projects (hubspaces) | Discussions / sidebar history |
-| Task submit + SSE stream | Starters (saved prompts) |
-| API key auth | Chat message cache |
-
-Flow: create a **Hubspace** (project + GitHub URL) → **New Task** (types a goal) → UI calls `POST /v1/tasks` → streams `/v1/tasks/{id}/events` into the chat view. **Team** page configures default tier and pipeline flags sent on each submit.
-
-Local dev: `./dev.sh` sets `GANTRY_DEV_AUTH_BYPASS` so the UI skips the API-key modal. Never enable that in production.
-
-UI docs: [`apps/web/README.md`](apps/web/README.md)
+**Not in this repository.** Product surface is the API + SDKs. Brand and restart notes for a future client: [`docs/brand/`](docs/brand/) · [`docs/platform/frontend-architecture.md`](docs/platform/frontend-architecture.md).
 
 ---
 
@@ -204,7 +188,6 @@ const result = await client.tasks.wait(task.id);
 ### Prerequisites
 
 - Python 3.12+ and [uv](https://github.com/astral-sh/uv)
-- Node.js 20+
 - [Temporal CLI](https://docs.temporal.io/cli) (or Temporal via Agentex Docker)
 - [Scale Agentex](https://github.com/scaleapi/scale-agentex) platform — `scale-agentex/agentex` via Docker Compose
 
@@ -216,13 +199,12 @@ cp .env.example .env
 # Optional: GH_TOKEN, DATABASE_URL, GANTRY_SECRETS_KEY
 
 uv sync
-cd apps/web && npm install
 ```
 
 ### Run
 
 ```bash
-./dev.sh              # Temporal, Agentex (if needed), worker, API :8001, UI :5173
+./dev.sh              # Temporal, Agentex (if needed), worker, API :8001
 ./dev.sh --status     # port check
 ./dev.sh --stop       # tear down local processes
 ./dev.sh --platform   # restart Agentex Docker first
@@ -233,10 +215,9 @@ cd apps/web && npm install
 | Agentex API | 5003 |
 | Agent ACP (`swarm-factory`) | 8000 |
 | Gantry API | 8001 |
-| Factory UI | 5173 |
 | Temporal | 7233 |
 
-Open [http://localhost:5173](http://localhost:5173) for the UI, [http://localhost:8001/docs](http://localhost:8001/docs) for the API.
+API docs: [http://localhost:8001/docs](http://localhost:8001/docs).
 
 Verification: `bash scripts/release_gate.sh`
 
@@ -248,7 +229,7 @@ Verification: `bash scripts/release_gate.sh`
 - **Agentex cluster:** [`docs/platform/agentex-cluster.md`](docs/platform/agentex-cluster.md)
 - **Worker scaling:** [`docs/platform/scaling-workers.md`](docs/platform/scaling-workers.md)
 
-Agentex, Temporal, and the worker stay off static hosting. Only `apps/web` is a static frontend.
+Agentex, Temporal, and the worker stay off static hosting. No in-repo static frontend.
 
 ---
 
@@ -278,7 +259,6 @@ Gantry/
 │   ├── acp.py                # FastACP → Temporal
 │   └── schema/               # crew catalog, playbooks, complexity tiers
 │
-├── apps/web/                 # Vite operator UI (optional)
 ├── sdk/python/               # gantry-sdk
 ├── sdk/typescript/           # @gantry/sdk
 ├── playbooks/                # Vertical YAML presets
