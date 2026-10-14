@@ -44,3 +44,16 @@ button {
   outline: 2px solid var(--accent-500);
   outline-offset: 2px;
 }
+
+/* All text inputs share the 2rem bar height contract */
+input[type="text"],
+input:not([type]),
+input[type="search"],
+input[type="email"],
+input[type="password"],
+.input-bar {
+  height: var(--input-height);
+  min-height: var(--input-height);
+  max-height: var(--input-height);
+  box-sizing: border-box;
+}

@@ -14,7 +14,8 @@ export function ComposeHome() {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "48px 24px 80px",
+        padding: "40px 28px 64px",
+        minHeight: 0,
       }}
     >
       <p

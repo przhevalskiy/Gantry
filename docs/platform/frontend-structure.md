@@ -98,7 +98,9 @@ apps/web/
 ## What this scaffold includes
 
 - Vite + React + TypeScript app under `apps/web`
-- App shell matching wireframe geometry (sidebar + stage + composer home)
+- App shell matching wireframe geometry (sidebar + **grooved** center stage + composer home)
+- Lucide icons only (no emoji in UI chrome)
+- Input bars locked to `--input-height: 2rem`
 - Design tokens from brand voice/look
 - Stub routes with firm copy (no Agent deploy landing)
 - Thin `services/gantry` placeholder pointing at `VITE_GANTRY_API_URL`

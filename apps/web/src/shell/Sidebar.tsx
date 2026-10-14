@@ -1,3 +1,4 @@
+import { FolderPlus, Hexagon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { paths } from "../lib/paths";
 import { SidebarNav } from "./SidebarNav";
@@ -44,9 +45,10 @@ export function Sidebar() {
               background: "var(--cta-primary-bg)",
               display: "grid",
               placeItems: "center",
+              color: "var(--accent-400)",
             }}
           >
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: "var(--accent-400)" }} />
+            <Hexagon size={12} strokeWidth={2.25} />
           </span>
           Gantry
         </Link>
@@ -56,21 +58,32 @@ export function Sidebar() {
 
       <div style={{ flex: 1 }} />
 
-      <div style={{ padding: "8px 14px", fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+      <div
+        style={{
+          padding: "8px 14px",
+          fontSize: 11,
+          color: "var(--text-muted)",
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+        }}
+      >
         Projects
       </div>
       <div style={{ padding: "0 10px 12px" }}>
         <Link
           to={paths.projects}
           style={{
-            display: "block",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
             padding: "8px 12px",
             borderRadius: 10,
             fontSize: 13,
             color: "var(--text-secondary)",
           }}
         >
-          + New project
+          <FolderPlus size={16} strokeWidth={1.75} aria-hidden />
+          New project
         </Link>
       </div>
 
