@@ -1,456 +1,344 @@
-# Gantry REST API
+# Gantry REST API (current)
 
-Base URL: `https://api.gantry.dev`  
-Local dev: `http://localhost:8001`  
-Interactive docs: `http://localhost:8001/docs`
+**Source of truth:** mounted routers in `api/main.py` + `api/routes/*`.  
+**Interactive:** `http://localhost:8001/docs` (Swagger) when the API is running.  
+**Base URL (dev):** `http://localhost:8001`  
+**Base URL (prod example):** `https://api.gantry.dev`
+
+This document reflects the **in-tree API after `apps/web` removal**. There is no dashboard dependency.
 
 ---
 
 ## Authentication
 
-All `/v1/` endpoints require a Bearer token:
+All `/v1/*` routes require:
 
 ```
 Authorization: Bearer gantry_<64 hex chars>
 ```
 
-Create a key in the dashboard (Agents → API tab) or via the API:
+| Mechanism | Behavior |
+|-----------|----------|
+| API key | SHA-256 hashed at rest; plaintext shown **once** on create (I4) |
+| Bootstrap | If no keys exist, `POST /v1/keys` may create the first key (optional `X-Gantry-Bootstrap-Token`) |
+| Dev bypass | `GANTRY_DEV_AUTH_BYPASS=1` — local only |
+
+### Scopes
+
+`admin` · `tasks:read` · `tasks:write` · `projects:read` · `projects:write` · `secrets:read` · `secrets:write`
+
+`admin` implies every scope.
+
+### Create a key
 
 ```bash
-curl -X POST https://api.gantry.dev/v1/keys \
+curl -X POST http://localhost:8001/v1/keys \
   -H "Content-Type: application/json" \
-  -d '{"name": "my-key"}'
+  -d '{"name": "bootstrap", "scopes": ["admin"]}'
 ```
 
-Keys are shown once on creation. Store them securely.
+Response includes `"key": "gantry_…"` — store it; it is not returned again.
 
 ---
 
-## Keys
+## Unauthenticated
 
-### `POST /keys`
-Create an API key. No auth required (bootstrap endpoint).
-
-```json
-{ "name": "ci-pipeline" }
-```
-
-Response `201`:
-```json
-{ "id": "key_abc", "key": "gantry_...", "name": "ci-pipeline", "created_at": "..." }
-```
-
-### `GET /keys`
-List all active keys (masked).
-
-### `DELETE /keys/:id`
-Revoke a key. Returns `204`.
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/health` | Liveness + DB flag |
+| `GET` | `/status` | Component health (DB, Agentex, Temporal config) + active task count |
+| `GET` | `/docs`, `/redoc`, `/openapi.json` | OpenAPI UI |
 
 ---
 
-## Projects
+## Keys — `/v1/keys`
 
-### `GET /v1/projects`
-List all projects.
-
-### `GET /v1/projects/:id`
-Get a single project.
-
-### `POST /v1/projects`
-Create a project.
-
-```json
-{ "name": "my-app", "github_url": "https://github.com/org/repo" }
-```
-
-### `PATCH /v1/projects/:id`
-Update a project's name or GitHub URL.
-
-```json
-{ "github_url": "https://github.com/org/new-repo" }
-```
+| Method | Path | Scope | Purpose |
+|--------|------|-------|---------|
+| `POST` | `/v1/keys` | bootstrap / admin | Create key (plaintext once) |
+| `GET` | `/v1/keys` | admin | List keys (masked) |
+| `DELETE` | `/v1/keys/{key_id}` | admin | Revoke |
 
 ---
 
-## Tasks
+## Projects — `/v1/projects`
 
-### `POST /v1/tasks`
-Submit an engineering task.
+GitHub-linked work units (alias: workspaces).
 
-```json
-{
-  "goal": "Add rate limiting to POST /v1/tasks",
-  "project_id": "proj_abc",
-  "branch_prefix": "swarm",
-  "tier": -1,
-  "playbook": "platform-backlog",
-  "github_token": "ghp_...",
-  "webhook_url": "https://your-server.com/webhooks/gantry"
-}
-```
-
-| Field | Required | Default | Description |
-|---|---|---|---|
-| `goal` | ✓ | — | Engineering goal in plain English |
-| `project_id` | ✓ | — | ID of the linked project |
-| `branch_prefix` | | `swarm` | Git branch prefix |
-| `tier` | | `-1` (auto) | Model tier: 0=Haiku, 1=Sonnet, 2=Opus |
-| `playbook` | | — | Job packet slug: `platform-backlog`, `a11y-remediation`, `monorepo-slice` |
-| `github_token` | | `GH_TOKEN` from env | Override the GitHub token for this task |
-| `webhook_url` | | — | URL to POST when task completes |
-
-Response `201`:
-```json
-{ "task_id": "task_xyz", "status": "queued", "project_id": "proj_abc" }
-```
-
-### `POST /v1/playbooks/run`
-Convenience submit bound to a playbook (and optional firm pack). Same factory — not a new ACP agent.
-
-```json
-{
-  "pack": "migration-runner@1",
-  "playbook": "a11y-remediation",
-  "goal": "Fix contrast on login",
-  "project_id": "proj_abc"
-}
-```
-
-| Field | Required | Description |
-|---|---|---|
-| `goal` | ✓ | Engineering goal |
-| `project_id` | ✓ | Workspace / project id |
-| `playbook` | one of pack/playbook | Job packet slug |
-| `pack` | one of pack/playbook | Firm pack id or `id@version` (uses pack default playbook if playbook omitted) |
-
-### Firm packs (`/v1/packs`)
-
-Versioned role sets + default playbooks for the one factory (`swe-factory@1`, `migration-runner@1`).
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/v1/packs` | Catalog + org install/enable + per-pack daily quota |
-| `POST` | `/v1/packs/{id}/install` | Install / re-enable; seeds system playbooks |
-| `PATCH` | `/v1/packs/{id}` | `{ "enabled": false, "max_tasks_per_day": 50 }` |
-| `DELETE` | `/v1/packs/{id}` | Remove install row |
-
-UI: `/packs` — thin catalog + run console (not chat).
-
-### `POST /v1/tasks/bulk`
-Submit up to 50 tasks in parallel. Returns immediately — partial failure is fine.
-
-```json
-{
-  "project_id": "proj_abc",
-  "tasks": [
-    { "goal": "Add rate limiting to POST /v1/tasks" },
-    { "goal": "Write tests for the auth module" },
-    { "goal": "Fix the N+1 query in project listing", "tier": 2 }
-  ],
-  "webhook_url": "https://your-server.com/hooks/monolift"
-}
-```
-
-Per-task fields (`branch_prefix`, `tier`, `webhook_url`) override the top-level defaults.
-
-Response `202`:
-```json
-{
-  "project_id": "proj_abc",
-  "submitted": 2,
-  "failed": 1,
-  "results": [
-    { "goal": "Add rate limiting...", "task_id": "task_abc", "status": "queued" },
-    { "goal": "Write tests...", "task_id": "task_def", "status": "queued" },
-    { "goal": "Fix the N+1...", "error": "Agentex error: ..." }
-  ]
-}
-```
-
-### `GET /v1/tasks/:id`
-Poll task status.
-
-```json
-{
-  "task_id": "task_xyz",
-  "status": "completed",
-  "pr_url": "https://github.com/org/repo/pull/42",
-  "project_id": "proj_abc",
-  "source": "api",
-  "created_at": "2026-05-23T10:00:00Z",
-  "updated_at": "2026-05-23T10:18:00Z"
-}
-```
-
-Status values: `queued` · `running` · `waiting_approval` · `completed` · `failed` · `cancelled` · `terminated` · `timeout`
-
-### `GET /v1/tasks/:id/messages`
-Stream agent activity messages.
-
-```json
-{ "task_id": "task_xyz", "messages": [ { "role": "assistant", "content": "..." } ] }
-```
-
-### `GET /v1/tasks/:id/source`
-Returns source metadata. No auth required.
-
-```json
-{ "source": "github_issues", "github_owner": "org", "github_repo": "repo", "github_issue_number": 42 }
-```
-
-### `DELETE /v1/tasks/:id`
-Terminate a running task. Returns `204`.
-
-### `POST /v1/tasks/:id/approve`
-Send a human-in-the-loop approval signal. Optional `checkpoint` records an Agentex-named HITL event in the audit log.
-
-```json
-{ "workflow_id": "task_xyz", "approved": true, "checkpoint": "architect_plan" }
-```
-
-### `POST /v1/tasks/:id/hitl`
-Named HITL door (`C3`). `checkpoint` must be one of `pm_clarification`, `architect_plan`, `max_heals`, `devops`.
-
-```json
-{
-  "checkpoint": "architect_plan",
-  "workflow_id": "<gantry_approval workflow id>",
-  "approved": true
-}
-```
-
-Clarification:
-
-```json
-{
-  "checkpoint": "pm_clarification",
-  "workflow_id": "<gantry_clarification workflow id>",
-  "payload": { "Which auth provider?": "Auth0" }
-}
-```
-
-### `GET /v1/tasks/:id/hitl`
-Audit events for this task (`hitl.*` and `task.approved`). File-backed when Postgres is unset.
+| Method | Path | Scope | Purpose |
+|--------|------|-------|---------|
+| `GET` | `/v1/projects` | projects:read | List |
+| `GET` | `/v1/projects/{id}` | projects:read | Get |
+| `POST` | `/v1/projects` | projects:write | Create `{ name, github_url, … }` |
+| `PATCH` | `/v1/projects/{id}` | projects:write | Update |
+| `DELETE` | `/v1/projects/{id}` | projects:write | Delete |
+| `GET` | `/v1/projects/{id}/artifacts` | projects:read | List artifacts |
+| `GET` | `/v1/projects/{id}/files/tree` | projects:read | File tree |
+| `GET` | `/v1/projects/{id}/files/content` | projects:read | File content |
+| `PUT` | `/v1/projects/{id}/files/content` | projects:write | Write file |
+| `GET` | `/v1/projects/{id}/memory` | projects:read | Project memory |
 
 ---
 
-## Agents (Agentex track)
+## Workspaces — `/v1/workspaces`
 
-### `GET /v1/agents`
+Parallel surface to projects (same org scoping). Task submit accepts `project_id` **or** `workspace_id`.
 
-Crew catalog: ACP name `swarm-factory`, Temporal child identities, L2–L5 mapping, HITL checkpoints, ACP `task/create` example. Auth: `tasks:read`.
-
-Foreman is the only ACP task entry. Children are `entrypoint: temporal_child`.
-
-### `GET /v1/agents/:name`
-
-One catalog row (`swarm-factory`, `gantry-builder`, …).
-
-Install on a cluster: [`docs/platform/agentex-cluster.md`](platform/agentex-cluster.md).
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/v1/workspaces` | List |
+| `GET` | `/v1/workspaces/{id}` | Get |
+| `POST` | `/v1/workspaces` | Create |
+| `PATCH` | `/v1/workspaces/{id}` | Update |
+| `DELETE` | `/v1/workspaces/{id}` | Delete |
+| `GET` | `/v1/workspaces/{id}/artifacts` | Artifacts |
+| `GET` | `/v1/workspaces/{id}/files/tree` | Tree |
+| `GET` | `/v1/workspaces/{id}/files/content` | Read file |
+| `PUT` | `/v1/workspaces/{id}/files/content` | Write file |
 
 ---
 
-## Secrets
+## Tasks — `/v1/tasks`
 
-Store GitHub PATs and other credentials encrypted at rest. Values are never returned on read.
+Primary product surface (**P1**).
 
-### `POST /v1/secrets`
+### Submit
 
-```json
-{ "name": "github-pat", "value": "ghp_..." }
-```
-
-Response `201`:
-
-```json
-{
-  "secret": {
-    "id": "...",
-    "org_id": "...",
-    "name": "github-pat",
-    "created_at": "..."
-  }
-}
-```
-
-Reference by name when submitting tasks:
+`POST /v1/tasks` → `201`  
+Scope: `tasks:write`
 
 ```json
 {
   "goal": "Add health check endpoint",
   "project_id": "proj_abc",
-  "github_token_secret": "github-pat"
+  "tier": 2,
+  "playbook": "platform-backlog",
+  "branch_prefix": "swarm",
+  "webhook_url": "https://example.com/hook",
+  "pipeline": {
+    "max_parallel_tracks": 2,
+    "max_heal_cycles": 2,
+    "disable_agents": []
+  },
+  "llm": null,
+  "artifact_ids": [],
+  "include_workspace_brief": true
 }
 ```
 
-### `GET /v1/secrets`
+`workspace_id` may replace `project_id`. Tier `-1` = auto-classify.
 
-List secret names (no values).
+### Bulk
 
-### `DELETE /v1/secrets/:name`
+`POST /v1/tasks/bulk` → `202` — array of goals on one project.
 
-Revoke a secret. Returns `204`.
+### Read / stream / control
 
-Production requires `GANTRY_SECRETS_KEY` (Fernet key) in the API environment.
+| Method | Path | Scope | Purpose |
+|--------|------|-------|---------|
+| `GET` | `/v1/tasks` | tasks:read | List (org-scoped filters) |
+| `GET` | `/v1/tasks/{id}` | tasks:read | Status + structured `result` |
+| `GET` | `/v1/tasks/{id}/events` | tasks:read | **SSE** lifecycle stream |
+| `GET` | `/v1/tasks/{id}/report` | tasks:read | Run report |
+| `GET` | `/v1/tasks/{id}/messages` | tasks:read | Agent messages (observability) |
+| `GET` | `/v1/tasks/{id}/traces` | tasks:read | Traces |
+| `GET` | `/v1/tasks/{id}/source` | **none** | Ingress meta (`source`, github owner/repo); unauthenticated helper |
+| `DELETE` | `/v1/tasks/{id}` | tasks:write | Cancel / terminate |
+| `POST` | `/v1/tasks/{id}/followup` | tasks:write | Follow-up message into run |
+| `POST` | `/v1/tasks/{id}/approve` | tasks:write | Legacy HITL approve |
+| `POST` | `/v1/tasks/{id}/hitl` | tasks:write | HITL decision |
+| `GET` | `/v1/tasks/{id}/hitl` | tasks:read | Pending HITL |
+
+Terminal statuses: `completed`, `failed`, `cancelled`, `terminated`, `timeout`.
+
+Structured result (I3) typically includes `pr_url`, `branch`, `artifact_type`, quality fields when present.
+
+SSE event types: [`platform/sse-events.md`](./platform/sse-events.md).
 
 ---
 
-## Quotas
+## Agents — `/v1/agents`
 
-Per-org limits (admin scope):
+| Method | Path | Scope | Purpose |
+|--------|------|-------|---------|
+| `GET` | `/v1/agents` | tasks:read | Crew catalog + autonomy + ACP example |
+| `GET` | `/v1/agents/{name}` | tasks:read | One role |
 
-### `GET /v1/quotas`
+Only **`swarm-factory`** is a valid ACP `task/create` target (**C1**).
 
-Returns limits and current usage (`concurrent_tasks`, `tasks_today`).
+---
 
-### `PATCH /v1/quotas`
+## Playbooks — `/v1/playbooks`
 
-```json
-{
-  "max_concurrent_tasks": 20,
-  "max_tasks_per_day": 1000,
-  "max_bulk_size": 100,
-  "requests_per_minute": 300
-}
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/v1/playbooks` | List |
+| `GET` | `/v1/playbooks/{id}` | Get |
+| `POST` | `/v1/playbooks` | Create org playbook |
+| `PATCH` | `/v1/playbooks/{id}` | Update |
+| `DELETE` | `/v1/playbooks/{id}` | Delete |
+| `POST` | `/v1/playbooks/run` | Run playbook → creates task |
+
+Deep dive: [`deep-dives/playbooks-and-packs.md`](./deep-dives/playbooks-and-packs.md).
+
+---
+
+## Firm packs — `/v1/packs`
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/v1/packs` | Catalog + install/quota state |
+| `GET` | `/v1/packs/{pack_ref}` | Detail |
+| `POST` | `/v1/packs/{pack_ref}/install` | Install / enable |
+| `PATCH` | `/v1/packs/{pack_ref}` | Enable flag / daily quota |
+| `DELETE` | `/v1/packs/{pack_ref}` | Uninstall row |
+
+---
+
+## Artifacts — `/v1/artifacts`
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/v1/artifacts` | Upload |
+| `GET` | `/v1/artifacts/{id}` | Download / meta |
+| `DELETE` | `/v1/artifacts/{id}` | Delete |
+
+Attach via `artifact_ids` on task submit.
+
+---
+
+## Secrets — `/v1/secrets`
+
+| Method | Path | Scope | Purpose |
+|--------|------|-------|---------|
+| `POST` | `/v1/secrets` | secrets:write | Store named secret |
+| `GET` | `/v1/secrets` | secrets:read | List names (not values) |
+| `DELETE` | `/v1/secrets/{name}` | secrets:write | Delete |
+
+Used for GitHub tokens / BYOK references (`github_token_secret`, LLM config).
+
+---
+
+## Org settings, quotas, usage, audit, webhooks
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` / `PATCH` | `/v1/settings` | Org settings |
+| `GET` / `PATCH` | `/v1/quotas` | Org quotas |
+| `GET` | `/v1/usage` | Usage ledger |
+| `GET` | `/v1/audit` | Audit log |
+| `POST` | `/v1/webhooks` | Register org webhook |
+| `GET` | `/v1/webhooks` | List |
+| `DELETE` | `/v1/webhooks/{id}` | Delete |
+| `POST` | `/v1/webhooks/test` | Test delivery |
+
+---
+
+## GitHub integration — `/v1/integrations/github`
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/v1/integrations/github/install` | Start App install |
+| `GET` | `/v1/integrations/github/setup` | Setup callback (redirects via `GANTRY_WEB_URL` — no in-repo UI target today) |
+| `GET` | `/v1/integrations/github/installations` | List installs |
+| `DELETE` | `/v1/integrations/github/installations/{id}` | Remove |
+| `POST` | `/v1/integrations/github/webhook` | GitHub webhook receiver |
+
+Docs: [`integrations/github-app.md`](./integrations/github-app.md), [`github-integration.md`](./github-integration.md).
+
+### GitHub browser helpers — `/v1/github`
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/v1/github/repos` | List accessible repos |
+| `POST` | `/v1/github/repos/search` | Search |
+| `GET` | `/v1/github/projects/{id}/tree` | Tree |
+| `GET` | `/v1/github/projects/{id}/file` | File |
+
+Helpers for future clients / tooling — not a shipped UI.
+
+---
+
+## Other integrations
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/v1/integrations/linear/webhook` | Linear ingress |
+| `POST` | `/v1/integrations/jira/webhook` | Jira ingress |
+
+---
+
+## Internal (worker / infra)
+
+Not for public integrators. Protected by internal auth.
+
+### `/internal`
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/internal/signal` | Temporal / HITL signal bridge |
+| `GET` | `/internal/files/tree` | Worker file tree |
+| `GET` | `/internal/files/content` | Worker file content |
+| `GET` | `/internal/traces` | Traces |
+| `GET` | `/internal/projects/{id}/memory` | Memory |
+
+### `/internal/db`
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET/POST/PATCH/DELETE` | `/internal/db/projects…` | Project DB sync |
+| `POST` | `/internal/db/builds` | **Primary** structured result upsert (I3) |
+| `GET` | `/internal/db/projects/{id}/builds` | Builds |
+| `GET` | `/internal/db/tasks/{id}/build` | Build for task |
+| `PATCH` | `/internal/db/tasks/{id}/meta` | Task meta |
+| `POST` | `/internal/db/tasks/{id}/status` | Lifecycle push |
+| `GET/PUT` | `/internal/db/ui-state` | Orphaned FE tab state (still mounted; unused without a client) |
+| `GET/PUT` | `/internal/db/preferences` | Orphaned FE preferences |
+
+---
+
+## Headless quick start
+
+```bash
+export API=http://localhost:8001
+
+# 1. Key
+curl -s -X POST $API/v1/keys -H 'Content-Type: application/json' \
+  -d '{"name":"dev"}' | tee /tmp/gantry-key.json
+export GANTRY_API_KEY=$(python -c "import json;print(json.load(open('/tmp/gantry-key.json'))['key'])")
+
+# 2. Project
+curl -s -X POST $API/v1/projects \
+  -H "Authorization: Bearer $GANTRY_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"demo","github_url":"https://github.com/org/repo"}'
+
+# 3. Task
+curl -s -X POST $API/v1/tasks \
+  -H "Authorization: Bearer $GANTRY_API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"goal":"Add README section for health checks","project_id":"proj_…","tier":1}'
+
+# 4. Poll
+curl -s $API/v1/tasks/TASK_ID -H "Authorization: Bearer $GANTRY_API_KEY"
 ```
 
-Exceeded limits return HTTP `429`.
+Requires Agentex + Temporal + worker for execution. API alone can create keys/projects/task rows depending on config.
 
 ---
 
-## Audit log
+## SDKs
 
-### `GET /v1/audit`
+- Python: `sdk/python/`
+- TypeScript: `sdk/typescript/`
 
-Immutable org audit trail. Query params: `limit`, `action`, `key_id`.
-
----
-
-## Scoped API keys
-
-Create keys with least privilege:
-
-```json
-{ "name": "ci-bot", "scopes": ["tasks:write", "projects:read"] }
-```
-
-Valid scopes: `admin`, `tasks:read`, `tasks:write`, `projects:read`, `projects:write`, `secrets:read`, `secrets:write`.
+Both target this `/v1` surface. Prefer SDK helpers for HITL and playbooks when available.
 
 ---
 
-## Task event stream
+## Related
 
-### `GET /v1/tasks/{id}/events`
-
-Server-Sent Events stream — status changes, lifecycle events, agent messages, terminal `done` event.
-
----
-
-## Status
-
-### `GET /status`
-
-Public platform health — DB, Agentex, active task count.
-
----
-
-## Org webhooks
-
-Register webhooks at the org level (recommended over per-task `webhook_url`):
-
-### `POST /v1/webhooks`
-
-```json
-{
-  "url": "https://your-server.com/hooks/gantry",
-  "events": ["task.queued", "task.started", "task.waiting_approval", "task.completed", "task.failed"]
-}
-```
-
-The response includes a `secret` for signature verification (shown once).
-
-### Events
-
-| Event | When |
-|---|---|
-| `task.queued` | Task accepted by API |
-| `task.started` | Agentex status → `running` |
-| `task.waiting_approval` | HITL checkpoint reached |
-| `task.completed` | PR opened successfully |
-| `task.failed` | Terminal failure |
-
----
-
-## Webhooks (per-task)
-
-When you pass `webhook_url` to `POST /v1/tasks`, Gantry POSTs to that URL when the task reaches a terminal state.
-
-### Payload
-
-```json
-{
-  "event": "task.completed",
-  "task_id": "task_xyz",
-  "project_id": "proj_abc",
-  "source": "api",
-  "pr_url": "https://github.com/org/repo/pull/42"
-}
-```
-
-### Events
-
-| Event | When |
-|---|---|
-| `task.completed` | PR opened successfully |
-| `task.failed` | Task ended with error, timeout, or termination |
-
-### Signature
-
-Every delivery includes `X-Gantry-Signature: sha256=<hmac>`.
-
-Verify in Python:
-```python
-import hmac, hashlib
-
-def verify(body: bytes, header: str, secret: str) -> bool:
-    expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, header)
-```
-
-### Retry policy
-
-Failed deliveries are retried up to 3 times with delays of 2s, 5s, and 10s.
-
-### `POST /v1/webhooks/test`
-Send a test ping to a URL.
-
-```json
-{ "url": "https://your-server.com/webhooks/test" }
-```
-
----
-
-## GitHub Integration
-
-See [github-integration.md](github-integration.md) for the full setup guide.
-
-### `POST /v1/integrations/github/webhook`
-Receives GitHub webhook events. Configure this URL in your repo settings.
-
-Verifies `X-Hub-Signature-256` against `GITHUB_WEBHOOK_SECRET`.
-
-Triggers on: `issues` event + `labeled` action + label `gantry`.
-
----
-
-## Errors
-
-| Status | Meaning |
-|---|---|
-| `401` | Invalid or missing API key |
-| `403` | No Authorization header |
-| `404` | Resource not found |
-| `422` | Validation error — check request body |
-| `502` | Upstream error (Agentex or GitHub unreachable) |
-
-All errors return `{ "detail": "..." }`.
+- Architecture: [`architecture.md`](./architecture.md)
+- Platform invariants: [`platform.md`](./platform.md)
+- HITL/SSE: [`deep-dives/hitl-and-sse.md`](./deep-dives/hitl-and-sse.md)
+- Event model: [`platform/event-model.md`](./platform/event-model.md)
