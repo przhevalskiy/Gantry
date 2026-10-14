@@ -10,10 +10,10 @@ export function PageScroll({
 }) {
   return (
     <div
+      className="scroll-pane"
       style={{
         flex: 1,
         minHeight: 0,
-        overflow: "auto",
         ...style,
       }}
     >

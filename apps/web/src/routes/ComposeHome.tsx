@@ -70,10 +70,10 @@ export function ComposeHome() {
 
   return (
     <div
+      className="scroll-pane"
       style={{
         flex: 1,
         minHeight: 0,
-        overflow: "auto",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",

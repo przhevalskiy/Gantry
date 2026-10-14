@@ -93,3 +93,34 @@ button {
     transform: translateY(0);
   }
 }
+
+/* Always-visible scroll rail (macOS overlay scrollbars hide by default). */
+.scroll-pane {
+  overflow-x: hidden;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(91, 86, 112, 0.45) rgba(243, 240, 248, 0.9);
+}
+
+.scroll-pane::-webkit-scrollbar {
+  width: 10px;
+}
+
+.scroll-pane::-webkit-scrollbar-track {
+  background: rgba(243, 240, 248, 0.9);
+  border-left: 1px solid var(--border-subtle);
+}
+
+.scroll-pane::-webkit-scrollbar-thumb {
+  background: rgba(91, 86, 112, 0.35);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.scroll-pane::-webkit-scrollbar-thumb:hover {
+  background: rgba(91, 86, 112, 0.55);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}

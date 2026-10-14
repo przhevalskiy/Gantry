@@ -68,11 +68,11 @@ export function MessageThread({
 
   return (
     <div
+      className="scroll-pane"
       style={{
         flex: 1,
         minHeight: 0,
-        overflow: "auto",
-        padding: "8px 20px 16px",
+        padding: "8px 16px 16px 20px",
         display: "flex",
         flexDirection: "column",
         gap: 12,
