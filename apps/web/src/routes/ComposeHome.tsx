@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Composer } from "../modules/composer/Composer";
+import { HeadlineCarousel } from "../modules/composer/HeadlineCarousel";
 import { SuggestionChips } from "../modules/composer/SuggestionChips";
 import { paths } from "../lib/paths";
 import { listProjects, submitTask } from "../services/gantry/client";
@@ -71,19 +72,7 @@ export function ComposeHome() {
         minHeight: 0,
       }}
     >
-      <p
-        style={{
-          margin: "0 0 28px",
-          fontFamily: "var(--font-display)",
-          fontSize: "clamp(28px, 4vw, 40px)",
-          fontWeight: 600,
-          letterSpacing: "-0.03em",
-          textAlign: "center",
-          color: "var(--text-primary)",
-        }}
-      >
-        What should the firm take on?
-      </p>
+      <HeadlineCarousel />
 
       <Composer
         value={goal}
