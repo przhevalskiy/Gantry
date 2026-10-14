@@ -1,4 +1,4 @@
-import { FolderPlus, PanelLeftClose } from "lucide-react";
+import { PanelLeftClose } from "lucide-react";
 import type { CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { paths } from "../lib/paths";
@@ -65,35 +65,6 @@ export function Sidebar({
       <SidebarNav />
 
       <div style={{ flex: 1 }} />
-
-      <div
-        style={{
-          padding: "8px 14px",
-          fontSize: 11,
-          color: "var(--text-muted)",
-          textTransform: "uppercase",
-          letterSpacing: "0.06em",
-        }}
-      >
-        Projects
-      </div>
-      <div style={{ padding: "0 10px 12px" }}>
-        <Link
-          to={paths.projects}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 12px",
-            borderRadius: 10,
-            fontSize: 13,
-            color: "var(--text-secondary)",
-          }}
-        >
-          <FolderPlus size={16} strokeWidth={1.75} aria-hidden />
-          New project
-        </Link>
-      </div>
 
       <UserChip />
     </aside>
