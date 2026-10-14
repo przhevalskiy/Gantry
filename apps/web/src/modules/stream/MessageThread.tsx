@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
 import type { PendingHitl } from "../../services/gantry/types";
 import { HitlCard } from "../hitl/HitlCard";
-import { CrewDialogue } from "./CrewDialogue";
-import { groupRowsIntoThread } from "./groupWork";
+import { EngagementStory } from "./EngagementStory";
+import { synthesizeStory } from "./synthesizeStory";
 import { TrackBoard } from "./TrackBoard";
 import type { StreamRow } from "./useTaskEventStream";
 
@@ -13,7 +13,7 @@ export type LocalBubble = {
   seat?: string | null;
 };
 
-/** Messaging thread: user bubbles + crew dialogue + work chains + HITL. */
+/** Messaging thread: your ask → synthesized firm story → chains → HITL. */
 export function MessageThread({
   taskId,
   goal,
@@ -22,7 +22,6 @@ export function MessageThread({
   onHitlResolved,
   localBubbles,
   live,
-  terminal = false,
 }: {
   taskId: string;
   goal?: string | null;
@@ -35,12 +34,11 @@ export function MessageThread({
 }) {
   const endRef = useRef<HTMLDivElement>(null);
 
-  const items = groupRowsIntoThread(
+  const items = synthesizeStory(
     rows,
     goal,
     localBubbles.filter((b) => b.role === "user").map((b) => ({ id: b.id, text: b.text })),
     pendingHitl.length > 0,
-    terminal,
   );
 
   useEffect(() => {
@@ -61,7 +59,7 @@ export function MessageThread({
     >
       {items.length === 0 && pendingHitl.length === 0 ? (
         <p style={{ margin: "24px auto", color: "var(--text-muted)", fontSize: 13 }}>
-          {live ? "Foreman is staffing the floor…" : "No messages yet."}
+          {live ? "Foreman is staffing the engagement…" : "No activity yet."}
         </p>
       ) : null}
 
@@ -84,12 +82,12 @@ export function MessageThread({
             </p>
           );
         }
-        if (item.kind === "crew") {
+        if (item.kind === "story") {
           return (
-            <CrewDialogue
+            <EngagementStory
               key={item.id}
-              exchanges={item.exchanges}
-              status={item.status}
+              beats={item.beats}
+              waitingOnYou={item.waitingOnYou}
             />
           );
         }

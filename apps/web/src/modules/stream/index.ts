@@ -1,5 +1,5 @@
-/** Engagement messaging — crew dialogue + work chains + follow-up. */
-export { CrewDialogue } from "./CrewDialogue";
+/** Engagement messaging — synthesized story + builder chains + follow-up. */
+export { EngagementStory } from "./EngagementStory";
 export { FollowUpComposer } from "./FollowUpComposer";
 export { MessageThread } from "./MessageThread";
 export type { LocalBubble } from "./MessageThread";

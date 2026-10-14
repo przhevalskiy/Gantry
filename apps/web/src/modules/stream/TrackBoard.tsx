@@ -1,8 +1,6 @@
-import type { TrackChain } from "./groupWork";
+import type { TrackChain } from "./synthesizeStory";
 
-/**
- * Parallel work chains (Architect tracks) — what’s in flight, dropped, or waiting.
- */
+/** Parallel builder chains derived from the Architect plan. */
 export function TrackBoard({ tracks }: { tracks: TrackChain[] }) {
   return (
     <section
@@ -11,16 +9,16 @@ export function TrackBoard({ tracks }: { tracks: TrackChain[] }) {
         maxWidth: "min(600px, 100%)",
         borderRadius: 16,
         border: "1px solid var(--border-subtle)",
-        background: "rgba(255,255,255,0.88)",
+        background: "rgba(255,255,255,0.9)",
         padding: "12px 14px 14px",
         display: "grid",
         gap: 10,
       }}
     >
       <div>
-        <p style={{ margin: 0, fontSize: 13, fontWeight: 650 }}>Work chains</p>
-        <p style={{ margin: "2px 0 0", fontSize: 12, color: "var(--text-muted)" }}>
-          Parallel tracks the Architect opened for Builders
+        <p style={{ margin: 0, fontSize: 14, fontWeight: 650 }}>Builder chains</p>
+        <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--text-muted)" }}>
+          What will run in parallel after you approve
         </p>
       </div>
       <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
@@ -44,22 +42,20 @@ export function TrackBoard({ tracks }: { tracks: TrackChain[] }) {
                 width: 8,
                 height: 8,
                 borderRadius: "50%",
-                background: pipColor(t.status),
+                background:
+                  t.status === "dropped"
+                    ? "#d97706"
+                    : t.status === "planned"
+                      ? "#94a3b8"
+                      : t.status === "done"
+                        ? "#10b981"
+                        : "var(--accent-500)",
               }}
             />
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 650 }}>{t.name}</div>
               {t.detail ? (
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "var(--text-muted)",
-                    marginTop: 2,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
                   {t.detail}
                 </div>
               ) : null}
@@ -68,28 +64,15 @@ export function TrackBoard({ tracks }: { tracks: TrackChain[] }) {
               style={{
                 fontSize: 11,
                 fontWeight: 650,
-                textTransform: "capitalize",
                 color: "var(--text-muted)",
+                textTransform: "capitalize",
               }}
             >
-              {t.status}
+              {t.status === "planned" ? "Queued" : t.status}
             </span>
           </li>
         ))}
       </ul>
     </section>
   );
-}
-
-function pipColor(status: TrackChain["status"]): string {
-  switch (status) {
-    case "dropped":
-      return "#d97706";
-    case "done":
-      return "#10b981";
-    case "running":
-      return "var(--accent-500)";
-    default:
-      return "#94a3b8";
-  }
 }
