@@ -23,7 +23,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
 AGENTEX_DIR="$ROOT/scale-agentex/agentex"
-UI_DIR="$ROOT/apps/web"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -79,7 +78,7 @@ _stop_all() {
 
 _show_status() {
   echo ""
-  for svc_port in "Agentex API:5003" "Temporal:7233" "Temporal UI:8080" "Agent ACP:8000" "Gantry API:8001" "apps/web:5173" "Redis:6379"; do
+  for svc_port in "Agentex API:5003" "Temporal:7233" "Temporal UI:8080" "Agent ACP:8000" "Gantry API:8001" "Redis:6379"; do
     label="${svc_port%%:*}"; port="${svc_port##*:}"
     printf "  %-20s" "$label (:$port)"
     nc -z localhost "$port" 2>/dev/null && echo -e "${GREEN}running${NC}" || echo -e "${RED}stopped${NC}"
@@ -187,12 +186,7 @@ echo "    PID $API_PID — logs: tail -f /tmp/gantry-api.log"
 wait_for_port 8001 "Gantry API" 20
 ok "API running"
 
-# ── Step 5: UI (removed) ────────────────────────────────────────────────────
-if [ -d "$UI_DIR" ]; then
-  warn "apps/web present but unsupported in this branch — not starting"
-else
-  ok "No apps/web (API-first; FE rebuild deferred)"
-fi
+ok "API-first — no in-tree UI (see docs/README.md)"
 
 # ── Ready ─────────────────────────────────────────────────────────────────────
 echo ""

@@ -62,7 +62,7 @@ Heal cycles retry Builder from a git snapshot. If the plan was wrong, Architect 
 
 Crew catalog (read-only): `GET /v1/agents`. Only **`swarm-factory`** accepts ACP `task/create`.
 
-Details: [`docs/platform/oracle-tiers.md`](docs/platform/oracle-tiers.md), [`docs/platform/agentex-citizen.md`](docs/platform/agentex-citizen.md), [`docs/platform/event-model.md`](docs/platform/event-model.md), [`docs/platform/stack-debloat.md`](docs/platform/stack-debloat.md), [`docs/platform/composable-crew-roadmap.md`](docs/platform/composable-crew-roadmap.md)
+Details: [`docs/architecture.md`](docs/architecture.md), [`docs/platform.md`](docs/platform.md), [`docs/platform/oracle-tiers.md`](docs/platform/oracle-tiers.md), [`docs/deep-dives/swarm-factory.md`](docs/deep-dives/swarm-factory.md)
 
 ---
 
@@ -70,12 +70,12 @@ Details: [`docs/platform/oracle-tiers.md`](docs/platform/oracle-tiers.md), [`doc
 
 Tier controls parallelism, heal budget, optional agents, and HITL gates. Auto-classified from the goal, or override on submit.
 
-| Tier | Label | Parallel tracks | Heal cycles | Reviewer / Security | HITL |
-|------|-------|-----------------|-------------|---------------------|------|
-| 0 | Micro | 1 | 0 | off | none |
-| 1 | Lightweight | 1 | 1 | off | PM clarification |
-| 2 | Standard | 2 | 2 | on | + architect plan |
-| 3 | Full Crew | 4 | 2 | on | + devops |
+| Tier | Label | Agentex autonomy | Parallel tracks | Heal cycles | Reviewer / Security | HITL |
+|------|-------|------------------|-----------------|-------------|---------------------|------|
+| 0 | Micro | L2 | 1 | 0 | off | none |
+| 1 | Lightweight | L3 | 1 | 1 | off | PM clarification |
+| 2 | Standard | L4 | 2 | 2 | on | + architect plan |
+| 3 | Full Crew | L5 | 4 | 2 | on | + devops |
 
 Pass `tier` and optional `pipeline` overrides on `POST /v1/tasks`:
 
@@ -92,7 +92,7 @@ Pass `tier` and optional `pipeline` overrides on `POST /v1/tasks`:
 }
 ```
 
-**Playbooks** (`playbook: "platform-backlog"`, `a11y-remediation`, `monorepo-slice`) are job packets — stages, seats, artifact — without forking the engine. **Firm packs** (`swe-factory@1`, `migration-runner@1`) group roles + default playbooks for org install (`GET /v1/packs`, UI `/packs`). Still one ACP citizen. See [`docs/platform/composable-crew-roadmap.md`](docs/platform/composable-crew-roadmap.md). Brand: [`docs/brand/`](docs/brand/) — professional-services firm, not a bot marketplace.
+**Playbooks** (`playbook: "platform-backlog"`, `a11y-remediation`, `monorepo-slice`) are job packets — stages, seats, artifact — without forking the engine. **Firm packs** (`swe-factory@1`, `migration-runner@1`) group roles + default playbooks for org install (`GET /v1/packs`). Still one ACP citizen. See [`docs/deep-dives/playbooks-and-packs.md`](docs/deep-dives/playbooks-and-packs.md). Brand: [`docs/brand/`](docs/brand/) — professional-services firm, not a bot marketplace.
 
 ---
 
@@ -265,10 +265,10 @@ Gantry/
 ├── manifest.yaml             # Agentex agent manifest (swarm-factory)
 ├── worker.py                 # Temporal worker bootstrap
 ├── dev.sh                    # local launcher
-└── docs/                     # API reference, platform invariants, verticals
+└── docs/                     # Architecture, platform, API, deep dives, brand
 ```
 
-Platform invariants and merge status: [`PLATFORM_REFACTOR.md`](PLATFORM_REFACTOR.md), [`docs/platform/platform-merge-plan.md`](docs/platform/platform-merge-plan.md)
+Docs index: [`docs/README.md`](docs/README.md) · Invariants: [`docs/platform.md`](docs/platform.md)
 
 ---
 
@@ -312,6 +312,7 @@ Cross-run learning uses a local facts store and episodic log (`.gantry/memory/` 
 
 ## Positioning docs
 
+- Docs index: [`docs/README.md`](docs/README.md)
+- Architecture / platform / API: [`docs/architecture.md`](docs/architecture.md) · [`docs/platform.md`](docs/platform.md) · [`docs/api.md`](docs/api.md)
 - Product thesis: [`GANTRY_THESIS.md`](GANTRY_THESIS.md)
-- API-first pivot checklist: [`PLATFORM_REFACTOR.md`](PLATFORM_REFACTOR.md)
-- Merge plan + invariants: [`docs/platform/platform-merge-plan.md`](docs/platform/platform-merge-plan.md)
+- Brand (future client): [`docs/brand/`](docs/brand/)

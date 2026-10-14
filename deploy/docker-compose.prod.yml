@@ -4,7 +4,7 @@
 # Use:
 #   docker compose -f deploy/agentex/docker-compose.yml up -d
 #
-# setup.sh and docs/hosting/PLAN.md already point at the new path.
+# setup.sh and DEPLOYMENT.md describe the API + worker path (no static UI).
 # This stub exists only so old bookmarks fail loudly instead of starting
 # an unlabeled "Gantry" stack.
 
