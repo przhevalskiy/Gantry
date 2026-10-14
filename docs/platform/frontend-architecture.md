@@ -1,6 +1,7 @@
 # Frontend technical architecture — restart baseline
 
-**Status:** `apps/web` **removed**. This doc is the **reference** for the next piece-by-piece rebuild — not a description of shipped UI.  
+**Status:** Greenfield scaffold under `apps/web` — structure only; features slice-by-slice.  
+**Tree:** [`frontend-structure.md`](./frontend-structure.md)  
 **Product direction:** [`../brand/frontend-greenfield.md`](../brand/frontend-greenfield.md)  
 **Brand / identity:** [`../brand/README.md`](../brand/README.md) · [`../brand/frontend-agent-representation.md`](../brand/frontend-agent-representation.md)  
 **Backend lock:** Phases A–E ([`composable-crew-roadmap.md`](./composable-crew-roadmap.md)) — I1, I7, I8, C1, P1–P4
@@ -58,5 +59,12 @@ Detailed IA and module names from the withdrawn greenfield attempt are **non-bin
 
 - [x] Backend A–E in place  
 - [x] Brand guides in `docs/brand/`  
-- [x] `apps/web` removed  
-- [ ] Next: empty FE scaffold + first vertical slice (to be agreed)
+- [x] Empty FE scaffold (`apps/web` + [`frontend-structure.md`](./frontend-structure.md))  
+- [x] ComposeHome → `POST /v1/tasks` (slice 1)  
+- [x] Engagement SSE `GET …/events` (slice 2)  
+- [x] HITL cards → `POST …/hitl` (slice 3)  
+- [x] Engagement floor roster (slice 4)  
+- [x] Practices / Team / Briefs catalogs (slice 5)  
+- [x] Artifact climax from `result` (slice 6)  
+- [x] Runs list + Projects page + pack install/enable + brief → compose handoff  
+- [x] Engagement as messaging UI (not ops console) — bubbles + follow-up + inline HITL

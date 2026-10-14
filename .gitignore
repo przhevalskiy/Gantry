@@ -45,6 +45,8 @@ htmlcov/
 
 # Frontend
 node_modules/
+apps/web/dist/
+apps/web/.env
 ui/node_modules/
 ui/.next/
 ui/tsconfig.tsbuildinfo

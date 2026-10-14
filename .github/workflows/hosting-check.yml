@@ -8,12 +8,12 @@ on:
 
 jobs:
   docs-and-invariants:
-    name: Docs + API-first invariants
+    name: Docs + FE structure invariants
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Core docs present
+      - name: Core docs + scaffold present
         run: |
           test -f docs/README.md
           test -f docs/architecture.md
@@ -21,9 +21,35 @@ jobs:
           test -f docs/use-cases.md
           test -f docs/api.md
           test -f docs/deep-dives/swarm-factory.md
-          test ! -d apps/web
+          test -f docs/platform/frontend-structure.md
+          test -f apps/web/package.json
+          test -f apps/web/src/App.tsx
           test ! -f deploy/vercel-deploy.sh
           test ! -d docs/hosting
+          ! rg -n "Deploy your agent|bot marketplace" apps/web/src
+
+  web-build:
+    name: Web scaffold build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install
+        run: npm install
+
+      - name: Production build
+        env:
+          VITE_GANTRY_API_URL: http://localhost:8001
+        run: npm run build
 
   api-cors:
     name: API CORS config
@@ -33,7 +59,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install API deps
         run: pip install -q pytest python-dotenv

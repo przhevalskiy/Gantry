@@ -22,4 +22,4 @@
 
 **Alignment:** Root [`README.md`](../../README.md) and [`../platform.md`](../platform.md) now lead with this firm model (retain → work order → artifact; Foreman staffs Operators).  
 
-**Frontend:** Deferred. `apps/web` removed. Rebuild only after platform docs ([`../README.md`](../README.md)) + this brand set + backend are treated as locked ([`frontend-greenfield.md`](./frontend-greenfield.md)).
+**Frontend:** Scaffold under `apps/web` ([`../platform/frontend-structure.md`](../platform/frontend-structure.md)). Feature slices only after brand + structure agreement ([`frontend-greenfield.md`](./frontend-greenfield.md)).

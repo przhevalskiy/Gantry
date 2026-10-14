@@ -1,0 +1,63 @@
+:root {
+  /* Shell — calm retained firm (brand/voice-and-look) */
+  --shell-bg: #f3f0f8;
+  --shell-gradient: linear-gradient(
+    165deg,
+    #f7f4fb 0%,
+    #ebe4f7 42%,
+    #e8eef8 100%
+  );
+  --atmosphere-sky: linear-gradient(
+    180deg,
+    #f6c9a8 0%,
+    #e8b4c8 28%,
+    #c9b8e8 55%,
+    #a8c4e8 78%,
+    #dfe8f4 100%
+  );
+
+  --panel-bg: #ffffff;
+  --panel-radius: 20px;
+  --panel-shadow: 0 10px 40px rgba(88, 70, 140, 0.08);
+
+  /* Inset / grooved stage */
+  --stage-inset: 14px;
+  --stage-radius: 22px;
+  --stage-bg: rgba(255, 255, 255, 0.78);
+  --stage-border: rgba(255, 255, 255, 0.65);
+  --stage-groove: inset 0 1px 2px rgba(255, 255, 255, 0.7),
+    inset 0 -1px 3px rgba(60, 40, 100, 0.06),
+    0 1px 0 rgba(255, 255, 255, 0.35);
+
+  --sidebar-bg: rgba(248, 246, 252, 0.92);
+  --sidebar-width: 248px;
+  --sidebar-border: rgba(120, 100, 160, 0.08);
+
+  --text-primary: #111827;
+  --text-secondary: #5b5670;
+  --text-muted: #8b849c;
+
+  --accent-400: #a78bfa;
+  --accent-500: #8b7cf6;
+  --accent-600: #7c6cf0;
+
+  --cta-primary-bg: #111827;
+  --cta-primary-fg: #ffffff;
+
+  --border-subtle: rgba(17, 24, 39, 0.08);
+  --nav-active-bg: rgba(139, 124, 246, 0.12);
+
+  --font-sans: "Albert Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Albert Sans", ui-sans-serif, system-ui, sans-serif;
+
+  /* Input bars — compact padding, 2rem controls */
+  --input-padding-inline: 0.875rem;
+  --input-padding-block: 0.5rem;
+  --input-control-size: 2rem;
+  --icon-size: 1rem;
+
+  /* Engagement floor presence fields */
+  --floor-active: rgba(139, 124, 246, 0.35);
+  --floor-blocked: rgba(217, 119, 6, 0.4);
+  --floor-done: rgba(16, 185, 129, 0.28);
+}

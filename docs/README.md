@@ -38,7 +38,8 @@ Start here before any full-stack / frontend work. Brand under [`brand/`](./brand
 | [`platform/llm-byok.md`](./platform/llm-byok.md) | BYOK / LLM config |
 | [`platform/scaling-workers.md`](./platform/scaling-workers.md) | Worker scaling |
 | [`platform/composable-crew-roadmap.md`](./platform/composable-crew-roadmap.md) | Phases A–E (implemented) |
-| [`platform/frontend-architecture.md`](./platform/frontend-architecture.md) | FE restart baseline (no UI in-tree) |
+| [`platform/frontend-structure.md`](./platform/frontend-structure.md) | Exact `apps/web` tree + IA remap |
+| [`platform/frontend-architecture.md`](./platform/frontend-architecture.md) | FE restart baseline + slice order |
 
 ## Brand (future client)
 

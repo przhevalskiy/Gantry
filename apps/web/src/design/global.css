@@ -1,0 +1,126 @@
+@import "./tokens.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  background: var(--shell-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: 2px;
+}
+
+/* Input bars share the 2rem inline padding contract */
+.input-bar {
+  padding-inline: var(--input-padding-inline);
+  padding-block: var(--input-padding-block);
+  box-sizing: border-box;
+}
+
+@keyframes gantry-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: gantry-spin 0.8s linear infinite;
+}
+
+@keyframes floor-breathe {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.06);
+  }
+}
+
+@keyframes floor-hold {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.04);
+  }
+}
+
+@keyframes composer-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Always-visible scroll rail (macOS overlay scrollbars hide by default). */
+.scroll-pane {
+  overflow-x: hidden;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(91, 86, 112, 0.45) rgba(243, 240, 248, 0.9);
+}
+
+.scroll-pane::-webkit-scrollbar {
+  width: 10px;
+}
+
+.scroll-pane::-webkit-scrollbar-track {
+  background: rgba(243, 240, 248, 0.9);
+  border-left: 1px solid var(--border-subtle);
+}
+
+.scroll-pane::-webkit-scrollbar-thumb {
+  background: rgba(91, 86, 112, 0.35);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.scroll-pane::-webkit-scrollbar-thumb:hover {
+  background: rgba(91, 86, 112, 0.55);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
