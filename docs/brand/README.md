@@ -20,4 +20,4 @@
 
 **Visual identity:** Operators — crafted silicon-colleague portraits on an engagement floor (see [`frontend-agent-representation.md`](./frontend-agent-representation.md)).
 
-**Frontend:** Deferred. `apps/web` removed. Rebuild only after this brand set + backend are treated as locked ([`frontend-greenfield.md`](./frontend-greenfield.md)).
+**Frontend:** Deferred. `apps/web` removed. Rebuild only after platform docs ([`../README.md`](../README.md)) + this brand set + backend are treated as locked ([`frontend-greenfield.md`](./frontend-greenfield.md)).

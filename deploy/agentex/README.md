@@ -26,6 +26,6 @@ AGENTEX_BASE_URL=http://agentex.internal:5003
 TEMPORAL_ADDRESS=temporal.internal:7233
 ```
 
-See [`docs/platform/agentex-cluster.md`](../../docs/platform/agentex-cluster.md) and [`docs/platform/stack-debloat.md`](../../docs/platform/stack-debloat.md).
+See [`docs/platform/agentex-cluster.md`](../../docs/platform/agentex-cluster.md) and [`docs/architecture.md`](../../docs/architecture.md).
 
 Do **not** put Gantry tenant keys / quotas in Agentex Postgres or Mongo. Use Gantry `DATABASE_URL` (or `GANTRY_HOME` files).

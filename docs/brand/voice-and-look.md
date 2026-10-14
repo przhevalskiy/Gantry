@@ -27,7 +27,7 @@ Chat UI copy may still say “message” for stream rows — frame as **run log 
 
 - Calm, precise, slightly formal (professional services).
 - Confident without AGI theater.
-- Errors: actionable (“firm pack disabled — enable via /packs”), not cute.
+- Errors: actionable (“firm pack disabled — enable via POST /v1/packs/{id}/install”), not cute.
 
 ### UI surface names (canonical)
 
@@ -44,7 +44,7 @@ Chat UI copy may still say “message” for stream rows — frame as **run log 
 
 ## Look + feel
 
-Source of truth for tokens: `apps/web/src/design/tokens.css`, `apps/web/src/index.css`.
+Source of truth for tokens: define in the next frontend scaffold (none in-tree today). Keep variables aligned with this doc when rebuilding.
 
 ### Visual direction
 
@@ -68,7 +68,7 @@ Source of truth for tokens: `apps/web/src/design/tokens.css`, `apps/web/src/inde
 
 - Lead marketing and empty states with **goal → artifact** and **packs / playbooks**.
 - Keep CTAs high-contrast black-on-light for submit / install.
-- Use firm language on `/packs` and Team (“practice,” “staffed roles,” “job packet”).
+- Use firm language for packs and crew (“practice,” “staffed roles,” “job packet”) — API: `/v1/packs`, `/v1/agents`.
 
 ### Don’t
 

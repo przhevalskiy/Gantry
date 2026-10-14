@@ -21,7 +21,7 @@ The unit of value is a **job (run)**, not a conversation thread.
 | Primary | Secondary |
 |---------|-----------|
 | Platform / integrator teams wiring GitHub, webhooks, SDKs, CI | Eng leads running migration / backlog / a11y job packets |
-| Orgs that want headless automation with HITL when needed | Operators using the optional web **run console** |
+| Orgs that want headless automation with HITL when needed | Operators using a future optional client of `/v1/*` |
 
 UI is optional. API works without it (I1 / P1).
 

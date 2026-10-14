@@ -1,6 +1,6 @@
 # Frontend design guidelines — Operator identity (silicon firm workplace)
 
-**Audience:** product design + `apps/web`  
+**Audience:** product design + future frontend (none in-tree today)  
 **Brand lock:** [`persona-the-firm.md`](./persona-the-firm.md) · [`voice-and-look.md`](./voice-and-look.md)  
 **North-star feeling:** *the future of the workplace for silicon engineering teams* — a retained digital firm whose people show up, take seats, and ship artifacts.  
 **Code today:** pipeline dots, lavender role tints (`agentTheme.ts`), pixel-dust blobs (`ChibiAvatar`), Lucide on Team — **starting point, not the destination**.

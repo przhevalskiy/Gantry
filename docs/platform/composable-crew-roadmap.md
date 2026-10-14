@@ -12,11 +12,11 @@
 | **B** | Artifact policy in DevOps; include/disable seats; structured `artifact_type` | **Done** |
 | **C** | Foreman DAG interpreter (`stage_graph` + plan loop; heal/HITL metadata; golden default ≡ current) | **Done** |
 | **D** | Role pack contract + `oracle-a11y` Temporal child (`OracleA11yAgent`) | **Done** |
-| **E** | Firm packs (`swe-factory@1`, `migration-runner@1`), org install/quota, SDK `playbooks.run`, `/packs` UI | **Done** |
+| **E** | Firm packs (`swe-factory@1`, `migration-runner@1`), org install/quota, SDK `playbooks.run`, pack REST | **Done** |
 
-Still true: no per-playbook ACP agents, no Grok-style bot marketplace — packs install into one factory.
+Still true: no per-playbook ACP agents, no Grok-style bot marketplace — packs install into one factory. UI deferred.
 
-Related: [`stack-debloat.md`](./stack-debloat.md) · [`agentex-citizen.md`](./agentex-citizen.md) · [`event-model.md`](./event-model.md) · [`frontend-architecture.md`](./frontend-architecture.md) · [`../verticals/README.md`](../verticals/README.md) · [`../brand/README.md`](../brand/README.md) (firm positioning) · `PLATFORM_REFACTOR.md` · `schemas/crew.py` · `schemas/playbooks.py`
+Related: [`../platform.md`](../platform.md) · [`agentex-citizen.md`](./agentex-citizen.md) · [`event-model.md`](./event-model.md) · [`../deep-dives/playbooks-and-packs.md`](../deep-dives/playbooks-and-packs.md) · [`../verticals/README.md`](../verticals/README.md) · [`../brand/README.md`](../brand/README.md) · `schemas/crew.py` · `schemas/playbooks.py`
 
 ---
 
@@ -24,7 +24,7 @@ Related: [`stack-debloat.md`](./stack-debloat.md) · [`agentex-citizen.md`](./ag
 
 Every phase must preserve these. A phase that requires violating one is rejected, not “deferred.”
 
-### Platform (from `PLATFORM_REFACTOR.md`)
+### Platform (see [`../platform.md`](../platform.md))
 
 | ID | Invariant |
 |----|-----------|
@@ -247,7 +247,7 @@ oracle hooks                  artifact: branch|patch|pr|report
 | E1. Versioned firm packs (`swe-factory@1`, `migration-runner@1`) = role set + default playbooks | I2 org install |
 | E2. Org enable/disable packs; quotas per pack | I2 |
 | E3. SDK: `playbooks.run({ pack, playbook, goal, project_id })` | I1 |
-| E4. Optional UI: pack catalog + run console (not chat product) | I8, P1 |
+| E4. Pack REST catalog (UI deferred; optional client of `/v1/packs`) | I8, P1 |
 | E5. Docs: “compose crews inside one factory,” not “deploy bots” | P2 |
 
 **Exit:** Buyer installs a pack, runs playbooks, gets structured artifacts; still one `swarm-factory` ACP citizen.
@@ -265,7 +265,7 @@ Phases **A–E landed**. Roadmap complete under current invariants.
 3. Role packs: `oracle_a11y` Temporal child  
 4. Firm packs: `schemas/firm_packs.py`, `GET/POST/PATCH /v1/packs`, migration `011_firm_packs.sql`  
 5. SDK: `client.playbooks.run({ pack, playbook, goal, project_id })` + `client.packs.*`  
-6. UI: `/packs` catalog + run console (not chat)  
+6. Pack REST: `GET/POST/PATCH /v1/packs` (UI deferred)  
 
 ### Explicitly never
 

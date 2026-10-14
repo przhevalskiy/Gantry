@@ -29,4 +29,4 @@ data: {"type":"done","status":"completed","result":{"pr_url":"https://github.com
 
 Do not emit: `intent`, `checklist`, `submitted`, `citations`.
 
-Implementation: `api/schemas/task_sse.py`, consumer adapter: `apps/web/src/shared/services/gantry/gantryStream.ts`.
+Implementation: `api/schemas/task_sse.py`. Integrators / future clients parse the SSE contract above — there is no in-repo UI consumer. See [`../deep-dives/hitl-and-sse.md`](../deep-dives/hitl-and-sse.md).
