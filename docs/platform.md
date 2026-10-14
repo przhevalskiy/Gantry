@@ -8,25 +8,27 @@ Thesis: [`../GANTRY_THESIS.md`](../GANTRY_THESIS.md) · Architecture: [`architec
 
 ## What Gantry is
 
-An **async software-engineering factory**: submit a goal against a linked repo; a durable Temporal crew plans, builds, verifies, and returns a **structured change artifact**.
+A **silicon engineering firm**: you retain a practice, file a work order against a linked repo, and a durable Temporal crew (Operators under one Foreman) returns a **structured change artifact**.
 
 | Concept | Meaning | Object |
 |---------|---------|--------|
-| **Firm** | One factory you retain | ACP agent `swarm-factory` |
+| **Firm** | The company you retain — one front desk | ACP agent `swarm-factory` (Foreman) |
 | **Practice** | What you’ve put on retainer | Firm pack (`swe-factory@1`, …) |
-| **Engagement type** | Kind of job | Playbook (job packet) |
-| **Staff / Operators** | Specialists per job | Temporal child roles |
-| **Deliverable** | What you get back | Structured `result` |
+| **Engagement type / brief** | Kind of job | Playbook (job packet) |
+| **Staff / Operators** | Specialists staffed per engagement | Temporal child roles |
+| **Work order** | How you file the job | `POST /v1/tasks` / `playbooks.run` |
+| **Deliverable** | How the engagement closes | Structured `result` (`pr` \| `branch` \| `patch` \| `report`) |
 
-Brand language (firm, not bot marketplace): [`brand/`](./brand/).
+Default SWE staffing: PM → Architect → Builders∥ → Inspector ↺ → Reviewer → Security → DevOps. Brand: [`brand/`](./brand/) · [`brand/persona-the-firm.md`](./brand/persona-the-firm.md).
 
 ---
 
 ## What Gantry is not
 
 - IDE pair-programmer (Cursor / Copilot / Claude Code)
-- Consumer chat product or personality marketplace
-- N separately deployable ACP “bots” per playbook
+- Consumer chat product or personality / bot marketplace
+- N separately deployable ACP “bots” per playbook or seat
+- A product whose identity is “opened a PR” (PR is one DevOps capability — **P4**)
 - A product that requires a web UI for core operations
 
 ---

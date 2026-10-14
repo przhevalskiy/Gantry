@@ -2,21 +2,25 @@
 
 ## What it is
 
-Gantry is an asynchronous software engineering factory. You describe a task in plain language. A crew of specialized AI agents plans it, writes the code in parallel across independent tracks, runs tests, heals failures automatically, reviews for logic correctness, scans for security issues, and opens a pull request on your GitHub repo — while you do something else.
+Gantry is a **silicon engineering firm** you retain. You describe a work order in plain language. One Foreman staffs specialized Operators (PM, Architect, Builders, Inspector, Reviewer, Security, DevOps): they plan, write code on parallel tracks, run tests, heal failures, review logic, scan security, and close with a structured change artifact (`pr` \| `branch` \| `patch` \| `report`) — while you do something else.
 
-Submit 1 task or 1000. Each is an independent pipeline. An engineering team can put an entire sprint's backlog in on Monday morning and spend the week reviewing PRs instead of writing boilerplate.
+Submit 1 engagement or 1000. Each is an independent durable run. An engineering team can put an entire sprint's backlog in on Monday morning and spend the week reviewing deliverables instead of writing boilerplate.
+
+Brand / persona: [`docs/brand/persona-the-firm.md`](docs/brand/persona-the-firm.md).
 
 ---
 
 ## What it is not
 
-**Not a pair programmer.** Gantry is not Cursor, GitHub Copilot, or Claude Code. Those tools are synchronous — they require an engineer present, guiding, correcting, prompting the next step. The bottleneck is human attention. Gantry is asynchronous. You write the goal. You review the PR. Everything in between is the factory's problem.
+**Not a pair programmer.** Gantry is not Cursor, GitHub Copilot, or Claude Code. Those tools are synchronous — they require an engineer present, guiding, correcting, prompting the next step. The bottleneck is human attention. Gantry is asynchronous. You file the goal. You review the artifact. Everything in between is the firm’s problem.
 
-Claude Code is for an engineer who wants to move faster right now, in the flow of current work. Gantry is for a tech lead who has 20 tickets in the backlog and wants 15 of them drafted by tomorrow without assigning them to anyone. One is a power tool. The other is a factory floor.
+Claude Code is for an engineer who wants to move faster right now, in the flow of current work. Gantry is for a tech lead who has 20 tickets in the backlog and wants 15 of them drafted by tomorrow without assigning them to anyone. One is a power tool. The other is a retained practice.
 
-**Not a chat interface.** There is no conversation. Gantry takes a goal, runs a full engineering pipeline, and delivers a branch with a PR. It only stops and waits for you at explicit approval checkpoints on complex tasks.
+**Not a bot marketplace or chat companion product.** You do not deploy or befriend N personality agents. One firm, one ACP front desk; Operators are Temporal seats inside a run — not separately hosted chatbots.
 
-**Not a wrapper around an LLM.** A single LLM call does not build software. What does is the orchestration — parallel execution across independent tracks, structured handoffs between specialized roles, a self-healing loop that retries failures with concrete fix instructions, and durable state that survives crashes and restarts. The LLM is a component. The factory is the product.
+**Not a chat interface as the product.** Client touchpoints are work orders and named HITL partner approvals. The climax is a structured deliverable, not a farewell message. It only waits on you at explicit checkpoints on complex engagements.
+
+**Not a wrapper around an LLM.** A single LLM call does not build software. What does is the orchestration — parallel tracks, structured handoffs between specialized roles, a self-healing loop, and durable state that survives crashes. The LLM is a component. The firm (Foreman + Operators) is the product.
 
 ---
 

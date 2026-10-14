@@ -1,9 +1,9 @@
 # Deep dive: playbooks and firm packs
 
-Playbooks are **job packets**. Firm packs are **practices** you install on an org. Neither creates a new ACP agent.
+In firm language: playbooks are **engagement briefs** (job packets); firm packs are **practices** you put on retainer. Neither creates a new ACP agent or chatbot.
 
 **Code:** `schemas/playbooks.py`, `schemas/firm_packs.py`, `api/routes/playbooks.py`, `api/routes/firm_packs.py`  
-**History:** [`../platform/composable-crew-roadmap.md`](../platform/composable-crew-roadmap.md) (A–E done)
+**History:** [`../platform/composable-crew-roadmap.md`](../platform/composable-crew-roadmap.md) (A–E done) · **Persona:** [`../brand/persona-the-firm.md`](../brand/persona-the-firm.md)
 
 ---
 

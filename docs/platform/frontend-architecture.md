@@ -9,19 +9,19 @@
 
 ## 1. What stays true without a UI
 
-The product is the **API factory**. UI is optional (I8).
+The product is the **firm’s control plane** (API-first). UI is optional (I8).
 
 ```
 Brand (firm) + Operator identity guidelines
                     │
-                    ▼  (future apps/web, built incrementally)
+                    ▼  (future client, built incrementally)
         thin client modules
                     │
                     ▼
-     HTTP / SSE / HITL  →  /v1/*
+     HTTP / SSE / HITL  →  /v1/*  (work orders, approvals, practices)
                     │
                     ▼
-   FastAPI → Temporal Foreman (swarm-factory) → structured result
+   FastAPI → Foreman (swarm-factory) staffs Operators → structured artifact
 ```
 
 ---

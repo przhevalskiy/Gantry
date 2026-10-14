@@ -1,32 +1,32 @@
 # Deep dive: swarm-factory (Foreman)
 
-One ACP citizen runs one Temporal Foreman workflow that composes specialized children. There is no second task agent.
+One ACP citizen — the firm’s front desk — runs one Temporal Foreman workflow that **staffs Operators** as child workflows. There is no second task agent and no per-seat ACP bot.
 
 **Code:** `workflows/swarm_orchestrator.py`, `workflows/swarm/`, `workflows/agents/`, `schemas/crew.py`  
-**Citizen rules:** [`../platform/agentex-citizen.md`](../platform/agentex-citizen.md)
+**Citizen rules:** [`../platform/agentex-citizen.md`](../platform/agentex-citizen.md) · **Firm persona:** [`../brand/persona-the-firm.md`](../brand/persona-the-firm.md)
 
 ---
 
-## Default DAG
+## Default SWE engagement DAG
 
 ```
 PM → Architect → Builders (parallel tracks) → Inspector ↺ heal
-       → Reviewer → Security → DevOps → structured result
+       → Reviewer → Security → DevOps → structured artifact
 ```
 
-Playbooks may overlay a `stage_graph` (Phase C) but still execute inside this factory — not a forked engine (**M4**, **I7**).
+This is the **full-service software-engineering practice** default. Playbooks may overlay a `stage_graph` (Phase C) but still execute inside this firm — not a forked engine (**M4**, **I7**).
 
-| Stage | Job |
-|-------|-----|
-| **PM** | Enrich goal; optional clarification HITL |
-| **Architect** | Repo map, parallel tracks, conflict resolution |
-| **Builder** | Tool-using LLM loop per track |
-| **Inspector** | Tests / lint / types; emit heal instructions |
-| **Reviewer** | Diff / logic review → may re-enter heal |
-| **Security** | Secrets / CVE patterns; can block |
-| **DevOps** | Branch, commit, push, optional PR |
+| Stage | Firm seat | Job |
+|-------|-----------|-----|
+| **PM** | Engagement lead | Enrich goal; optional clarification HITL |
+| **Architect** | Tech lead | Repo map, parallel tracks, conflict resolution; plan HITL |
+| **Builder** | Implementation | Tool-using LLM loop per track |
+| **Inspector** | QA / build gate | Tests / lint / types; emit heal instructions |
+| **Reviewer** | Senior review | Diff / logic review → may re-enter heal |
+| **Security** | Security review | Secrets / CVE patterns; can block ship |
+| **DevOps** | Delivery | Close engagement: branch / commit / push / optional PR |
 
-Heal cycles restore from git snapshot before retrying Builder. Wrong plans can return to Architect before burning more cycles.
+Heal cycles restore from git snapshot before retrying Builder. Wrong plans can return to Architect before burning more cycles. Client approvals are HITL checkpoints (partner gates), not companion chat.
 
 ---
 
@@ -73,7 +73,7 @@ Primary consumer field: structured `result` on the task (**I3**).
 
 ## Catalog
 
-`GET /v1/agents` returns crew roles + autonomy table. Only **`swarm-factory`** accepts ACP `task/create`. Sibling names are Temporal children, not separate ACP targets (**C1**, **C2**).
+`GET /v1/agents` returns the Operator catalog + autonomy table. Only **`swarm-factory`** (Foreman) accepts ACP `task/create`. Sibling names are Temporal seats, not deployable bots (**C1**, **C2**).
 
 ---
 

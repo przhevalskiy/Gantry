@@ -1,68 +1,77 @@
 # Gantry
 
-**Async code-agent platform with a tenant control plane.**
+**A silicon engineering firm you retain — API-first, one front desk, durable engagements.**
 
-Gantry runs software engineering tasks as durable, orchestrated agent workflows. You submit a goal against a GitHub-linked project; a Temporal pipeline plans the work, writes code in parallel tracks, verifies it, and opens a pull request. Integrators use the REST API, webhooks, and SDKs. There is **no in-repo web UI** today — the product core is the API + worker (I8). Brand guides for a future client live under `docs/brand/`.
+You put a practice on retainer, file a work order (`POST /v1/tasks`) against a GitHub-linked project, and receive a **structured change artifact** (`pr` \| `branch` \| `patch` \| `report`). A Temporal Foreman staffs specialized Operators for the run; integrators use REST, webhooks, and SDKs. There is **no in-repo web UI** today — the product core is the control plane + worker (I8). Brand: [`docs/brand/`](docs/brand/).
 
 ---
 
 ## What this is
 
-Gantry is three systems wired together:
+Gantry is one firm with three layers:
 
 ```
-Integrator (SDK / curl / future UI)  →  api/ (FastAPI)  →  Agentex  →  Temporal worker (workflows + activities)
+Client (SDK / curl / CI / future UI)  →  api/ (control plane)  →  Agentex  →  Temporal worker (Foreman + Operators)
 ```
 
-| Layer | Role |
-|-------|------|
-| **`workflows/` + `activities/` + `worker.py`** | The engine. One Agentex entry agent (`swarm-factory`) runs a Temporal Foreman workflow that composes child workflows (PM, Architect, Builder, Inspector, Reviewer, Security, DevOps). LLM planner activities call repo tools (read/write/patch, git, tests, symbol index). |
-| **`api/`** | The control plane. Org-scoped API keys, projects, task metadata, quotas, audit, webhooks, HITL routing. Submits work to Agentex via ACP `task/create`; the worker pushes status/results back (poller is a slow fallback). Does not execute agent logic itself. |
-| **UI** | Not in-tree. Future optional client of `/v1/*` only — see `docs/brand/` + `docs/platform/frontend-architecture.md`. |
+| Layer | Firm role | Path |
+|-------|-----------|------|
+| **Foreman** | Front desk / managing partner — only ACP entry (`swarm-factory`) | `workflows/` + `activities/` + `worker.py` |
+| **Operators** | Staffed seats (PM, Architect, Builders, Inspector, Reviewer, Security, DevOps) as Temporal children — not separate ACP bots | same worker |
+| **Control plane** | Matter filing, keys, quotas, HITL, webhooks, SSE | `api/` |
+| **UI** | Optional client of `/v1/*` (deferred) | [`docs/brand/`](docs/brand/) · [`docs/platform/frontend-architecture.md`](docs/platform/frontend-architecture.md) |
 
-**Primary artifact:** a **task run** (with optional `result.pr_url`, `result.branch`), not a conversation thread.
+| Concept | Meaning |
+|---------|---------|
+| **Firm** | One ACP citizen: `swarm-factory` |
+| **Practice** | Firm pack on retainer (`swe-factory@1`, …) via `/v1/packs` |
+| **Engagement / brief** | Playbook (job packet: seats, stages, artifact) |
+| **Work order** | `POST /v1/tasks` (or `playbooks.run`) |
+| **Deliverable** | Structured `result` — not a chat farewell |
 
-**Primary interface:** `POST /v1/tasks` on the Gantry API (`:8001`). The API works without the UI.
+**Primary interface:** `POST /v1/tasks` on the Gantry API (`:8001`). The API works without a UI (I1 / P1).
 
-**Agency browser extensions** (ShopSwitch, ClientMark, etc.) live in a separate repo: [agency-extension-hub](https://github.com/przhevalskiy/agency-extension-hub).
+**Agency browser extensions** live in a separate repo: [agency-extension-hub](https://github.com/przhevalskiy/agency-extension-hub).
 
 ---
 
 ## What this is not
 
-| Category | Gantry | Cursor / Copilot / Claude Code |
-|----------|--------|--------------------------------|
-| Interaction | Submit a goal, poll or stream run status | Synchronous pair programming in the editor |
-| Unit of work | Durable pipeline run → PR | Interactive edit session |
-| Where it runs | Agentex + Temporal worker on your infra | Local IDE / CLI |
+| Gantry | Not |
+|--------|-----|
+| Retain a firm → file engagements → get artifacts | Deploy / befriend a marketplace of chat bots |
+| One Foreman staffs Operators inside a run | N separately hosted ACP “bots” per role |
+| Durable async pipeline with HITL gates | Synchronous IDE pair programming (Cursor / Copilot / Claude Code) |
+| Deliverable: `pr` \| `branch` \| `patch` \| `report` | Product identity = “opened a PR” |
+| API + SDKs are the product (UI optional) | Dashboard-required core ops |
 
-Brand framing (professional-services firm, not chat pets): [`docs/brand/README.md`](docs/brand/README.md).
+Brand detail: [`docs/brand/README.md`](docs/brand/README.md) · [`docs/platform.md`](docs/platform.md).
 
 ---
 
-## Pipeline
+## Pipeline — default SWE engagement
 
-Each task is one Temporal workflow (`swarm-factory`). The Foreman composes child workflows — they are not separate ACP targets.
+Each work order is one Temporal workflow (`swarm-factory`). The **Foreman** composes Operator child workflows — they are not separate ACP targets (C1 / I7).
 
 ```
 PM → Architect → Builders (parallel) → Inspector ↺ → Reviewer → Security → DevOps
 ```
 
-| Stage | Responsibility |
-|-------|----------------|
-| **PM** | Goal enrichment; optional clarification HITL (tier ≥ 1) |
-| **Architect** | Repo map, parallel track plan, conflict resolution on overlapping files |
-| **Builder** | Tool-using LLM loop: read → edit → `verify_build` → `finish_build` |
-| **Inspector** | Tests, lint, types; emits heal instructions on failure |
-| **Reviewer** | Diff review; logic bugs re-enter the heal loop |
-| **Security** | Secret/CVE scan; can block PR |
-| **DevOps** | Branch, commit, push, open PR |
+| Stage | Firm seat | Responsibility |
+|-------|-----------|----------------|
+| **PM** | Engagement lead | Goal enrichment; optional clarification HITL (tier ≥ 1) |
+| **Architect** | Tech lead | Repo map, parallel track plan, conflict resolution; plan HITL (tier ≥ 2) |
+| **Builder** | Implementation | Tool-using LLM loop: read → edit → `verify_build` → `finish_build` |
+| **Inspector** | QA / build gate | Tests, lint, types; emits heal instructions on failure |
+| **Reviewer** | Senior review | Diff / logic review; bugs re-enter the heal loop |
+| **Security** | Security review | Secret/CVE scan; can block ship |
+| **DevOps** | Delivery | Branch, commit, push; close with artifact (`pr` \| `branch` \| `patch` \| `report`) |
 
-Heal cycles retry Builder from a git snapshot. If the plan was wrong, Architect re-plans before burning more cycles. Named HITL checkpoints (plan approval, deploy approval, PM clarification) pause the workflow until signalled via REST.
+Heal cycles retry Builder from a git snapshot. Wrong plans return to Architect before burning more cycles. Client touchpoints are named HITL checkpoints (clarify, approve plan, continue after max heals, approve deploy) — partner approvals via REST, not companion chat.
 
-Crew catalog (read-only): `GET /v1/agents`. Only **`swarm-factory`** accepts ACP `task/create`.
+This DAG is the **full-service SWE practice** default. Playbooks may mute seats, change artifact policy, or add oracle overlays without forking the engine. Crew catalog: `GET /v1/agents`. Only **`swarm-factory`** accepts ACP `task/create`.
 
-Details: [`docs/architecture.md`](docs/architecture.md), [`docs/platform.md`](docs/platform.md), [`docs/platform/oracle-tiers.md`](docs/platform/oracle-tiers.md), [`docs/deep-dives/swarm-factory.md`](docs/deep-dives/swarm-factory.md)
+Details: [`docs/architecture.md`](docs/architecture.md) · [`docs/platform.md`](docs/platform.md) · [`docs/deep-dives/swarm-factory.md`](docs/deep-dives/swarm-factory.md) · [`docs/brand/persona-the-firm.md`](docs/brand/persona-the-firm.md)
 
 ---
 
@@ -92,7 +101,7 @@ Pass `tier` and optional `pipeline` overrides on `POST /v1/tasks`:
 }
 ```
 
-**Playbooks** (`playbook: "platform-backlog"`, `a11y-remediation`, `monorepo-slice`) are job packets — stages, seats, artifact — without forking the engine. **Firm packs** (`swe-factory@1`, `migration-runner@1`) group roles + default playbooks for org install (`GET /v1/packs`). Still one ACP citizen. See [`docs/deep-dives/playbooks-and-packs.md`](docs/deep-dives/playbooks-and-packs.md). Brand: [`docs/brand/`](docs/brand/) — professional-services firm, not a bot marketplace.
+**Playbooks** are engagement briefs / job packets (`platform-backlog`, `a11y-remediation`, `monorepo-slice`) — stages, seats, artifact — without forking the engine. **Firm packs** are practices on retainer (`swe-factory@1`, `migration-runner@1`) via `GET/POST /v1/packs`. Still one ACP citizen. See [`docs/deep-dives/playbooks-and-packs.md`](docs/deep-dives/playbooks-and-packs.md).
 
 ---
 
@@ -300,7 +309,7 @@ Tasks need a GitHub token to clone and push. Options:
 2. **Org secret** — store via `POST /v1/secrets`, reference by name
 3. **GitHub App** — preferred for integrations ([`docs/integrations/github-app.md`](docs/integrations/github-app.md))
 
-Projects store the repo URL (`POST /v1/projects`). The worker clones that repo, builds on a branch, and opens a PR.
+Projects store the repo URL (`POST /v1/projects`). The worker clones that repo and closes the engagement with the playbook’s artifact policy (often a PR; also branch / patch / report).
 
 ---
 
@@ -313,6 +322,6 @@ Cross-run learning uses a local facts store and episodic log (`.gantry/memory/` 
 ## Positioning docs
 
 - Docs index: [`docs/README.md`](docs/README.md)
+- Firm persona / brand: [`docs/brand/`](docs/brand/) · [`docs/brand/persona-the-firm.md`](docs/brand/persona-the-firm.md)
 - Architecture / platform / API: [`docs/architecture.md`](docs/architecture.md) · [`docs/platform.md`](docs/platform.md) · [`docs/api.md`](docs/api.md)
 - Product thesis: [`GANTRY_THESIS.md`](GANTRY_THESIS.md)
-- Brand (future client): [`docs/brand/`](docs/brand/)
