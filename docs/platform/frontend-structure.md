@@ -96,12 +96,12 @@ apps/web/
 | Path | Screen | Slice status |
 |------|--------|--------------|
 | `/` | ComposeHome — firm greeting + composer | **Compose bar** — `+` project/brief + `POST /v1/tasks`; API key in sidebar |
-| `/runs` | Runs list | Stub |
-| `/runs/:taskId` | Engagement (messaging + floor + HITL) | **Slices 2–6** — SSE + HITL + floor + artifact climax |
-| `/practices` | Firm packs | **Slice 5** — `GET /v1/packs` |
-| `/team` | Operators | **Slice 5** — `GET /v1/agents` + portraits |
-| `/briefs` | Playbooks | **Slice 5** — `GET /v1/playbooks` |
-| `/projects` | Projects / workspaces | Stub (composer picker already lists/creates) |
+| `/runs` | Runs list | **Wired** — `GET /v1/tasks` → Engagement (`?project=` filter) |
+| `/runs/:taskId` | Engagement (messaging + floor + HITL) | **Wired** — SSE + HITL + floor + artifact |
+| `/practices` | Firm packs | **Wired** — list + install/enable |
+| `/team` | Operators | **Wired** — `GET /v1/agents` + portraits |
+| `/briefs` | Playbooks | **Wired** — list + “Use on new run” |
+| `/projects` | Projects / workspaces | **Wired** — list/create + link to runs |
 
 ---
 
@@ -112,16 +112,13 @@ apps/web/
 - Lucide icons only (no emoji in UI chrome)
 - Input bars: compact padding; submit/control size `2rem`
 - Design tokens from brand voice/look
-- Stub routes with firm copy (no Agent deploy landing)
-- Thin `services/gantry` placeholder pointing at `VITE_GANTRY_API_URL`
+- All primary nav routes wired to `/v1/*` (no Agent deploy landing)
+- Thin `services/gantry` client pointing at `VITE_GANTRY_API_URL`
 
 ## What this scaffold explicitly does **not** include
 
 - Full portrait art kit (`operator-portraits@1`) — CSS silhouette shells for now
-- Runs list / Projects page full CRUD beyond composer picker
-- Auth/billing beyond API key field
-- Operator portrait art kit
-- Auth/billing (“Free plan”) beyond placeholder chrome
+- Auth/billing beyond API key in sidebar UserChip
 - Messenger deploy / Skills marketplace / Plugins nav
 - Resurrected deleted console/messaging code
 

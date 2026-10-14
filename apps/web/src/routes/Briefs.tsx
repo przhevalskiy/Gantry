@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { paths } from "../lib/paths";
 import { listPlaybooks } from "../services/gantry/client";
 import { GantryApiError, type PlaybookBrief } from "../services/gantry/types";
 
@@ -77,6 +79,19 @@ export function Briefs() {
               <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-muted)" }}>
                 {b.slug || b.id}
               </p>
+              <Link
+                to={paths.home}
+                state={{ playbookId: b.id }}
+                style={{
+                  display: "inline-block",
+                  marginTop: 10,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "var(--accent-600)",
+                }}
+              >
+                Use on new run
+              </Link>
             </li>
           );
         })}

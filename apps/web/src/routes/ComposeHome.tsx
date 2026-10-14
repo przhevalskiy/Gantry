@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Composer } from "../modules/composer/Composer";
 import { HeadlineCarousel } from "../modules/composer/HeadlineCarousel";
 import { SuggestionChips } from "../modules/composer/SuggestionChips";
@@ -10,11 +10,19 @@ import { GantryApiError } from "../services/gantry/types";
 /** Wireframe home — headline + Claude-shaped composer only. */
 export function ComposeHome() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const navState = (location.state || {}) as { playbookId?: string };
   const [goal, setGoal] = useState("");
   const [projectId, setProjectId] = useState<string | null>(null);
-  const [playbookId, setPlaybookId] = useState<string | null>(null);
+  const [playbookId, setPlaybookId] = useState<string | null>(
+    () => navState.playbookId ?? null,
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (navState.playbookId) setPlaybookId(navState.playbookId);
+  }, [navState.playbookId]);
 
   useEffect(() => {
     let cancelled = false;

@@ -65,4 +65,5 @@ Detailed IA and module names from the withdrawn greenfield attempt are **non-bin
 - [x] HITL cards → `POST …/hitl` (slice 3)  
 - [x] Engagement floor roster (slice 4)  
 - [x] Practices / Team / Briefs catalogs (slice 5)  
-- [x] Artifact climax from `result` (slice 6)
+- [x] Artifact climax from `result` (slice 6)  
+- [x] Runs list + Projects page + pack install/enable + brief → compose handoff

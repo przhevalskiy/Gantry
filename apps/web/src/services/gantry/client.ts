@@ -94,6 +94,13 @@ export async function getTask(taskId: string): Promise<Task> {
   return expectOk<Task>(res);
 }
 
+/** GET /v1/tasks — org matter list */
+export async function listTasks(limit = 50): Promise<Task[]> {
+  const res = await gantryFetch(`/v1/tasks?limit=${encodeURIComponent(String(limit))}`);
+  const data = await expectOk<{ tasks: Task[]; count: number }>(res);
+  return data.tasks ?? [];
+}
+
 function parseSseFrame(frame: string): TaskSseEvent | null {
   const line = frame.split("\n").find((l) => l.startsWith("data: "));
   if (!line) return null;
@@ -131,6 +138,29 @@ export async function listPacks(): Promise<FirmPack[]> {
   const res = await gantryFetch("/v1/packs");
   const data = await expectOk<{ packs: FirmPack[] }>(res);
   return data.packs ?? [];
+}
+
+/** POST /v1/packs/{ref}/install — put practice on retainer. */
+export async function installPack(packRef: string): Promise<FirmPack> {
+  const res = await gantryFetch(
+    `/v1/packs/${encodeURIComponent(packRef)}/install`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+  const data = await expectOk<{ pack: FirmPack }>(res);
+  return data.pack;
+}
+
+/** PATCH /v1/packs/{ref} — enable / disable practice. */
+export async function updatePack(
+  packRef: string,
+  body: { enabled?: boolean; max_tasks_per_day?: number },
+): Promise<FirmPack> {
+  const res = await gantryFetch(`/v1/packs/${encodeURIComponent(packRef)}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+  const data = await expectOk<{ pack: FirmPack }>(res);
+  return data.pack;
 }
 
 /** GET /v1/playbooks — engagement briefs. */
