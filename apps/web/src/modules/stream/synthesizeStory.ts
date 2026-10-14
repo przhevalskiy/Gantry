@@ -1,3 +1,4 @@
+import type { PhaseView } from "./engagementPhase";
 import type { TaskSseEvent } from "../../services/gantry/types";
 import {
   extractMessageText,
@@ -10,7 +11,6 @@ import type { StreamRow } from "./useTaskEventStream";
 export type StoryBeat = {
   id: string;
   actor: string;
-  /** Plain-language outcome — not a raw log line */
   headline: string;
   detail?: string;
   state: "done" | "active" | "blocked" | "warn";
@@ -26,8 +26,8 @@ export type TrackChain = {
 export type ThreadItem =
   | { kind: "user"; id: string; text: string }
   | { kind: "system"; id: string; text: string }
-  | { kind: "story"; id: string; beats: StoryBeat[]; waitingOnYou: boolean }
-  | { kind: "tracks"; id: string; tracks: TrackChain[] };
+  | { kind: "story"; id: string; beats: StoryBeat[]; phaseLabel: string; caption: string }
+  | { kind: "tracks"; id: string; tracks: TrackChain[]; caption: string };
 
 type RawLine = { id: string; seat: string; text: string };
 
@@ -50,14 +50,17 @@ function collectLines(rows: StreamRow[]): RawLine[] {
     const body = stripSeatPrefix(raw).trim();
     if (!body) continue;
     for (const [i, line] of body.split("\n").map((l) => l.trim()).filter(Boolean).entries()) {
-      if (/^Goal:/i.test(line)) continue; // already the user bubble
+      if (/^Goal:/i.test(line)) continue;
       out.push({ id: `${row.id}:${i}`, seat, text: line });
     }
   }
   return out;
 }
 
-function parseTracks(lines: RawLine[]): TrackChain[] {
+function parseTracks(
+  lines: RawLine[],
+  activeTrackStatus: PhaseView["activeTrackStatus"],
+): TrackChain[] {
   const tracks = new Map<string, TrackChain>();
   for (const { text } of lines) {
     const dropped = text.match(/track\(s\)\s+dropped[^:]*:\s*([^.]+)/i);
@@ -80,16 +83,30 @@ function parseTracks(lines: RawLine[]): TrackChain[] {
       const steps = text.match(/(\d+)\s+steps?/i)?.[1];
       const stack = text.match(/stack:\s*([^,]+)/i)?.[1]?.trim();
       const usefulStack = stack && !/unknown/i.test(stack) ? stack : null;
+      const detailBits = [
+        usefulStack,
+        steps ? `${steps} builder step${steps === "1" ? "" : "s"}` : null,
+      ].filter(Boolean);
       for (let i = 0; i < n; i++) {
         const name = n === 1 ? "Primary track" : `Track ${i + 1}`;
         if (!tracks.has(name)) {
+          const status =
+            activeTrackStatus === "queued"
+              ? "planned"
+              : activeTrackStatus === "running"
+                ? "running"
+                : "done";
+          const detail =
+            activeTrackStatus === "queued"
+              ? detailBits.join(" · ") || "Waiting for partner approval"
+              : activeTrackStatus === "running"
+                ? detailBits.join(" · ") || "Builder executing this chain"
+                : detailBits.join(" · ") || "Chain finished";
           tracks.set(name, {
             id: `plan-${name}`,
             name,
-            status: "planned",
-            detail: [usefulStack, steps ? `${steps} builder step${steps === "1" ? "" : "s"}` : null]
-              .filter(Boolean)
-              .join(" · ") || "Ready after you approve",
+            status,
+            detail,
           });
         }
       }
@@ -101,24 +118,21 @@ function parseTracks(lines: RawLine[]): TrackChain[] {
 function repoLabel(text: string): string | null {
   const m = text.match(/Repo:\s*(\S+)/i);
   if (!m) return null;
-  const path = m[1];
-  const base = path.split("/").filter(Boolean).pop() || path;
-  return base;
+  return m[1].split("/").filter(Boolean).pop() || m[1];
 }
 
 function branchLabel(text: string): string | null {
-  const m = text.match(/Branch:\s*(\S+)/i);
-  return m?.[1] ?? null;
+  return text.match(/Branch:\s*(\S+)/i)?.[1] ?? null;
 }
 
 /**
- * Turn noisy swarm logs into a short engagement story a partner can read.
+ * Turn swarm logs into a short engagement story aligned to PhaseView.
  */
 export function synthesizeStory(
   rows: StreamRow[],
   goal: string | null | undefined,
   localUser: { id: string; text: string }[],
-  waitingOnYou: boolean,
+  phase: PhaseView,
 ): ThreadItem[] {
   const items: ThreadItem[] = [];
   if (goal) items.push({ kind: "user", id: "goal", text: goal });
@@ -135,29 +149,32 @@ export function synthesizeStory(
   let archDone = false;
   let archSummary: string | null = null;
   let dropNote: string | null = null;
+  let builderSeen = false;
 
   for (const line of lines) {
     const t = line.text;
 
-    const tier = t.match(/Complexity tier:\s*([^(—-]+)\s*[—(]\s*Tier\s*(\d+)[^)]*\)\s*—\s*(.+)$/i)
-      || t.match(/Complexity tier:\s*(.+)$/i);
+    const tier =
+      t.match(
+        /Complexity tier:\s*([^(—-]+)\s*[—(]\s*Tier\s*(\d+)[^)]*\)\s*—\s*(.+)$/i,
+      ) || t.match(/Complexity tier:\s*(.+)$/i);
     if (tier) {
-      if (tier.length >= 4) {
-        tierLine = `${tier[1].trim()} (Tier ${tier[2]}) — ${tier[3].trim()}`;
-      } else {
-        tierLine = tier[1].trim();
-      }
+      tierLine =
+        tier.length >= 4
+          ? `${tier[1].trim()} (Tier ${tier[2]}) — ${tier[3].trim()}`
+          : tier[1].trim();
       continue;
     }
 
     if (/swarm factory activated/i.test(t) || /^Repo:/i.test(t) || /Branch:/i.test(t)) {
-      boundRepo = repoLabel(t) || boundRepo;
-      boundBranch = branchLabel(t) || boundBranch;
-      // Also handle "Swarm Factory activated. · Repo: ..."
       const inlineRepo = t.match(/Repo:\s*(\S+)/i);
       const inlineBranch = t.match(/Branch:\s*(\S+)/i);
-      if (inlineRepo) boundRepo = inlineRepo[1].split("/").filter(Boolean).pop() || inlineRepo[1];
-      if (inlineBranch) boundBranch = inlineBranch[1];
+      if (inlineRepo) {
+        boundRepo = inlineRepo[1].split("/").filter(Boolean).pop() || inlineRepo[1];
+      } else {
+        boundRepo = repoLabel(t) || boundRepo;
+      }
+      boundBranch = inlineBranch?.[1] || branchLabel(t) || boundBranch;
       continue;
     }
 
@@ -198,9 +215,15 @@ export function synthesizeStory(
         : "Dropped a track that had no valid steps";
       continue;
     }
+
+    if (
+      /dispatching\s+builder/i.test(t) ||
+      line.seat.toLowerCase().includes("builder")
+    ) {
+      builderSeen = true;
+    }
   }
 
-  // Terminal events
   for (const row of rows) {
     const ev = row.event as TaskSseEvent;
     if (ev.type === "error") {
@@ -215,29 +238,31 @@ export function synthesizeStory(
   }
 
   if (tierLine || boundRepo) {
-    const bits = [
-      tierLine ? `Staffed as ${tierLine}` : "Staffed the engagement",
-      boundRepo ? `on ${boundRepo}` : null,
-      boundBranch ? `(${boundBranch})` : null,
-    ].filter(Boolean);
     beats.push({
       id: "staff",
       actor: "Foreman",
-      headline: bits.join(" "),
-      detail: "Foreman set autonomy and opened the factory run",
+      headline: [
+        tierLine ? `Staffed as ${tierLine}` : "Staffed the engagement",
+        boundRepo ? `on ${boundRepo}` : null,
+        boundBranch ? `(${boundBranch})` : null,
+      ]
+        .filter(Boolean)
+        .join(" "),
+      detail: "Set autonomy and opened the factory run",
       state: "done",
     });
   }
 
   if (pmActive || archActive || archDone) {
+    const pmFinished = pmDone || archActive || archDone;
     beats.push({
       id: "pm",
       actor: "PM",
-      headline: pmDone || archActive || archDone
+      headline: pmFinished
         ? "Reviewed the brief and scanned the repo for gaps"
         : "Reviewing the brief and scanning the repo",
-      detail: "Checks the goal is clear before Architect plans tracks",
-      state: pmDone || archActive || archDone ? "done" : "active",
+      detail: "Makes sure the goal is clear before Architect plans",
+      state: pmFinished ? "done" : "active",
     });
   }
 
@@ -248,18 +273,44 @@ export function synthesizeStory(
       headline: archDone
         ? archSummary || "Finished the build plan"
         : "Mapping the repo into parallel build tracks",
-      detail: dropNote || "Decomposes the job so Builders can run in parallel",
-      state: waitingOnYou && archDone ? "blocked" : archDone ? "done" : "active",
+      detail: dropNote || "Splits the job into builder chains",
+      state:
+        phase.phase === "awaiting_you" && archDone
+          ? "blocked"
+          : archDone
+            ? "done"
+            : "active",
     });
   }
 
-  if (waitingOnYou && archDone) {
+  if (phase.phase === "awaiting_you" && archDone) {
     beats.push({
       id: "gate",
       actor: "You",
       headline: "Approve the plan so Builders can start",
-      detail: "Partner gate — nothing ships until you decide",
+      detail: "Partner gate — Builders stay blocked until you decide",
       state: "blocked",
+    });
+  } else if (
+    phase.phase === "building" ||
+    phase.phase === "verifying" ||
+    phase.phase === "shipping" ||
+    phase.phase === "completed"
+  ) {
+    beats.push({
+      id: "build",
+      actor: "Builder",
+      headline:
+        phase.phase === "building"
+          ? builderSeen
+            ? "Executing the primary work chain"
+            : "Cleared to build — no partner approval required on this tier"
+          : "Finished the planned work chain",
+      detail:
+        phase.phase === "building"
+          ? "Implements the Architect plan on the active track"
+          : "Handed off for verify / ship",
+      state: phase.phase === "building" ? "active" : "done",
     });
   }
 
@@ -268,13 +319,19 @@ export function synthesizeStory(
       kind: "story",
       id: "story",
       beats,
-      waitingOnYou,
+      phaseLabel: phase.label,
+      caption: phase.caption,
     });
   }
 
-  const tracks = parseTracks(lines);
+  const tracks = parseTracks(lines, phase.activeTrackStatus);
   if (tracks.length) {
-    items.push({ kind: "tracks", id: "tracks", tracks });
+    items.push({
+      kind: "tracks",
+      id: "tracks",
+      tracks,
+      caption: phase.chainsCaption,
+    });
   }
 
   for (const u of localUser) {

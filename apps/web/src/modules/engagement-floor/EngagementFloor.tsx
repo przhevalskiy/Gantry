@@ -69,11 +69,14 @@ export function EngagementFloor({
   status,
   pendingHitl,
   compact = false,
+  captionOverride,
 }: {
   status: string | null;
   pendingHitl: PendingHitl[];
   /** Header strip under chat chrome (Muse Goals/Floor as secondary). */
   compact?: boolean;
+  /** Pass null to hide; undefined keeps legacy active-seat line. */
+  captionOverride?: string | null;
 }) {
   const [seats, setSeats] = useState<AgentSeat[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +109,7 @@ export function EngagementFloor({
     (s) => presenceFor(s, status, pendingHitl) === "blocked",
   ) || seats.find((s) => presenceFor(s, status, pendingHitl) === "active");
 
-  const line =
+  const legacyLine =
     pendingHitl[0]?.description ||
     pendingHitl[0]?.action ||
     (pendingHitl[0]
@@ -114,6 +117,8 @@ export function EngagementFloor({
       : active
         ? `${active.role} on the floor`
         : null);
+  const line =
+    captionOverride === undefined ? legacyLine : captionOverride;
 
   if (compact) {
     return (

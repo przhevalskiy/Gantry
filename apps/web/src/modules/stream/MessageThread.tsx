@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
-import type { PendingHitl } from "../../services/gantry/types";
+import { useEffect, useMemo, useRef } from "react";
+import type { PendingHitl, TaskResult } from "../../services/gantry/types";
 import { HitlCard } from "../hitl/HitlCard";
+import { derivePhaseView } from "./engagementPhase";
 import { EngagementStory } from "./EngagementStory";
 import { synthesizeStory } from "./synthesizeStory";
 import { TrackBoard } from "./TrackBoard";
@@ -13,7 +14,6 @@ export type LocalBubble = {
   seat?: string | null;
 };
 
-/** Messaging thread: your ask → synthesized firm story → chains → HITL. */
 export function MessageThread({
   taskId,
   goal,
@@ -22,6 +22,8 @@ export function MessageThread({
   onHitlResolved,
   localBubbles,
   live,
+  status,
+  result,
 }: {
   taskId: string;
   goal?: string | null;
@@ -30,20 +32,37 @@ export function MessageThread({
   onHitlResolved: (workflowId: string) => void;
   localBubbles: LocalBubble[];
   live: boolean;
+  status?: string | null;
+  result?: TaskResult | null;
   terminal?: boolean;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
 
-  const items = synthesizeStory(
-    rows,
-    goal,
-    localBubbles.filter((b) => b.role === "user").map((b) => ({ id: b.id, text: b.text })),
-    pendingHitl.length > 0,
+  const phase = useMemo(
+    () =>
+      derivePhaseView({
+        status,
+        pendingHitl,
+        result,
+        rows,
+      }),
+    [status, pendingHitl, result, rows],
+  );
+
+  const items = useMemo(
+    () =>
+      synthesizeStory(
+        rows,
+        goal,
+        localBubbles.filter((b) => b.role === "user").map((b) => ({ id: b.id, text: b.text })),
+        phase,
+      ),
+    [rows, goal, localBubbles, phase],
   );
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [items.length, pendingHitl.length, rows.length]);
+  }, [items.length, pendingHitl.length, rows.length, phase.phase]);
 
   return (
     <div
@@ -87,21 +106,26 @@ export function MessageThread({
             <EngagementStory
               key={item.id}
               beats={item.beats}
-              waitingOnYou={item.waitingOnYou}
+              phaseLabel={item.phaseLabel}
+              caption={item.caption}
             />
           );
         }
-        return <TrackBoard key={item.id} tracks={item.tracks} />;
+        return (
+          <TrackBoard key={item.id} tracks={item.tracks} caption={item.caption} />
+        );
       })}
 
-      {pendingHitl.map((p) => (
-        <div
-          key={p.workflow_id || p.checkpoint}
-          style={{ maxWidth: "min(600px, 100%)", alignSelf: "stretch" }}
-        >
-          <HitlCard taskId={taskId} pending={p} onResolved={onHitlResolved} />
-        </div>
-      ))}
+      {phase.waitingOnYou
+        ? pendingHitl.map((p) => (
+            <div
+              key={p.workflow_id || p.checkpoint}
+              style={{ maxWidth: "min(600px, 100%)", alignSelf: "stretch" }}
+            >
+              <HitlCard taskId={taskId} pending={p} onResolved={onHitlResolved} />
+            </div>
+          ))
+        : null}
 
       <div ref={endRef} />
     </div>

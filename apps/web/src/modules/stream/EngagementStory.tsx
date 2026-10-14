@@ -1,16 +1,15 @@
 import { OperatorPortrait } from "../engagement-floor/OperatorPortrait";
 import type { StoryBeat } from "./synthesizeStory";
 
-/**
- * Plain-language engagement story — what each Operator accomplished,
- * not a replay of dispatch logs.
- */
+/** Plain-language engagement story aligned to a single phase. */
 export function EngagementStory({
   beats,
-  waitingOnYou,
+  phaseLabel,
+  caption,
 }: {
   beats: StoryBeat[];
-  waitingOnYou: boolean;
+  phaseLabel: string;
+  caption: string;
 }) {
   return (
     <section
@@ -26,26 +25,39 @@ export function EngagementStory({
         gap: 14,
       }}
     >
-      <header>
-        <p style={{ margin: 0, fontSize: 14, fontWeight: 650, letterSpacing: "-0.01em" }}>
-          What the firm did
-        </p>
-        <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--text-muted)", lineHeight: 1.4 }}>
-          {waitingOnYou
-            ? "Plan is ready — your approval unblocks Builders"
-            : "Live progress on this engagement"}
-        </p>
-      </header>
-
-      <ol
+      <header
         style={{
-          listStyle: "none",
-          margin: 0,
-          padding: 0,
-          display: "grid",
-          gap: 0,
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          alignItems: "flex-start",
         }}
       >
+        <div>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 650, letterSpacing: "-0.01em" }}>
+            What the firm did
+          </p>
+          <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--text-muted)", lineHeight: 1.4 }}>
+            {caption}
+          </p>
+        </div>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 650,
+            padding: "4px 8px",
+            borderRadius: 999,
+            background: "var(--shell-bg)",
+            border: "1px solid var(--border-subtle)",
+            color: "var(--text-secondary)",
+            flexShrink: 0,
+          }}
+        >
+          {phaseLabel}
+        </span>
+      </header>
+
+      <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 0 }}>
         {beats.map((beat, i) => (
           <li
             key={beat.id}
@@ -159,7 +171,6 @@ export function EngagementStory({
                   fontWeight: 550,
                   lineHeight: 1.4,
                   letterSpacing: "-0.01em",
-                  color: "var(--text-primary)",
                 }}
               >
                 {beat.headline}

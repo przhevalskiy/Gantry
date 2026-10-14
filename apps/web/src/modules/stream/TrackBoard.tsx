@@ -1,7 +1,12 @@
 import type { TrackChain } from "./synthesizeStory";
 
-/** Parallel builder chains derived from the Architect plan. */
-export function TrackBoard({ tracks }: { tracks: TrackChain[] }) {
+export function TrackBoard({
+  tracks,
+  caption,
+}: {
+  tracks: TrackChain[];
+  caption: string;
+}) {
   return (
     <section
       style={{
@@ -18,7 +23,7 @@ export function TrackBoard({ tracks }: { tracks: TrackChain[] }) {
       <div>
         <p style={{ margin: 0, fontSize: 14, fontWeight: 650 }}>Builder chains</p>
         <p style={{ margin: "3px 0 0", fontSize: 12, color: "var(--text-muted)" }}>
-          What will run in parallel after you approve
+          {caption}
         </p>
       </div>
       <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 8 }}>
@@ -68,7 +73,11 @@ export function TrackBoard({ tracks }: { tracks: TrackChain[] }) {
                 textTransform: "capitalize",
               }}
             >
-              {t.status === "planned" ? "Queued" : t.status}
+              {t.status === "planned"
+                ? "Queued"
+                : t.status === "running"
+                  ? "Running"
+                  : t.status}
             </span>
           </li>
         ))}

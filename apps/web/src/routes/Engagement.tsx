@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
-import { formatStatus } from "../lib/format";
 import { paths } from "../lib/paths";
 import { ArtifactClimax } from "../modules/artifacts";
 import { EngagementFloor } from "../modules/engagement-floor";
@@ -10,11 +9,9 @@ import {
   useTaskEventStream,
   type LocalBubble,
 } from "../modules/stream";
+import { derivePhaseView } from "../modules/stream/engagementPhase";
 
-/**
- * Messaging-first engagement — chat with the firm, floor as presence,
- * HITL cards inline, artifact climax (not an ops console).
- */
+/** Messaging-first engagement — one phase drives header, story, chains, artifact. */
 export function Engagement() {
   const { taskId } = useParams();
   const location = useLocation();
@@ -36,8 +33,16 @@ export function Engagement() {
   const displayStatus = status ?? task?.status ?? null;
   const displayResult = result !== undefined ? result : task?.result;
   const goal = task?.goal || navState.goal;
-  const terminal = ["completed", "failed", "cancelled", "terminated", "timeout"].includes(
-    (displayStatus || "").toLowerCase(),
+
+  const phase = useMemo(
+    () =>
+      derivePhaseView({
+        status: displayStatus,
+        pendingHitl,
+        result: displayResult,
+        rows,
+      }),
+    [displayStatus, pendingHitl, displayResult, rows],
   );
 
   if (!taskId) {
@@ -67,44 +72,39 @@ export function Engagement() {
           flexShrink: 0,
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "baseline",
-            justifyContent: "space-between",
-            gap: 12,
-          }}
-        >
-          <div style={{ minWidth: 0 }}>
-            <p style={{ margin: "0 0 4px", fontSize: 12 }}>
-              <Link to={paths.runs} style={{ color: "var(--text-muted)" }}>
-                Runs
-              </Link>
-              <span style={{ color: "var(--text-muted)" }}> · </span>
-              <span style={{ color: "var(--text-muted)" }}>
-                {formatStatus(displayStatus)}
-                {live ? " · live" : ""}
-              </span>
-            </p>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: 17,
-                fontWeight: 650,
-                letterSpacing: "-0.02em",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {goal || "Engagement"}
-            </h1>
-          </div>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ margin: "0 0 4px", fontSize: 12 }}>
+            <Link to={paths.runs} style={{ color: "var(--text-muted)" }}>
+              Runs
+            </Link>
+            <span style={{ color: "var(--text-muted)" }}> · </span>
+            <span style={{ color: "var(--text-muted)" }}>
+              {phase.label}
+              {live && !phase.terminal ? " · live" : ""}
+            </span>
+          </p>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: 17,
+              fontWeight: 650,
+              letterSpacing: "-0.02em",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {goal || "Engagement"}
+          </h1>
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-muted)" }}>
+            {phase.caption}
+          </p>
         </div>
         <EngagementFloor
           status={displayStatus}
           pendingHitl={pendingHitl}
           compact
+          captionOverride={null}
         />
       </header>
 
@@ -125,10 +125,11 @@ export function Engagement() {
         onHitlResolved={dismissHitl}
         localBubbles={localBubbles}
         live={live}
-        terminal={terminal}
+        status={displayStatus}
+        result={displayResult}
       />
 
-      {displayResult ? (
+      {phase.showDeliverable && displayResult ? (
         <div style={{ padding: "0 20px 12px", flexShrink: 0 }}>
           <ArtifactClimax result={displayResult} />
         </div>
@@ -136,7 +137,7 @@ export function Engagement() {
 
       <FollowUpComposer
         taskId={taskId}
-        disabled={terminal}
+        disabled={phase.terminal}
         onSent={(text) =>
           setLocalBubbles((prev) => [
             ...prev,

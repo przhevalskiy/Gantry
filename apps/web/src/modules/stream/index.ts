@@ -1,4 +1,6 @@
-/** Engagement messaging — synthesized story + builder chains + follow-up. */
+/** Engagement messaging — phase-aligned story + builder chains + follow-up. */
+export { derivePhaseView } from "./engagementPhase";
+export type { EngagementPhase, PhaseView } from "./engagementPhase";
 export { EngagementStory } from "./EngagementStory";
 export { FollowUpComposer } from "./FollowUpComposer";
 export { MessageThread } from "./MessageThread";
