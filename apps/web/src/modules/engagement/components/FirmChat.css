@@ -38,22 +38,22 @@
   padding-left: 4px;
 }
 
+/* Muse founding pattern: every message in a bubble (entity, not tool) */
 .firm-chat__bubble {
-  padding: 12px 16px;
-  border-radius: 18px;
-  background: white;
-  border: 1px solid rgba(139, 124, 246, 0.12);
-  color: var(--gray-800);
-  line-height: 1.5;
+  padding: 10px 14px;
+  border-radius: 18px 18px 18px 6px;
+  background: #ece8f6;
+  border: none;
+  color: var(--gray-900);
+  line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
-  box-shadow: 0 2px 10px rgba(72, 56, 112, 0.04);
 }
 
 .firm-chat__row--user .firm-chat__bubble {
-  background: var(--gray-900);
+  background: var(--accent-500);
   color: white;
-  border-color: transparent;
+  border-radius: 18px 18px 6px 18px;
 }
 
 .firm-chat__row--lifecycle .firm-chat__bubble {

@@ -1,0 +1,459 @@
+/* Muse / iMessage messaging architecture — no product tabs */
+
+.muse-msg {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  background: var(--shell-gradient, var(--shell-bg));
+}
+
+/* —— Threads (conversation list) —— */
+.muse-msg__threads {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid rgba(139, 124, 246, 0.14);
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(12px);
+}
+
+.muse-msg__threads-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 14px 12px;
+}
+
+.muse-msg__brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: -0.03em;
+}
+
+.muse-msg__brand-lockup img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.muse-msg__icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--gray-700);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.muse-msg__thread-list {
+  list-style: none;
+  overflow-y: auto;
+  padding: 4px 8px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.muse-msg__thread {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 14px;
+  color: inherit;
+}
+
+.muse-msg__thread:hover {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.muse-msg__thread.is-active {
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 1px 0 rgba(139, 124, 246, 0.08);
+}
+
+.muse-msg__thread-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: linear-gradient(160deg, #f7f4ff, #e4dcf8);
+  color: var(--accent-700);
+  font-size: 1rem;
+}
+
+.muse-msg__thread-avatar[data-kind='matter'] {
+  background: linear-gradient(160deg, #f3f4f6, #e8e0ff);
+  opacity: 0.92;
+}
+
+.muse-msg__thread-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.muse-msg__thread-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.muse-msg__thread-preview {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* —— Chat canvas —— */
+.muse-msg__chat {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.muse-msg__presence {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(139, 124, 246, 0.1);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(10px);
+}
+
+.muse-msg__back {
+  display: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 1.4rem;
+  color: var(--accent-700);
+  background: transparent;
+}
+
+.muse-msg__presence-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  color: inherit;
+  padding: 2px 4px;
+  border-radius: 12px;
+}
+
+.muse-msg__presence-main:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.muse-msg__presence-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.muse-msg__presence-copy strong {
+  font-size: 0.95rem;
+  letter-spacing: -0.02em;
+}
+
+.muse-msg__presence-copy span {
+  font-size: 0.78rem;
+  color: var(--gray-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.muse-msg__presence-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.muse-msg__presence-actions button {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(139, 124, 246, 0.14);
+}
+
+.muse-msg__stream {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.muse-msg__stream .firm-chat {
+  padding-top: 18px;
+}
+
+.muse-msg__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 32px 24px;
+  gap: 6px;
+  animation: muse-in 0.45s ease-out;
+}
+
+.muse-msg__empty-brand {
+  font-size: clamp(2.4rem, 6vw, 3.6rem);
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.muse-msg__empty-line {
+  color: var(--accent-700);
+  font-size: 1.15rem;
+  font-weight: 500;
+}
+
+.muse-msg__empty-hint {
+  max-width: 22rem;
+  color: var(--gray-600);
+  font-size: 0.95rem;
+  margin-top: 6px;
+  line-height: 1.45;
+}
+
+.muse-msg__error {
+  color: var(--color-error);
+  font-size: 0.85rem;
+  margin-top: 10px;
+}
+
+.muse-msg__error--inline {
+  margin: 12px 16px 0;
+}
+
+.muse-msg__composer-wrap {
+  border-top: 1px solid rgba(139, 124, 246, 0.1);
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(10px);
+}
+
+.muse-msg__composer-wrap .job-composer {
+  border-top: none;
+  background: transparent;
+  backdrop-filter: none;
+}
+
+.muse-msg__workspace-pill {
+  padding: 10px 16px 0;
+}
+
+.muse-msg__workspace-pill select {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(139, 124, 246, 0.18);
+  background: white;
+  color: var(--gray-700);
+}
+
+/* —— Sheets (Goals / Floor / Menu) — not tabs —— */
+.muse-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.muse-sheet__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(40, 30, 70, 0.28);
+  border: none;
+  cursor: pointer;
+}
+
+.muse-sheet__panel {
+  position: relative;
+  width: min(520px, 100%);
+  max-height: min(78vh, 720px);
+  background: #fff;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -12px 40px rgba(72, 56, 112, 0.18);
+  display: flex;
+  flex-direction: column;
+  animation: sheet-up 0.28s ease-out;
+  overflow: hidden;
+}
+
+.muse-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid rgba(139, 124, 246, 0.1);
+}
+
+.muse-sheet__head h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.muse-sheet__head button {
+  font-weight: 600;
+  color: var(--accent-700);
+  font-size: 0.95rem;
+}
+
+.muse-sheet__body {
+  overflow-y: auto;
+  padding: 12px 16px 28px;
+}
+
+.muse-sheet__body--floor {
+  padding: 0;
+}
+
+.muse-sheet__body--floor .eng-floor {
+  border: none;
+  background: transparent;
+}
+
+.muse-sheet__lead {
+  font-size: 0.9rem;
+  color: var(--gray-600);
+  margin-bottom: 12px;
+}
+
+.muse-sheet__section {
+  margin-bottom: 18px;
+}
+
+.muse-sheet__section h3 {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--gray-500);
+  margin-bottom: 8px;
+}
+
+.muse-sheet__list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.muse-sheet__list button,
+.muse-sheet__static {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  padding: 12px 12px;
+  border-radius: 12px;
+  background: var(--gray-50);
+  color: inherit;
+}
+
+.muse-sheet__list button:hover {
+  background: var(--accent-50);
+}
+
+.muse-sheet__list strong {
+  font-size: 0.92rem;
+}
+
+.muse-sheet__list span {
+  font-size: 0.78rem;
+  color: var(--gray-500);
+}
+
+.muse-sheet__empty {
+  color: var(--gray-500);
+  font-size: 0.9rem;
+  padding: 8px 4px;
+}
+
+.muse-sheet__signout {
+  margin-top: 8px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 999px;
+  background: var(--gray-100);
+  font-weight: 600;
+  color: var(--gray-700);
+}
+
+@keyframes muse-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0.85;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@media (max-width: 840px) {
+  .muse-msg {
+    grid-template-columns: 1fr;
+  }
+
+  .muse-msg__threads {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    width: 100%;
+    transform: translateX(-105%);
+    transition: transform 0.25s ease;
+  }
+
+  .muse-msg__threads.is-open {
+    transform: none;
+  }
+
+  .muse-msg__back {
+    display: grid;
+    place-items: center;
+  }
+}

@@ -70,38 +70,45 @@ Default experiential tier: **L5 / Full Crew** in the UI story (even when user pi
 
 ---
 
-## Information architecture
+## Information architecture (Muse / iMessage — not tabs)
 
-| Route | Name | Purpose |
-|-------|------|---------|
-| `/` | **Home** | Muse-like open: Foreman presence, composer, ideas from practices/briefs, active matters |
-| `/jobs/:id` | **Engagement** | Primary Muse theater: thread + floor + artifact + HITL |
-| `/jobs` | **Matters** | Goals-tab analogue — all durable jobs |
-| `/practices` | **Practices** | Firm packs |
-| `/briefs` | **Briefs** | Playbooks |
-| `/people` | **People** | Operator directory (firm handbook) |
-| `/workspaces` | **Workspaces** | Repos |
-| `/develop` | **API** | Integrator docs |
+**Lock:** The product is a **messaging app**. There is **no product tab bar** (no Home / Matters / Practices / Briefs nav).
 
-Chat is not a separate product mode — **Engagement is chat-shaped**. Home is where you start talking to the firm.
+| Surface | Role |
+|---------|------|
+| **Thread list** | Main firm chat + matter **side chats** (iMessage conversation list) |
+| **Chat canvas** | Message bubbles + Foreman presence header + composer |
+| **Goals sheet** | Matters list — Muse Goals analogue, opened from chat chrome |
+| **Floor sheet** | Operator roster + artifact dock — presence detail, not a page |
+| **Menu sheet** | Practices / briefs / workspaces / sign-out — settings, not destinations |
+
+| Route | Purpose |
+|-------|---------|
+| `/` | Firm main chat (empty state + composer to file) |
+| `/c/:jobId` | Matter side-chat (engagement stream) |
+
+Secondary firm data never becomes top-level tabs.
 
 ---
 
-## Primary composition (Engagement)
+## Primary composition (messaging)
 
-Muse’s lesson: conversation + identity presence + goals/artifacts/HITL. Gantry’s lesson: show the L5 floor.
+Muse’s lesson: **feel like iMessage** — bubbles, presence under avatar, goals as a sheet, not an AI dashboard.  
+Gantry’s lesson: L5 Operators appear via **Floor sheet / presence**, not a console rail.
 
 ```
-┌──────────────────────────────────────────┬────────────────────┐
-│  Engagement thread (Muse-like)           │  Floor (L5)        │
-│  · Foreman / firm turns                  │  Operator portraits│
-│  · Operator-attributed log lines         │  plan order        │
-│  · HITL cards inline                     │  presence snippet  │
-│  · Artifact cards inline + pin           │  tap → activity    │
-│  · Composer (interrupt / amend / @job)   │                    │
-├──────────────────────────────────────────┤  Artifact dock     │
-│  Stage (optional split): diff / preview  │  PR·branch·report  │
-└──────────────────────────────────────────┴────────────────────┘
+┌─────────────────┬──────────────────────────────────────┐
+│ Threads         │  ◆ Foreman    snippet: “Inspector…”  │
+│ · Gantry (main) │  Goals · Floor                       │
+│ · Matter A      ├──────────────────────────────────────┤
+│ · Matter B      │  [bubble] you                        │
+│                 │  [bubble] Foreman / Operators        │
+│                 │  [HITL card]                         │
+│                 │  [artifact card]                     │
+│                 ├──────────────────────────────────────┤
+│                 │  Message the firm…           [Send]  │
+└─────────────────┴──────────────────────────────────────┘
+         sheets ↑ Goals / Floor / Menu (not tabs)
 ```
 
 ### Interaction model
@@ -167,12 +174,12 @@ Atomic unit of the feed: **EngagementEvent** (may render as bubble). Not `ChatMe
 
 | Phase | Ship |
 |-------|------|
-| **G0** | Home composer + Engagement (thread + Floor + HITL cards + artifact) on real `/v1/tasks` — **landed** (legacy FE dropped) |
-| **G1** | Matters list, Practices, Briefs, People, Workspaces — **landed** (SSE proactive polish ongoing) |
+| **G0** | Muse messaging shell (threads + chat bubbles + presence + HITL/artifact) on `/v1/tasks` — **landed** |
+| **G1** | Goals / Floor / Menu sheets (matters, practices, briefs, workspaces) — **landed** |
 | **G2** | Stage (diff/preview), Operator portrait kit v1, presence polish |
 | **G3** | Ideas (playbook/pack suggestions), org Foreman styling within kit |
 
-**Layout lock:** Muse-like L5 engagement theater (thread + floor + cards + artifact) — **not** a job console / ops sidebar.
+**Layout lock:** Muse / **iMessage architecture** — conversation list + bubble chat + presence header + sheets. **Not** a tabbed web app. **Not** a job console.
 
 ---
 

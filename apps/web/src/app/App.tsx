@@ -1,15 +1,8 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthGate, useAuthStore } from '@/modules/kernel';
-import { FirmShell } from './FirmShell';
-import { HomePage } from './pages/HomePage';
-import { EngagementPage } from './pages/EngagementPage';
-import { MattersPage } from './pages/MattersPage';
-import { PracticesPage } from './pages/PracticesPage';
-import { BriefsPage } from './pages/BriefsPage';
-import { PeoplePage } from './pages/PeoplePage';
-import { WorkspacesPage } from './pages/WorkspacesPage';
-import { DevelopPage } from './pages/DevelopPage';
+import { MuseShell } from './MuseShell';
+import { MessagingPage } from './pages/MessagingPage';
 import './App.css';
 
 export default function App() {
@@ -30,23 +23,25 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={<FirmShell />}>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/jobs" element={<MattersPage />} />
-          <Route path="/jobs/:jobId" element={<EngagementPage />} />
-          <Route path="/practices" element={<PracticesPage />} />
-          <Route path="/briefs" element={<BriefsPage />} />
-          <Route path="/people" element={<PeoplePage />} />
-          <Route path="/workspaces" element={<WorkspacesPage />} />
-          <Route path="/develop" element={<DevelopPage />} />
-          {/* Legacy redirects — old frontend dropped */}
-          <Route path="/runs/*" element={<Navigate to="/jobs" replace />} />
-          <Route path="/packs" element={<Navigate to="/practices" replace />} />
-          <Route path="/agents" element={<Navigate to="/people" replace />} />
-          <Route path="/starters" element={<Navigate to="/briefs" replace />} />
-          <Route path="/templates" element={<Navigate to="/briefs" replace />} />
+        <Route element={<MuseShell />}>
+          {/* Single messaging surface — Muse / iMessage architecture */}
+          <Route path="/" element={<MessagingPage />} />
+          <Route path="/c/:jobId" element={<MessagingPage />} />
+          <Route path="/jobs/:jobId" element={<MessagingPage />} />
+          {/* Old tab IA → messaging */}
+          <Route path="/jobs" element={<Navigate to="/" replace />} />
+          <Route path="/practices" element={<Navigate to="/" replace />} />
+          <Route path="/briefs" element={<Navigate to="/" replace />} />
+          <Route path="/people" element={<Navigate to="/" replace />} />
+          <Route path="/workspaces" element={<Navigate to="/" replace />} />
+          <Route path="/develop" element={<Navigate to="/" replace />} />
+          <Route path="/runs/*" element={<Navigate to="/" replace />} />
+          <Route path="/packs" element={<Navigate to="/" replace />} />
+          <Route path="/agents" element={<Navigate to="/" replace />} />
+          <Route path="/starters" element={<Navigate to="/" replace />} />
+          <Route path="/templates" element={<Navigate to="/" replace />} />
           <Route path="/chat/*" element={<Navigate to="/" replace />} />
-          <Route path="/developer" element={<Navigate to="/develop" replace />} />
+          <Route path="/developer" element={<Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

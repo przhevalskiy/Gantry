@@ -32,9 +32,12 @@ Brand (firm) + Design kit (Operators) + Muse-like engagement
 | **Kernel** | Auth, HTTP, SSE normalize, shell tokens, invariants | Product copy as SoR |
 | **API** | Tasks, playbooks, packs, HITL, artifacts, agents | Browser shadow factory |
 
+**Shell lock (Muse architecture):** iMessage-style messaging — thread list + chat canvas + sheets.  
+**Forbidden:** product tab bars (Home / Matters / Practices / Briefs / People as primary nav).
+
 One line:
 
-> Modules compose a Muse-grade engagement theater; the backend remains the only factory.
+> Modules compose a Muse-grade messaging surface; the backend remains the only factory.
 
 ---
 
@@ -261,30 +264,21 @@ Legacy `features/*` has been **removed**. All surfaces import from `@/modules/*`
 
 ---
 
-## 5. Page composition (greenfield IA)
+## 5. Page composition (Muse messaging IA)
 
-Pages are thin assemblers — not domain owners.
+One assembler owns the product chrome — **no tab destinations**.
 
 | Route | Assembler | Modules |
 |-------|-----------|---------|
-| `/` | HomePage | `home`, `operators`, `matters` |
-| `/jobs/:id` | EngagementPage | `engagement`, `operators`, `hitl`, `artifacts`, `stage` |
-| `/jobs` | MattersPage | `matters` |
-| `/practices` | PracticesPage | `practices` |
-| `/briefs` | BriefsPage | `briefs` |
-| `/people` | PeoplePage | `operators` |
-| `/workspaces` | WorkspacesPage | `workspaces` |
-| `/develop` | DeveloperPage | docs only (legacy ok) |
+| `/`, `/c/:jobId` | `MessagingPage` | `engagement`, `operators`, `hitl`, `artifacts`, `matters`, `practices`, `briefs`, `workspaces` |
 
-### Engagement composition (canonical)
+### Messaging composition (canonical)
 
 ```
-┌─ engagement.FirmChat ───────────────────┬─ operators.EngagementFloor ─┐
-│  EngagementEvent stream                 │  portraits · presence         │
-│  hitl.HitlCard inline                   │  tap → ActivitySheet          │
-│  artifacts.ArtifactCard inline          ├─ artifacts.ArtifactDock ──────┤
-│  JobComposer (followup / amend)         │  PR · branch · patch · report │
-├─ stage.StagePane (optional) ────────────┴───────────────────────────────┘
+┌─ Threads ───────┬─ presence (Foreman + snippet) · Goals · Floor ─┐
+│ firm + matters  ├─ FirmChat (bubbles · HITL · artifact cards) ───┤
+│                 ├─ JobComposer ───────────────────────────────────┤
+└─────────────────┴─ sheets: Goals / Floor / Menu (not tabs) ──────┘
 ```
 
 ---
@@ -294,7 +288,7 @@ Pages are thin assemblers — not domain owners.
 | Concern | Location | Rule |
 |---------|----------|------|
 | Tokens | `design/tokens.css` | CSS variables only; no new hardcoded brand hex in modules |
-| Shell | `kernel` + existing layout | Soft firm atmosphere; wordmark hero on Home |
+| Shell | `MuseShell` + `MessagingPage` | iMessage layout; soft firm atmosphere |
 | Type | Albert Sans (+ restrained display) | No Inter/Roboto/system as brand face |
 | Motion | module-owned, few | Presence on, HITL hold, artifact land (greenfield § Visual) |
 | Cards | HITL + interactive only | No decorative card grids in hero |
@@ -306,10 +300,10 @@ Greenfield shell invariants (extend, don’t silently contradict `design/shellIn
 |-----|------|
 | `client` | Thin client of `/v1/*` — I8 |
 | `factory` | One `swarm-factory` — no bot marketplace UI |
-| `engagement` | Chat-shaped theater; domain model is EngagementEvent + Matter |
-| `identity` | Foreman + Operator portraits; no companion-pet product |
-| `climax` | Structured artifact from API `result` |
-| `ia` | Home · Jobs · Matters · Practices · Briefs · People · Workspaces · Develop |
+| `engagement` | Messaging bubbles; domain model is EngagementEvent + Matter |
+| `identity` | Foreman presence in chat header; Floor sheet for Operators |
+| `climax` | Structured artifact from API `result` (in-thread + sheet) |
+| `ia` | Thread list + chat canvas; Goals/Floor/Menu as sheets — **no product tabs** |
 
 ---
 
@@ -347,13 +341,12 @@ User action (composer / HITL / install pack)
 
 | Area | Status |
 |------|--------|
-| Home / Engagement / Matters / Practices / Briefs / People / Workspaces / Develop | **Shipped (G0/G1 shell)** |
-| Operator portraits (CSS kit v0) + Floor + HITL cards + Artifact dock | **Shipped** |
+| Muse messaging shell (threads + chat + sheets; **no tab bar**) | **Shipped** |
+| Operator portraits (CSS kit v0) + Floor sheet + HITL + Artifact in-thread | **Shipped** |
 | Real `/v1/tasks` submit, SSE, HITL, packs, playbooks, agents, workspaces | **Wired** |
 | Stage (diff/preview) | **Stub module** — G2 |
 | Portrait art kit v1 / presence polish | **G2** |
-| Legacy `features/*` chat/IDE/console | **Deleted** |
-| Legacy routes (`/runs`, `/packs`, `/chat`, …) | Redirect to greenfield IA |
+| Legacy `features/*` + tabbed FirmShell | **Deleted** |
 
 ---
 
@@ -384,7 +377,7 @@ User action (composer / HITL / install pack)
 - [x] This document  
 - [x] `apps/web/src/modules/*` barrels + domain READMEs  
 - [x] Links from brand greenfield + brand README + crew roadmap  
-- [x] G0/G1 page assemblers + FirmShell (legacy frontend dropped)  
+- [x] Muse messaging shell (`MessagingPage`) — no product tabs  
 - [ ] Stage / portrait kit v1 (G2)  
 - [ ] ESLint boundary rule (`modules/*` public barrel only) — follow-up  
 
