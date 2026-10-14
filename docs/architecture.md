@@ -63,7 +63,7 @@ scripts/             migrate, release_gate, stubs
 tests/               Contract + unit tests
 ```
 
-Removed / non-product: `apps/web` (deleted), legacy `ui/`, root demo SPA, Vercel UI deploy scripts.
+Optional client: `apps/web` (greenfield scaffold — [`platform/frontend-structure.md`](./platform/frontend-structure.md)). Removed: legacy `ui/`, root demo SPA, Vercel UI deploy scripts.
 
 ---
 

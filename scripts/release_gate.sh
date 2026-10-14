@@ -41,8 +41,15 @@ rg "agentName: swarm-factory" deploy/helm/gantry/values.yaml >/dev/null
 echo "==> invariant: legacy ui/ removed"
 test ! -d ui
 
-echo "==> invariant: apps/web not in-tree (API-first)"
-test ! -d apps/web
+echo "==> invariant: FE scaffold present (optional client)"
+test -f apps/web/package.json
+test -f apps/web/src/App.tsx
+test -f docs/platform/frontend-structure.md
+# Refuse bot-deploy landing copy in scaffold
+if rg -n "Deploy your agent|bot marketplace" apps/web/src >/dev/null 2>&1; then
+  echo "FAIL: forbidden bot-deploy copy in apps/web/src"
+  exit 1
+fi
 
 echo "==> invariant: no Vercel UI deploy scripts"
 test ! -f deploy/vercel-deploy.sh
@@ -56,12 +63,12 @@ test -f docs/use-cases.md
 test -f docs/api.md
 test -f docs/deep-dives/swarm-factory.md
 
-echo "==> invariant: DEPLOYMENT is API-first (no apps/web root)"
+echo "==> invariant: DEPLOYMENT stays API-primary (no Vercel SPA root)"
 if rg -n "Root Directory.*apps/web|apps/web.*Vercel|Vercel.*apps/web" DEPLOYMENT.md >/dev/null 2>&1; then
-  echo "FAIL: DEPLOYMENT.md still references apps/web / Vercel UI"
+  echo "FAIL: DEPLOYMENT.md still references Vercel UI root"
   exit 1
 fi
-rg -n "no in-repo static UI|API \+ worker" DEPLOYMENT.md >/dev/null
+rg -n "API \+ worker|no in-repo static UI|optional client" DEPLOYMENT.md >/dev/null
 
 echo "==> CORS config tests"
 .venv/bin/python -m pytest tests/test_cors_config.py -q

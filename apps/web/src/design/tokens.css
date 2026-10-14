@@ -1,0 +1,45 @@
+:root {
+  /* Shell — calm retained firm (brand/voice-and-look) */
+  --shell-bg: #f3f0f8;
+  --shell-gradient: linear-gradient(
+    165deg,
+    #f7f4fb 0%,
+    #ebe4f7 42%,
+    #e8eef8 100%
+  );
+  --atmosphere-sky: linear-gradient(
+    180deg,
+    #f6c9a8 0%,
+    #e8b4c8 28%,
+    #c9b8e8 55%,
+    #a8c4e8 78%,
+    #dfe8f4 100%
+  );
+
+  --panel-bg: #ffffff;
+  --panel-radius: 18px;
+  --panel-shadow: 0 10px 40px rgba(88, 70, 140, 0.08);
+
+  --sidebar-bg: rgba(248, 246, 252, 0.92);
+  --sidebar-width: 248px;
+  --sidebar-border: rgba(120, 100, 160, 0.08);
+
+  --text-primary: #111827;
+  --text-secondary: #5b5670;
+  --text-muted: #8b849c;
+
+  --accent-400: #a78bfa;
+  --accent-500: #8b7cf6;
+  --accent-600: #7c6cf0;
+
+  --cta-primary-bg: #111827;
+  --cta-primary-fg: #ffffff;
+
+  --border-subtle: rgba(17, 24, 39, 0.08);
+  --nav-active-bg: rgba(139, 124, 246, 0.12);
+
+  --font-sans: "Albert Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Albert Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --composer-height: 56px;
+}

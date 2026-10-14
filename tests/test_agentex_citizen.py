@@ -172,7 +172,8 @@ def test_sdk_and_docs_surfaces():
     assert "/v1/agents" in api_md
     assert "/hitl" in api_md
     assert not (ROOT / "ui").exists(), "legacy ui/ removed"
-    assert not (ROOT / "apps" / "web").exists(), "apps/web removed — API-first"
+    assert (ROOT / "apps" / "web" / "package.json").is_file(), "FE scaffold expected"
+    assert (ROOT / "docs" / "platform" / "frontend-structure.md").is_file()
     assert (ROOT / "docs" / "architecture.md").is_file()
     assert (ROOT / "docs" / "platform.md").is_file()
     assert "SSE" in api_md or "/events" in api_md

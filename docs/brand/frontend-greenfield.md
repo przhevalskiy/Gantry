@@ -14,9 +14,9 @@
 |-------|--------|
 | **Backend** | In place — `/v1/*`, Temporal Foreman, firm packs, HITL, SSE, structured `result` |
 | **Brand strategy + guidelines** | In place — firm persona, voice/look, Operator identity, Muse research |
-| **`apps/web`** | **Removed** — no product UI in-tree |
+| **`apps/web`** | **Scaffolded** — shell + stub routes; see [`../platform/frontend-structure.md`](../platform/frontend-structure.md) |
 
-Do not resurrect the deleted console/messaging shells. Next frontend work starts empty and ships incrementally against the API + brand docs.
+Do not resurrect deleted console/messaging shells. Ship incrementally against API + brand; wireframe geometry only (no Agent deploy / bot marketplace IA).
 
 ---
 

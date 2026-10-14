@@ -156,9 +156,9 @@ def phase3_docs() -> None:
         path = os.path.join(ROOT, *rel.split("/"))
         report.add("D-" + rel, "docs present", "PASS" if os.path.isfile(path) else "FAIL")
     report.add(
-        "D-no-web",
-        "apps/web absent",
-        "PASS" if not os.path.isdir(os.path.join(ROOT, "apps", "web")) else "FAIL",
+        "D-fe-scaffold",
+        "apps/web scaffold present",
+        "PASS" if os.path.isfile(os.path.join(ROOT, "apps", "web", "package.json")) else "FAIL",
     )
 
 

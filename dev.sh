@@ -9,7 +9,7 @@
 #   2. Starts Temporal dev server if not running (:7233)
 #   3. Starts the swarm-factory agent (ACP :8000 + Temporal worker)
 #   4. Starts the Gantry API (:8001)
-#   5. (UI removed — apps/web not in-tree)
+#   5. Optional: apps/web Vite client (:5173) — not auto-started
 #
 # Usage:
 #   ./dev.sh               Start all services

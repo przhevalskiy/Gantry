@@ -1,6 +1,6 @@
 # Gantry — Deployment (API + worker)
 
-Production surface is the **Gantry API + Temporal worker** on a VPS (or cluster), talking to an **Agentex** stack (Temporal / Redis / Agentex DB). There is **no in-repo static UI** and no third-party SPA hosting for a product frontend.
+Production surface is the **Gantry API + Temporal worker** on a VPS (or cluster), talking to an **Agentex** stack (Temporal / Redis / Agentex DB). Optional browser client: `apps/web` (greenfield scaffold) — not required for core ops; no Vercel-as-product-root path.
 
 Architecture: [`docs/architecture.md`](docs/architecture.md) · Cluster join: [`docs/platform/agentex-cluster.md`](docs/platform/agentex-cluster.md)
 
@@ -79,8 +79,8 @@ bash scripts/release_gate.sh   # from a filled venv
 
 ---
 
-## 7. What not to deploy from this repo
+## 7. Optional client + what not to do
 
-- No static SPA root directory in this repository
+- `apps/web` is an optional Vite client of `/v1/*` only (I8) — see `docs/platform/frontend-structure.md`
 - No Next.js (or other) reverse-proxy in front of `/v1`
-- UI, when rebuilt, is a separate optional client of `https://api.<domain>/v1/*` only (I8)
+- Do not treat a third-party SPA host as the product core; API + worker remain primary
