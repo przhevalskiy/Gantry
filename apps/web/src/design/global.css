@@ -61,3 +61,23 @@ button {
 .spin {
   animation: gantry-spin 0.8s linear infinite;
 }
+
+@keyframes floor-breathe {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.06);
+  }
+}
+
+@keyframes floor-hold {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.04);
+  }
+}

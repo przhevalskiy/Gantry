@@ -78,6 +78,47 @@ export interface AgentSeat {
   role: string;
   description?: string;
   level?: string;
+  workflow?: string;
+  entrypoint?: string;
+  acp_name?: string;
+  tools?: string[];
+}
+
+export interface AgentsCatalog {
+  acp_agent: string;
+  orchestration?: string;
+  product?: {
+    model?: string;
+    summary?: string;
+    artifacts?: string[];
+  };
+  agents: AgentSeat[];
+}
+
+export interface FirmPack {
+  pack_id: string;
+  version: string;
+  ref: string;
+  label: string;
+  description?: string | null;
+  roles?: string[];
+  playbooks?: string[];
+  default_playbook?: string | null;
+  enabled?: boolean;
+  installed?: boolean;
+  auto_enabled?: boolean;
+  max_tasks_per_day?: number;
+}
+
+export interface PlaybookBrief {
+  id: string;
+  slug?: string;
+  label: string;
+  description?: string | null;
+  org_id?: string;
+  is_system?: boolean;
+  config?: Record<string, unknown>;
+  workspace_id?: string | null;
 }
 
 /** SSE payloads from GET /v1/tasks/{id}/events — docs/platform/sse-events.md */

@@ -65,8 +65,10 @@ apps/web/
     │   ├── composer/         # work-order input + suggestion chips
     │   │   ├── Composer.tsx
     │   │   └── SuggestionChips.tsx
-    │   ├── engagement-floor/ # Operator portraits (later)
-    │   │   └── index.ts
+    │   ├── engagement-floor/ # Operator roster rail (slice 4)
+    │   │   ├── index.ts
+    │   │   ├── EngagementFloor.tsx
+    │   │   └── OperatorPortrait.tsx
     │   ├── stream/           # SSE timeline (slice 2)
     │   │   ├── index.ts
     │   │   ├── StreamTimeline.tsx
@@ -75,8 +77,9 @@ apps/web/
     │   │   ├── index.ts
     │   │   ├── HitlCard.tsx
     │   │   └── HitlPanel.tsx
-    │   └── artifacts/        # deliverable climax (later)
-    │       └── index.ts
+    │   └── artifacts/        # deliverable climax (slice 6)
+    │       ├── index.ts
+    │       └── ArtifactClimax.tsx
     └── services/
         └── gantry/
             ├── client.ts     # thin /v1 fetch (no orchestration)
@@ -91,11 +94,11 @@ apps/web/
 |------|--------|--------------|
 | `/` | ComposeHome — firm greeting + composer | **Slice 1 wired** — project pick + `POST /v1/tasks` |
 | `/runs` | Runs list | Stub |
-| `/runs/:taskId` | Engagement (messaging + floor + HITL) | **Slice 3 wired** — SSE timeline + HITL cards → `POST …/hitl` |
-| `/practices` | Firm packs | Stub |
-| `/team` | Operators | Stub |
-| `/briefs` | Playbooks | Stub |
-| `/projects` | Projects / workspaces | Stub |
+| `/runs/:taskId` | Engagement (messaging + floor + HITL) | **Slices 2–6** — SSE + HITL + floor + artifact climax |
+| `/practices` | Firm packs | **Slice 5** — `GET /v1/packs` |
+| `/team` | Operators | **Slice 5** — `GET /v1/agents` + portraits |
+| `/briefs` | Playbooks | **Slice 5** — `GET /v1/playbooks` |
+| `/projects` | Projects / workspaces | Stub (composer picker already lists/creates) |
 
 ---
 
@@ -111,7 +114,9 @@ apps/web/
 
 ## What this scaffold explicitly does **not** include
 
-- Floor portraits / artifact climax / catalog wiring (later slices)
+- Full portrait art kit (`operator-portraits@1`) — CSS silhouette shells for now
+- Runs list / Projects page full CRUD beyond composer picker
+- Auth/billing beyond API key field
 - Operator portrait art kit
 - Auth/billing (“Free plan”) beyond placeholder chrome
 - Messenger deploy / Skills marketplace / Plugins nav
@@ -124,8 +129,8 @@ apps/web/
 1. ~~ComposeHome + `POST /v1/tasks` submit~~ **done** (auth key field, project picker, navigate to engagement)  
 2. ~~Engagement thread + `GET …/events` SSE~~ **done** (typed stream client + timeline)  
 3. ~~HITL cards → `POST …/hitl`~~ **done** (deterministic approve/reject cards)  
-4. Engagement floor portraits  
-5. Practices / Team / Briefs read-only catalogs  
-6. Artifact climax from `result`
+4. ~~Engagement floor portraits~~ **done** (CSS silhouette roster + presence)  
+5. ~~Practices / Team / Briefs read-only catalogs~~ **done**  
+6. ~~Artifact climax from `result`~~ **done**
 
 Every slice talks only to `/v1/*` (I8).

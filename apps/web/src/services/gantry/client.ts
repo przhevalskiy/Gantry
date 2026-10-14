@@ -6,8 +6,11 @@
 import { getApiKey } from "./auth";
 import {
   GantryApiError,
+  type AgentsCatalog,
+  type FirmPack,
   type HitlDecideBody,
   type HitlDecideResponse,
+  type PlaybookBrief,
   type Project,
   type SubmitTaskBody,
   type SubmitTaskResponse,
@@ -115,6 +118,26 @@ export async function decideHitl(
     body: JSON.stringify(body),
   });
   return expectOk<HitlDecideResponse>(res);
+}
+
+/** GET /v1/agents — Operator directory (Temporal seats; one ACP swarm-factory). */
+export async function listAgents(): Promise<AgentsCatalog> {
+  const res = await gantryFetch("/v1/agents");
+  return expectOk<AgentsCatalog>(res);
+}
+
+/** GET /v1/packs — firm practices catalog. */
+export async function listPacks(): Promise<FirmPack[]> {
+  const res = await gantryFetch("/v1/packs");
+  const data = await expectOk<{ packs: FirmPack[] }>(res);
+  return data.packs ?? [];
+}
+
+/** GET /v1/playbooks — engagement briefs. */
+export async function listPlaybooks(): Promise<PlaybookBrief[]> {
+  const res = await gantryFetch("/v1/playbooks");
+  const data = await expectOk<{ playbooks: PlaybookBrief[] }>(res);
+  return data.playbooks ?? [];
 }
 
 /**

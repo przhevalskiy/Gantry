@@ -1,9 +1,11 @@
 import { Link, useLocation, useParams } from "react-router-dom";
 import { paths } from "../lib/paths";
+import { ArtifactClimax } from "../modules/artifacts";
+import { EngagementFloor } from "../modules/engagement-floor";
 import { HitlPanel } from "../modules/hitl";
 import { StreamTimeline, useTaskEventStream } from "../modules/stream";
 
-/** Active matter — GET task + SSE timeline + HITL cards. */
+/** Active matter — floor + SSE + HITL + artifact climax. */
 export function Engagement() {
   const { taskId } = useParams();
   const location = useLocation();
@@ -26,7 +28,7 @@ export function Engagement() {
   const projectId = task?.project_id || navState.project_id;
 
   return (
-    <div style={{ padding: "48px 32px 32px", maxWidth: 720 }}>
+    <div style={{ padding: "48px 32px 32px", maxWidth: 800 }}>
       <p style={{ margin: "0 0 8px", fontSize: 13 }}>
         <Link to={paths.runs} style={{ color: "var(--text-muted)" }}>
           Runs
@@ -45,8 +47,7 @@ export function Engagement() {
         Engagement
       </h1>
       <p style={{ margin: "0 0 20px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
-        Stream + partner approvals via{" "}
-        <code style={{ fontSize: 12 }}>/v1/tasks/{"{id}"}</code>
+        Staffed floor, live stream, partner approvals
         {live ? (
           <span style={{ marginLeft: 8, color: "var(--text-muted)", fontSize: 12 }}>
             · live
@@ -61,6 +62,8 @@ export function Engagement() {
       {streamError ? (
         <p style={{ color: "#b45309", fontSize: 13, marginBottom: 16 }}>{streamError}</p>
       ) : null}
+
+      <EngagementFloor status={displayStatus} pendingHitl={pendingHitl} />
 
       <section style={{ marginBottom: 28 }}>
         <dl
@@ -140,33 +143,7 @@ export function Engagement() {
         <StreamTimeline rows={rows} live={live} />
       </section>
 
-      {displayResult ? (
-        <section>
-          <h2
-            style={{
-              margin: "0 0 12px",
-              fontSize: 13,
-              fontWeight: 650,
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
-              color: "var(--text-muted)",
-            }}
-          >
-            Result
-          </h2>
-          <pre
-            style={{
-              margin: 0,
-              fontSize: 12,
-              whiteSpace: "pre-wrap",
-              color: "var(--text-secondary)",
-              lineHeight: 1.45,
-            }}
-          >
-            {JSON.stringify(displayResult, null, 2)}
-          </pre>
-        </section>
-      ) : null}
+      {displayResult ? <ArtifactClimax result={displayResult} /> : null}
     </div>
   );
 }

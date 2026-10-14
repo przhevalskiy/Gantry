@@ -63,4 +63,6 @@ Detailed IA and module names from the withdrawn greenfield attempt are **non-bin
 - [x] ComposeHome → `POST /v1/tasks` (slice 1)  
 - [x] Engagement SSE `GET …/events` (slice 2)  
 - [x] HITL cards → `POST …/hitl` (slice 3)  
-- [ ] Next: engagement floor + catalogs + artifact climax
+- [x] Engagement floor roster (slice 4)  
+- [x] Practices / Team / Briefs catalogs (slice 5)  
+- [x] Artifact climax from `result` (slice 6)

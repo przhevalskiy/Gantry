@@ -55,4 +55,9 @@
   --input-padding-block: 0.5rem;
   --input-control-size: 2rem;
   --icon-size: 1rem;
+
+  /* Engagement floor presence fields */
+  --floor-active: rgba(139, 124, 246, 0.35);
+  --floor-blocked: rgba(217, 119, 6, 0.4);
+  --floor-done: rgba(16, 185, 129, 0.28);
 }
