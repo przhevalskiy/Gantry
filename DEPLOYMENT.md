@@ -1,6 +1,6 @@
 # Gantry — Deployment (API + worker)
 
-Production surface is the **Gantry API + Temporal worker** on a VPS (or cluster), talking to an **Agentex** stack (Temporal / Redis / Agentex DB). Optional browser client: `apps/web` (greenfield scaffold) — not required for core ops; no Vercel-as-product-root path.
+Production surface is the **Gantry API + Temporal worker** on a VPS (or cluster), talking to an **Agentex** stack (Temporal / Redis / Agentex DB). Optional browser client lives under `apps/web` (greenfield scaffold) and is not required for core ops.
 
 Architecture: [`docs/architecture.md`](docs/architecture.md) · Cluster join: [`docs/platform/agentex-cluster.md`](docs/platform/agentex-cluster.md)
 
