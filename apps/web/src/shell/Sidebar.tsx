@@ -1,20 +1,22 @@
 import { FolderPlus, Hexagon } from "lucide-react";
+import type { CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { paths } from "../lib/paths";
 import { SidebarNav } from "./SidebarNav";
 import { UserChip } from "./UserChip";
 
-export function Sidebar() {
+export function Sidebar({ style }: { style?: CSSProperties }) {
   return (
     <aside
+      className="sidebar-pane"
       style={{
         width: "var(--sidebar-width)",
         flexShrink: 0,
         display: "flex",
         flexDirection: "column",
         background: "var(--sidebar-bg)",
-        borderRight: "1px solid var(--sidebar-border)",
         backdropFilter: "blur(12px)",
+        ...style,
       }}
     >
       <div
