@@ -45,15 +45,9 @@ button {
   outline-offset: 2px;
 }
 
-/* All text inputs share the 2rem bar height contract */
-input[type="text"],
-input:not([type]),
-input[type="search"],
-input[type="email"],
-input[type="password"],
+/* Input bars share the 2rem inline padding contract */
 .input-bar {
-  height: var(--input-height);
-  min-height: var(--input-height);
-  max-height: var(--input-height);
+  padding-inline: var(--input-padding-inline);
+  padding-block: var(--input-padding-block);
   box-sizing: border-box;
 }

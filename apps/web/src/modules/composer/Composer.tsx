@@ -3,7 +3,8 @@ import { useState, type FormEvent } from "react";
 
 /**
  * Work-order composer (wireframe input bar).
- * Height locked to --input-height (2rem). Submit wiring lands in a later slice.
+ * Inline padding locked to 2rem; vertical padding restored for chrome.
+ * Submit wiring lands in a later slice.
  */
 export function Composer({
   value,
@@ -33,21 +34,16 @@ export function Composer({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 8,
-          height: "var(--input-height)",
-          minHeight: "var(--input-height)",
-          maxHeight: "var(--input-height)",
-          padding: "0 6px 0 10px",
+          gap: 12,
           borderRadius: 999,
           background: "var(--panel-bg)",
           boxShadow: "var(--panel-shadow)",
           border: "1px solid var(--border-subtle)",
-          boxSizing: "border-box",
         }}
       >
         <Plus
           aria-hidden
-          size={16}
+          size={18}
           strokeWidth={1.75}
           style={{ flexShrink: 0, color: "var(--text-muted)" }}
         />
@@ -58,39 +54,39 @@ export function Composer({
           aria-label="Work order goal"
           style={{
             flex: 1,
-            height: "100%",
             border: "none",
             outline: "none",
             background: "transparent",
-            fontSize: 13,
-            lineHeight: 1,
+            fontSize: 15,
+            lineHeight: 1.4,
             padding: 0,
             minWidth: 0,
+            height: "auto",
           }}
         />
         <span
           style={{
             display: "inline-flex",
             alignItems: "center",
-            gap: 4,
-            height: "calc(var(--input-height) - 6px)",
-            fontSize: 11,
+            gap: 6,
+            height: "var(--input-control-size)",
+            fontSize: 12,
             color: "var(--text-muted)",
-            padding: "0 8px",
+            padding: "0 10px",
             borderRadius: 999,
             background: "var(--shell-bg)",
             flexShrink: 0,
           }}
         >
-          <Monitor size={12} strokeWidth={1.75} aria-hidden />
+          <Monitor size={14} strokeWidth={1.75} aria-hidden />
           Gantry
         </span>
         <button
           type="submit"
           aria-label="Submit work order"
           style={{
-            width: "calc(var(--input-height) - 6px)",
-            height: "calc(var(--input-height) - 6px)",
+            width: "var(--input-control-size)",
+            height: "var(--input-control-size)",
             borderRadius: "50%",
             background: "var(--cta-primary-bg)",
             color: "var(--cta-primary-fg)",
@@ -99,7 +95,7 @@ export function Composer({
             flexShrink: 0,
           }}
         >
-          <ArrowUp size={14} strokeWidth={2.25} aria-hidden />
+          <ArrowUp size={16} strokeWidth={2.25} aria-hidden />
         </button>
       </div>
       {hint ? (

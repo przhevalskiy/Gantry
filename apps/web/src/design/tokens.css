@@ -50,8 +50,9 @@
   --font-sans: "Albert Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Albert Sans", ui-sans-serif, system-ui, sans-serif;
 
-  /* All input bars — fixed height */
-  --input-height: 2rem;
-  --composer-height: 2rem;
+  /* Input bars — 2rem horizontal padding, breathe vertically */
+  --input-padding-inline: 2rem;
+  --input-padding-block: 0.875rem;
+  --input-control-size: 2rem;
   --icon-size: 1rem;
 }
