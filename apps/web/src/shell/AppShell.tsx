@@ -32,31 +32,41 @@ export function AppShell() {
             minHeight: "100vh",
             padding: "var(--stage-inset)",
             display: "flex",
-            gap: "var(--stage-inset)",
+            gap: 0,
           }}
         >
-          {sidebarOpen ? (
-            <Sidebar style={groovePane} onCollapse={() => setSidebarOpen(false)} />
-          ) : (
-            <button
-              type="button"
-              aria-label="Open sidebar"
-              onClick={() => setSidebarOpen(true)}
+          {/* Width animates to 0 — sidebar fully clipped / hidden */}
+          <div
+            aria-hidden={!sidebarOpen}
+            style={{
+              width: sidebarOpen
+                ? "calc(var(--sidebar-width) + var(--stage-inset))"
+                : 0,
+              flexShrink: 0,
+              overflow: "hidden",
+              transition: "width 280ms cubic-bezier(0.22, 1, 0.36, 1)",
+              pointerEvents: sidebarOpen ? "auto" : "none",
+            }}
+          >
+            <div
               style={{
-                ...groovePane,
-                width: 48,
-                flexShrink: 0,
-                display: "grid",
-                placeItems: "center",
-                alignSelf: "stretch",
-                background: "var(--sidebar-bg)",
-                color: "var(--text-secondary)",
-                cursor: "pointer",
+                width: "calc(var(--sidebar-width) + var(--stage-inset))",
+                height: "100%",
+                paddingRight: "var(--stage-inset)",
+                boxSizing: "border-box",
+                opacity: sidebarOpen ? 1 : 0,
+                transform: sidebarOpen ? "translateX(0)" : "translateX(-12px)",
+                transition:
+                  "opacity 220ms ease, transform 280ms cubic-bezier(0.22, 1, 0.36, 1)",
               }}
             >
-              <PanelLeftOpen size={18} strokeWidth={1.75} aria-hidden />
-            </button>
-          )}
+              <Sidebar
+                style={{ ...groovePane, height: "100%" }}
+                onCollapse={() => setSidebarOpen(false)}
+              />
+            </div>
+          </div>
+
           <main
             className="stage-pane"
             style={{
@@ -65,8 +75,34 @@ export function AppShell() {
               minWidth: 0,
               display: "flex",
               flexDirection: "column",
+              position: "relative",
             }}
           >
+            {!sidebarOpen ? (
+              <button
+                type="button"
+                aria-label="Open sidebar"
+                onClick={() => setSidebarOpen(true)}
+                style={{
+                  position: "absolute",
+                  top: 14,
+                  left: 14,
+                  zIndex: 2,
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  display: "grid",
+                  placeItems: "center",
+                  color: "var(--text-secondary)",
+                  background: "rgba(255,255,255,0.72)",
+                  border: "1px solid var(--border-subtle)",
+                  boxShadow: "0 2px 8px rgba(60, 40, 100, 0.08)",
+                  backdropFilter: "blur(8px)",
+                }}
+              >
+                <PanelLeftOpen size={18} strokeWidth={1.75} aria-hidden />
+              </button>
+            ) : null}
             <Outlet />
           </main>
         </div>
