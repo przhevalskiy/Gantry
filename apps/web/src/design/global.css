@@ -51,3 +51,13 @@ button {
   padding-block: var(--input-padding-block);
   box-sizing: border-box;
 }
+
+@keyframes gantry-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: gantry-spin 0.8s linear infinite;
+}

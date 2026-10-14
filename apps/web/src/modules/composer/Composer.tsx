@@ -1,29 +1,30 @@
-import { ArrowUp, Monitor, Plus } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { ArrowUp, LoaderCircle, Monitor, Plus } from "lucide-react";
+import { type FormEvent } from "react";
 
 /**
- * Work-order composer (wireframe input bar).
- * Inline padding locked to 2rem; vertical padding restored for chrome.
- * Submit wiring lands in a later slice.
+ * Work-order composer. Parent handles POST /v1/tasks (P1).
  */
 export function Composer({
   value,
   onChange,
   onSubmit,
+  disabled = false,
+  submitting = false,
+  error = null,
   placeholder = "File a work order or type / for more",
 }: {
   value: string;
   onChange: (v: string) => void;
   onSubmit: (goal: string) => void;
+  disabled?: boolean;
+  submitting?: boolean;
+  error?: string | null;
   placeholder?: string;
 }) {
-  const [hint, setHint] = useState<string | null>(null);
-
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const goal = value.trim();
-    if (!goal) return;
-    setHint("Scaffold only — POST /v1/tasks wiring comes in the next slice.");
+    if (!goal || disabled || submitting) return;
     onSubmit(goal);
   }
 
@@ -39,6 +40,7 @@ export function Composer({
           background: "var(--panel-bg)",
           boxShadow: "var(--panel-shadow)",
           border: "1px solid var(--border-subtle)",
+          opacity: disabled ? 0.7 : 1,
         }}
       >
         <Plus
@@ -52,6 +54,7 @@ export function Composer({
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           aria-label="Work order goal"
+          disabled={disabled || submitting}
           style={{
             flex: 1,
             border: "none",
@@ -84,6 +87,7 @@ export function Composer({
         <button
           type="submit"
           aria-label="Submit work order"
+          disabled={disabled || submitting || !value.trim()}
           style={{
             width: "var(--input-control-size)",
             height: "var(--input-control-size)",
@@ -93,21 +97,26 @@ export function Composer({
             display: "grid",
             placeItems: "center",
             flexShrink: 0,
+            opacity: disabled || submitting || !value.trim() ? 0.45 : 1,
           }}
         >
-          <ArrowUp size={16} strokeWidth={2.25} aria-hidden />
+          {submitting ? (
+            <LoaderCircle size={16} strokeWidth={2.25} className="spin" aria-hidden />
+          ) : (
+            <ArrowUp size={16} strokeWidth={2.25} aria-hidden />
+          )}
         </button>
       </div>
-      {hint ? (
+      {error ? (
         <p
           style={{
             margin: "10px 4px 0",
             fontSize: 12,
-            color: "var(--text-muted)",
+            color: "#b45309",
             textAlign: "center",
           }}
         >
-          {hint}
+          {error}
         </p>
       ) : null}
     </form>

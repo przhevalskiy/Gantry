@@ -85,9 +85,9 @@ apps/web/
 
 | Path | Screen | Slice status |
 |------|--------|--------------|
-| `/` | ComposeHome — firm greeting + composer | **Scaffold chrome** |
+| `/` | ComposeHome — firm greeting + composer | **Slice 1 wired** — project pick + `POST /v1/tasks` |
 | `/runs` | Runs list | Stub |
-| `/runs/:taskId` | Engagement (messaging + floor + HITL) | Stub shell |
+| `/runs/:taskId` | Engagement (messaging + floor + HITL) | **Slice 1 partial** — `GET /v1/tasks/{id}` status (SSE later) |
 | `/practices` | Firm packs | Stub |
 | `/team` | Operators | Stub |
 | `/briefs` | Playbooks | Stub |
@@ -117,7 +117,7 @@ apps/web/
 
 ## Slice order (after structure lands)
 
-1. ComposeHome polish + `POST /v1/tasks` submit  
+1. ~~ComposeHome + `POST /v1/tasks` submit~~ **done** (auth key field, project picker, navigate to engagement)  
 2. Engagement thread + `GET …/events` SSE  
 3. HITL cards → `POST …/hitl`  
 4. Engagement floor portraits  
