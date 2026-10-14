@@ -100,7 +100,7 @@ Steps to reproduce:
 1. Label an issue gantry
 2. Wait for the "task is running" comment
 3. Remove the label
-4. Task keeps running in the Gantry dashboard
+4. Task keeps running (visible via GET /v1/tasks/{id})
 ```
 
 ---
@@ -133,7 +133,7 @@ curl -X PATCH https://api.gantry.dev/v1/projects/<project_id> \
 
 **Task runs but no PR is opened**
 
-Check the Gantry dashboard for the task — the agent feed will show where it stopped. Common causes:
+Inspect the task via `GET /v1/tasks/{id}` (status + `result`) and optionally `GET /v1/tasks/{id}/messages` or the SSE stream. Common causes:
 - The repo's default branch is protected and the bot's GitHub token doesn't have push access
 - The GH_TOKEN on the server doesn't have `repo` scope — regenerate with full `repo` permissions
 

@@ -16,14 +16,20 @@ def structured_result_from_devops(
     tier: int | None = None,
     heal_cycles: int | None = None,
     files_changed: int | None = None,
+    artifact_type: str | None = None,
 ) -> dict[str, Any]:
     """Build the I3 structured result dict written to builds / api_tasks."""
     pr_url = (devops_result or {}).get("pr_url", "") or ""
     resolved_branch = (devops_result or {}).get("branch", "") or branch
-    result: dict[str, Any] = {}
-    if pr_url:
+    artifact = (
+        artifact_type
+        or (devops_result or {}).get("artifact_type")
+        or ("pr" if pr_url else "branch")
+    )
+    result: dict[str, Any] = {"artifact_type": artifact}
+    if pr_url and artifact == "pr":
         result["pr_url"] = pr_url
-    if resolved_branch:
+    if resolved_branch and artifact != "report":
         result["branch"] = resolved_branch
     if quality_score and quality_score.get("score") is not None:
         result["quality_score"] = quality_score["score"]

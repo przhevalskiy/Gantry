@@ -18,7 +18,7 @@ local_development:
 
 # C1: single ACP task entry. Child workflows are Temporal-composed by Foreman (I7).
 agent:
-  acp_type: agentic
+  acp_type: async
   name: swarm-factory
   description: "L5 Durable Software Engineering Factory — Foreman composes PM, Architect, Builder, Inspector, Reviewer, Security, DevOps"
   temporal:
@@ -48,6 +48,9 @@ agent:
       - name: DevOpsAgent
         queue_name: gantry_queue
         description: "gantry-devops — Temporal child"
+      - name: OracleA11yAgent
+        queue_name: gantry_queue
+        description: "gantry-oracle-a11y — Temporal child (role pack oracle-a11y)"
       - name: gantry_approval
         queue_name: gantry_queue
         description: "HITL approve/reject checkpoint"

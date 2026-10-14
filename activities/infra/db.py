@@ -33,17 +33,20 @@ async def db_upsert_build(
     tier: int | None = None,
     heal_cycles: int | None = None,
     files_changed: int | None = None,
+    artifact_type: str = "pr",
 ) -> str:
     """Upsert a structured build record via the Gantry API (Invariant I3).
 
-    This is the primary path for task results. Failures are logged; the poller
-    may fall back to message scraping only when this write does not succeed.
+    This is the primary path for task results and terminal lifecycle events.
+    The Agentex poller is only a slow safety net when this push fails.
     """
+    artifact = (artifact_type or "pr").lower().strip() or "pr"
     structured_result = {
         k: v
         for k, v in {
-            "pr_url": pr_url or None,
-            "branch": branch or None,
+            "artifact_type": artifact,
+            "pr_url": pr_url or None if artifact == "pr" else None,
+            "branch": branch or None if artifact != "report" else None,
             "quality_score": quality_score,
             "tier": tier,
             "heal_cycles": heal_cycles,
@@ -81,6 +84,42 @@ async def db_upsert_build(
         return json.dumps({"ok": True, "build": resp.json().get("build", {})})
     except Exception as exc:
         log.warning("db_upsert_build_error", task_id=task_id, error=str(exc))
+        return json.dumps({"ok": False, "reason": str(exc)})
+
+
+@activity.defn(name="db_notify_task_status")
+async def db_notify_task_status(
+    task_id: str,
+    status: str,
+    pr_url: str = "",
+    branch: str = "",
+) -> str:
+    """Push lifecycle status to the Gantry API (running / waiting_approval / failed)."""
+    payload: dict = {"status": status}
+    if pr_url:
+        payload["pr_url"] = pr_url
+    if branch:
+        payload["branch"] = branch
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                f"{_GANTRY_API_URL}/internal/db/tasks/{task_id}/status",
+                json=payload,
+                headers=_headers(),
+            )
+        if resp.status_code == 404:
+            log.warning("db_notify_task_status_not_found", task_id=task_id)
+            return json.dumps({"ok": False, "reason": "task not found"})
+        if resp.status_code not in (200, 201):
+            log.warning(
+                "db_notify_task_status_failed",
+                task_id=task_id,
+                status_code=resp.status_code,
+            )
+            return json.dumps({"ok": False, "reason": f"status {resp.status_code}"})
+        return json.dumps({"ok": True})
+    except Exception as exc:
+        log.warning("db_notify_task_status_error", task_id=task_id, error=str(exc))
         return json.dumps({"ok": False, "reason": str(exc)})
 
 

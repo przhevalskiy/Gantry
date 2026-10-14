@@ -1,7 +1,9 @@
 """
-Swarm pipeline — PM → Architect → Builders → Inspector → Reviewer → Security → DevOps.
+Swarm pipeline — Foreman DAG interpreter over Temporal crew roles.
 
-Extracted from workflows/swarm_orchestrator.py. Invoked by the Foreman workflow only.
+Default plan (Phase C): PM → Architect → build_verify → Security → DevOps.
+Stage order comes from playbook ``stages[]`` via ``workflows.swarm.stage_graph``;
+builder/inspector/reviewer stay one coupled heal unit. Invoked by Foreman only.
 """
 from __future__ import annotations
 
@@ -30,6 +32,12 @@ from workflows.swarm.healing import _parse_failing_tests
 from workflows.swarm.state import build_manifest
 from workflows.swarm.reporting import _build_final_report, format_quality_comment
 from workflows.swarm.completion import build_episode_record
+from workflows.swarm.interpreter import (
+    core_roles_present,
+    hitl_required,
+    plan_for_run,
+    stage_by_role,
+)
 
 from workflows.agents.architect import ArchitectAgent
 from workflows.agents.builder import BuilderAgent
@@ -38,15 +46,16 @@ from workflows.agents.inspector import InspectorAgent
 from workflows.agents.pm import PMAgent
 from workflows.agents.reviewer import ReviewerAgent
 from workflows.agents.security import SecurityAgent
+from workflows.agents.oracle_a11y import OracleA11yAgent
 
 from project.llm_runtime import extract_agentex_llm_params, model_for_tier
 from project.schema.complexity import TIER_LABELS
 from project.schema.playbooks import (
     architect_prompt_overlay,
     inspector_prompt_overlay,
+    normalize_artifact_type,
     playbook_oracle_qa_commands,
 )
-
 log = structlog.get_logger(__name__)
 
 PM_TIMEOUT = timedelta(hours=50)
@@ -102,11 +111,29 @@ async def run_swarm_pipeline(
     task_params: dict | None = None,
 ) -> str:
     branch = branch_name(f"{task_id}-r{iteration}", branch_prefix)
-    disabled = disable_agents or set()
+    disabled = {str(x).lower() for x in (disable_agents or set())}
     playbook_spec = (task_params or {}).get("playbook_spec") if task_params else None
     architect_overlay = architect_prompt_overlay(playbook, playbook_spec)
     inspector_overlay = inspector_prompt_overlay(playbook, playbook_spec)
     playbook_qa = playbook_oracle_qa_commands(playbook, playbook_spec)
+    artifact_type = normalize_artifact_type(
+        (task_params or {}).get("artifact") if task_params else None
+    )
+
+    # Phase C — data-driven stage graph (default ≡ today's pipeline).
+    stages, execution_plan = plan_for_run(
+        playbook_spec=playbook_spec if isinstance(playbook_spec, dict) else None,
+        tier=tier,
+        disabled=disabled,
+        lightweight_mode=lightweight_mode,
+    )
+    active_roles = {s["role"] for s in stages}
+    architect_stage = stage_by_role(stages, "architect")
+    build_verify_unit = next(
+        (u for u in execution_plan if u["kind"] == "build_verify"),
+        {"kind": "build_verify", "stages": []},
+    )
+    core_roles = core_roles_present(build_verify_unit)
 
     await adk.messages.create(
         task_id=task_id,
@@ -120,32 +147,64 @@ async def run_swarm_pipeline(
         ),
     )
 
-    # ── Step 0: PM Agent (tier >= 1 — skip on Auto) ──────────────────────
-    if tier >= 1 and "pm" not in disabled:
-        await adk.messages.create(
-            task_id=task_id,
-            content=TextContent(
-                author="agent",
-                content=f"[Foreman] Dispatching PM — scanning repo and checking for ambiguities",
-            ),
-        )
-        pm_json: str = await workflow.execute_child_workflow(
-            PMAgent.run,
-            args=[goal, repo_path, task_id, task_queue, tier, model_for_tier_from_params(tier, task_params)],
-            id=f"{task_id}-r{iteration}-pm",
-            task_queue=task_queue,
-            execution_timeout=PM_TIMEOUT,
-        )
-        try:
-            pm_result = json.loads(pm_json)
-            enriched = pm_result.get("enriched_goal", "").strip()
-            if enriched and enriched != goal:
-                goal = enriched
-                log.info("pm_enriched_goal", length=len(goal))
-        except (json.JSONDecodeError, ValueError):
-            pass  # use original goal if PM fails
+    # Stubs for seats muted by stage graph (tier / disable / lightweight).
+    security_report: dict = {
+        "passed": True,
+        "summary": "Security skipped.",
+        "findings": [],
+    }
+    devops_result: dict = {
+        "branch": "" if artifact_type == "report" else branch,
+        "success": True,
+        "summary": "DevOps not run.",
+        "pr_url": "",
+        "artifact_type": artifact_type,
+    }
+    oracle_a11y_report: dict = {
+        "passed": True,
+        "summary": "Oracle a11y not run.",
+        "findings": [],
+    }
 
-    # ── Step 1: Architect ─────────────────────────────────────────────────
+    # Pre-core outer roles from the plan (pm before architect on default path).
+    for unit in execution_plan:
+        if unit["kind"] != "role":
+            if unit["kind"] == "build_verify":
+                break
+            continue
+        role = unit["stage"]["role"]
+        if role == "pm":
+            await adk.messages.create(
+                task_id=task_id,
+                content=TextContent(
+                    author="agent",
+                    content=f"[Foreman] Dispatching PM — scanning repo and checking for ambiguities",
+                ),
+            )
+            pm_json: str = await workflow.execute_child_workflow(
+                PMAgent.run,
+                args=[goal, repo_path, task_id, task_queue, tier, model_for_tier_from_params(tier, task_params)],
+                id=f"{task_id}-r{iteration}-pm",
+                task_queue=task_queue,
+                execution_timeout=PM_TIMEOUT,
+            )
+            try:
+                pm_result = json.loads(pm_json)
+                enriched = pm_result.get("enriched_goal", "").strip()
+                if enriched and enriched != goal:
+                    goal = enriched
+                    log.info("pm_enriched_goal", length=len(goal))
+            except (json.JSONDecodeError, ValueError):
+                pass
+        elif role == "architect":
+            break
+        # security/devops/oracle before core are deferred to the post-core pass
+        # only when they appear after build_verify in the plan (validated order).
+
+    # ── Architect (required before build_verify) ──────────────────────────
+    if "architect" not in active_roles:
+        return "[Foreman] Invalid stage graph — architect seat missing."
+
     await adk.messages.create(
         task_id=task_id,
         content=TextContent(author="agent", content=f"[Foreman] Dispatching Architect — mapping {repo_path}"),
@@ -281,8 +340,9 @@ async def run_swarm_pipeline(
     # and works correctly across distributed workers (no filesystem dependency).
     ctx.manifest = build_manifest(tracks)
 
-    # ── HITL checkpoint 1: architect plan review (Standard / Full Crew) ─────
-    if tier >= 2:
+    # ── HITL: architect plan (checkpoint id from stage metadata) ──────────
+    architect_hitl = hitl_required(architect_stage, tier=tier)
+    if architect_hitl:
         conflict_note = (
             f" ⚠ {len(conflict_warnings)} file conflict(s) auto-resolved."
             if conflict_warnings else ""
@@ -295,7 +355,7 @@ async def run_swarm_pipeline(
         approved = await hitl_checkpoint(
             task_id=task_id,
             task_queue=task_queue,
-            checkpoint="architect_plan",
+            checkpoint=architect_hitl,
             action=action,
             iteration=iteration,
         )
@@ -317,13 +377,15 @@ async def run_swarm_pipeline(
     except Exception:
         pre_existing_tests = []
 
-    # ── Step 2: Parallel Builders + Inspector self-healing loop ───────────
+    # ── build_verify unit: Builders + Inspector heal + Reviewer ───────────
     heal_instructions: list[str] = []
     build_result: dict = {}
     inspector_report: dict = {}
     reviewer_report: dict = {"verdict": "approve", "summary": "", "comments": []}
     heal_cycles = 0
     reviewer_heal_cycles = 0
+    inspector_in_core = "inspector" in core_roles
+    reviewer_in_core = "reviewer" in core_roles
     MAX_REVIEWER_HEAL_CYCLES = 1  # Reviewer retries don't consume Inspector budget
     _builder_model = model_for_tier_from_params(tier, task_params)
     _inspector_model = model_for_tier_from_params(tier, task_params)
@@ -654,8 +716,8 @@ async def run_swarm_pipeline(
         except Exception:
             pass  # smoke test unavailable — proceed to Inspector as before
 
-        # Inspector
-        if "inspector" in disabled:
+        # Inspector (seat presence from stage graph / core_roles)
+        if not inspector_in_core:
             inspector_report = {"passed": True, "summary": "Inspector skipped via pipeline config.", "heal_instructions": []}
             await adk.messages.create(
                 task_id=task_id,
@@ -710,7 +772,7 @@ async def run_swarm_pipeline(
                 build_result["summary"] = (existing + f"\n\n{inspector_summary}").strip()
 
             # ── Reviewer: logic + contract check ─────────────────────────
-            if lightweight_mode or "reviewer" in disabled:
+            if not reviewer_in_core:
                 reviewer_report = {"verdict": "approve", "summary": "Reviewer skipped.", "comments": []}
             else:
                 await adk.messages.create(
@@ -900,116 +962,11 @@ async def run_swarm_pipeline(
         )
         tracks = [{"label": "heal", "implementation_steps": heal_instructions, "key_files": []}]
 
-    # ── Step 3: Security ──────────────────────────────────────────────────
-    if lightweight_mode or "security" in disabled:
-        security_report = {
-            "passed": True,
-            "summary": "Security skipped.",
-            "findings": [],
-        }
-        await adk.messages.create(
-            task_id=task_id,
-            content=TextContent(author="agent", content="[Foreman] Security skipped"),
-        )
-    else:
-        await adk.messages.create(
-            task_id=task_id,
-            content=TextContent(author="agent", content="[Foreman] Dispatching Security — scanning secrets, deps, SAST"),
-        )
-
-        security_json: str = await workflow.execute_child_workflow(
-            SecurityAgent.run,
-            args=[goal, repo_path, task_id],
-            id=f"{task_id}-r{iteration}-security",
-            task_queue=task_queue,
-            execution_timeout=SECURITY_TIMEOUT,
-        )
-
-        try:
-            security_report = json.loads(security_json)
-        except (json.JSONDecodeError, ValueError):
-            security_report = {"passed": True, "summary": security_json, "findings": []}
-
-    if not security_report.get("passed"):
-        critical = [
-            f for f in security_report.get("findings", [])
-            if f.get("severity") in ("critical", "high")
-        ]
-        await adk.messages.create(
-            task_id=task_id,
-            content=TextContent(
-                author="agent",
-                content=(
-                    f"[Security] ✗ failed — {len(critical)} critical/high finding(s): "
-                    + "; ".join(f.get('description', '')[:60] for f in critical[:3])
-                ),
-            ),
-        )
-        return _build_final_report(
-            goal=goal,
-            tracks=tracks,
-            build_result=build_result,
-            inspector_report=inspector_report,
-            reviewer_report=reviewer_report,
-            security_report=security_report,
-            devops_result=None,
-            heal_cycles=heal_cycles,
-            blocked_by="security",
-            quality_score=None,
-        )
-
-    await adk.messages.create(
-        task_id=task_id,
-        content=TextContent(
-            author="agent",
-            content=f"[Security] ✓ done — {security_report.get('summary', 'no critical findings')}",
-        ),
-    )
-
-    # ── Step 4: DevOps ────────────────────────────────────────────────────
-    # HITL checkpoint 3: deployment approval (Full Crew only)
-    if tier >= 3:
-        action = (
-            f"Build and QA complete. Approve creating branch '{branch}' "
-            f"and opening a pull request?"
-        )
-        approved = await hitl_checkpoint(
-            task_id=task_id,
-            task_queue=task_queue,
-            checkpoint="devops",
-            action=action,
-            iteration=iteration,
-        )
-        if not approved:
-            await adk.messages.create(
-                task_id=task_id,
-                content=TextContent(author="agent", content="[Foreman] Deployment rejected by user. Build artifacts remain on disk."),
-            )
-            return _build_final_report(
-                goal=goal,
-                tracks=tracks,
-                build_result=build_result,
-                inspector_report=inspector_report,
-                reviewer_report=reviewer_report,
-                security_report=security_report,
-                devops_result=None,
-                heal_cycles=heal_cycles,
-                blocked_by="user rejected deployment",
-                quality_score=None,
-            )
-
-    await adk.messages.create(
-        task_id=task_id,
-        content=TextContent(author="agent", content=f"[Foreman] Dispatching DevOps — branch: {branch}"),
-    )
-
-    # Union actual writes (from Builder edits) with Architect plan key_files.
-    # Edits are authoritative — key_files may be stale after heal/reviewer cycles.
+    # Shared context for DevOps / post-core roles (built once after heal).
     _edited_paths = sorted({e.get("path", "") for e in build_result.get("edits", []) if e.get("path")})
     _plan_key_files = sorted({kf for t in tracks for kf in t.get("key_files", []) if kf})
     all_key_files = sorted(set(_edited_paths) | set(_plan_key_files))
 
-    # ── Build report: assemble structured audit trail for PR description ──
     _prior_episode_count: int = 0
     _active_facts: str = ""
     try:
@@ -1031,67 +988,251 @@ async def run_swarm_pipeline(
     except Exception:
         pass
 
-    _build_report: dict = {
-        "goal": goal,
-        "build_number": _prior_episode_count + 1,
-        "prior_episode_count": _prior_episode_count,
-        "tier": tier,
-        "tier_label": TIER_LABELS.get(tier, str(tier)),
-        "tracks": [
-            {
-                "label": t.get("label", ""),
-                "description": t.get("description", ""),
-            }
-            for t in tracks
-            if t.get("label") not in ("heal", "reviewer-heal")
-        ],
-        "tech_stack": architect_plan.get("tech_stack", []),
-        "files_modified": len(_edited_paths),
-        "heal_cycles": heal_cycles,
-        "inspector": {
-            "passed": inspector_report.get("passed", False),
-            "issues_fixed": heal_cycles,
-        },
-        "reviewer": {
-            "verdict": reviewer_report.get("verdict", "approve"),
-            "notes": reviewer_report.get("notes", ""),
-        },
-        "security": {
-            "passed": security_report.get("passed", True),
-            "finding_count": len(security_report.get("findings", [])),
-            "critical_count": len([
-                f for f in security_report.get("findings", [])
-                if f.get("severity") in ("critical", "high")
-            ]),
-        },
-        "active_facts": _active_facts,
-        "explicit_exclusions": architect_plan.get("out_of_scope", []),
-    }
+    def _make_build_report() -> dict:
+        return {
+            "goal": goal,
+            "build_number": _prior_episode_count + 1,
+            "prior_episode_count": _prior_episode_count,
+            "tier": tier,
+            "tier_label": TIER_LABELS.get(tier, str(tier)),
+            "tracks": [
+                {
+                    "label": t.get("label", ""),
+                    "description": t.get("description", ""),
+                }
+                for t in tracks
+                if t.get("label") not in ("heal", "reviewer-heal")
+            ],
+            "tech_stack": architect_plan.get("tech_stack", []),
+            "files_modified": len(_edited_paths),
+            "heal_cycles": heal_cycles,
+            "inspector": {
+                "passed": inspector_report.get("passed", False),
+                "issues_fixed": heal_cycles,
+            },
+            "reviewer": {
+                "verdict": reviewer_report.get("verdict", "approve"),
+                "notes": reviewer_report.get("notes", ""),
+            },
+            "security": {
+                "passed": security_report.get("passed", True),
+                "finding_count": len(security_report.get("findings", [])),
+                "critical_count": len([
+                    f for f in security_report.get("findings", [])
+                    if f.get("severity") in ("critical", "high")
+                ]),
+            },
+            "oracle_a11y": {
+                "passed": oracle_a11y_report.get("passed", True),
+                "finding_count": len(oracle_a11y_report.get("findings", [])),
+            },
+            "active_facts": _active_facts,
+            "explicit_exclusions": architect_plan.get("out_of_scope", []),
+            "artifact_type": artifact_type,
+        }
 
-    devops_json: str = await workflow.execute_child_workflow(
-        DevOpsAgent.run,
-        args=[goal, repo_path, branch, task_id, build_result.get("summary", ""), all_key_files or None, _build_report],
-        id=f"{task_id}-r{iteration}-devops",
-        task_queue=task_queue,
-        execution_timeout=DEVOPS_TIMEOUT,
-    )
+    _build_report = _make_build_report()
 
-    try:
-        devops_result = json.loads(devops_json)
-    except (json.JSONDecodeError, ValueError):
-        devops_result = {"branch": branch, "success": False, "summary": devops_json}
+    # ── Post-core outer roles in plan order (security / oracle_a11y / devops) ─
+    saw_build_verify = False
+    for unit in execution_plan:
+        if unit["kind"] == "build_verify":
+            saw_build_verify = True
+            continue
+        if not saw_build_verify or unit["kind"] != "role":
+            continue
+        role = unit["stage"]["role"]
+        stage = unit["stage"]
 
-    pr_url = devops_result.get("pr_url", "")
-    await adk.messages.create(
-        task_id=task_id,
-        content=TextContent(
-            author="agent",
-            content=(
-                f"[DevOps] ✓ done — branch '{devops_result.get('branch', branch)}' pushed"
-                + (f", PR: {pr_url}" if pr_url else "")
+        if role == "security":
+            await adk.messages.create(
+                task_id=task_id,
+                content=TextContent(
+                    author="agent",
+                    content="[Foreman] Dispatching Security — scanning secrets, deps, SAST",
+                ),
+            )
+            security_json: str = await workflow.execute_child_workflow(
+                SecurityAgent.run,
+                args=[goal, repo_path, task_id],
+                id=f"{task_id}-r{iteration}-security",
+                task_queue=task_queue,
+                execution_timeout=SECURITY_TIMEOUT,
+            )
+            try:
+                security_report = json.loads(security_json)
+            except (json.JSONDecodeError, ValueError):
+                security_report = {"passed": True, "summary": security_json, "findings": []}
+
+            if not security_report.get("passed"):
+                critical = [
+                    f for f in security_report.get("findings", [])
+                    if f.get("severity") in ("critical", "high")
+                ]
+                await adk.messages.create(
+                    task_id=task_id,
+                    content=TextContent(
+                        author="agent",
+                        content=(
+                            f"[Security] ✗ failed — {len(critical)} critical/high finding(s): "
+                            + "; ".join(f.get("description", "")[:60] for f in critical[:3])
+                        ),
+                    ),
+                )
+                return _build_final_report(
+                    goal=goal,
+                    tracks=tracks,
+                    build_result=build_result,
+                    inspector_report=inspector_report,
+                    reviewer_report=reviewer_report,
+                    security_report=security_report,
+                    devops_result=None,
+                    heal_cycles=heal_cycles,
+                    blocked_by="security",
+                    quality_score=None,
+                )
+            await adk.messages.create(
+                task_id=task_id,
+                content=TextContent(
+                    author="agent",
+                    content=f"[Security] ✓ done — {security_report.get('summary', 'no critical findings')}",
+                ),
+            )
+            _build_report = _make_build_report()
+
+        elif role == "oracle_a11y":
+            await adk.messages.create(
+                task_id=task_id,
+                content=TextContent(
+                    author="agent",
+                    content="[Foreman] Dispatching OracleA11y — WCAG / a11y verification",
+                ),
+            )
+            oracle_json: str = await workflow.execute_child_workflow(
+                OracleA11yAgent.run,
+                args=[goal, repo_path, task_id, playbook_qa or None],
+                id=f"{task_id}-r{iteration}-oracle-a11y",
+                task_queue=task_queue,
+                execution_timeout=INSPECTOR_TIMEOUT,
+            )
+            try:
+                oracle_a11y_report = json.loads(oracle_json)
+            except (json.JSONDecodeError, ValueError):
+                oracle_a11y_report = {"passed": True, "summary": oracle_json, "findings": []}
+            await adk.messages.create(
+                task_id=task_id,
+                content=TextContent(
+                    author="agent",
+                    content=(
+                        f"[OracleA11y] {'✓' if oracle_a11y_report.get('passed') else '✗'} — "
+                        f"{oracle_a11y_report.get('summary', '')}"
+                    ),
+                ),
+            )
+            _build_report = _make_build_report()
+
+        elif role == "devops":
+            devops_hitl = hitl_required(stage, tier=tier)
+            # Artifact policy: deploy HITL only when opening a PR.
+            if devops_hitl and artifact_type == "pr":
+                action = (
+                    f"Build and QA complete. Approve creating branch '{branch}' "
+                    f"and opening a pull request?"
+                )
+                approved = await hitl_checkpoint(
+                    task_id=task_id,
+                    task_queue=task_queue,
+                    checkpoint=devops_hitl,
+                    action=action,
+                    iteration=iteration,
+                )
+                if not approved:
+                    await adk.messages.create(
+                        task_id=task_id,
+                        content=TextContent(
+                            author="agent",
+                            content="[Foreman] Deployment rejected by user. Build artifacts remain on disk.",
+                        ),
+                    )
+                    return _build_final_report(
+                        goal=goal,
+                        tracks=tracks,
+                        build_result=build_result,
+                        inspector_report=inspector_report,
+                        reviewer_report=reviewer_report,
+                        security_report=security_report,
+                        devops_result=None,
+                        heal_cycles=heal_cycles,
+                        blocked_by="user rejected deployment",
+                        quality_score=None,
+                    )
+
+            await adk.messages.create(
+                task_id=task_id,
+                content=TextContent(
+                    author="agent",
+                    content=f"[Foreman] Dispatching DevOps — branch: {branch} artifact={artifact_type}",
+                ),
+            )
+            devops_json: str = await workflow.execute_child_workflow(
+                DevOpsAgent.run,
+                args=[
+                    goal,
+                    repo_path,
+                    branch,
+                    task_id,
+                    build_result.get("summary", ""),
+                    all_key_files or None,
+                    _build_report,
+                    artifact_type,
+                ],
+                id=f"{task_id}-r{iteration}-devops",
+                task_queue=task_queue,
+                execution_timeout=DEVOPS_TIMEOUT,
+            )
+            try:
+                devops_result = json.loads(devops_json)
+            except (json.JSONDecodeError, ValueError):
+                devops_result = {"branch": branch, "success": False, "summary": devops_json}
+            devops_result["artifact_type"] = artifact_type
+            if artifact_type != "pr":
+                devops_result["pr_url"] = ""
+
+            pr_url_msg = devops_result.get("pr_url", "")
+            await adk.messages.create(
+                task_id=task_id,
+                content=TextContent(
+                    author="agent",
+                    content=(
+                        f"[DevOps] ✓ done — artifact={artifact_type} "
+                        f"branch '{devops_result.get('branch', branch)}'"
+                        + (f", PR: {pr_url_msg}" if pr_url_msg else "")
+                    ),
+                ),
+            )
+
+    if "devops" not in active_roles:
+        devops_result = {
+            "branch": "" if artifact_type == "report" else branch,
+            "success": True,
+            "summary": "DevOps skipped — pipeline.disable_agents",
+            "pr_url": "",
+            "artifact_type": artifact_type,
+        }
+        await adk.messages.create(
+            task_id=task_id,
+            content=TextContent(
+                author="agent",
+                content=f"[Foreman] DevOps skipped — artifact={artifact_type}",
             ),
-        ),
-    )
+        )
+    elif "security" not in active_roles:
+        await adk.messages.create(
+            task_id=task_id,
+            content=TextContent(author="agent", content="[Foreman] Security skipped"),
+        )
+
+    pr_url = devops_result.get("pr_url", "") if artifact_type == "pr" else ""
 
     # ── Quality scoring — Phase 5 (#15) ──────────────────────────────────
     # Run a lightweight Haiku eval after DevOps to score the build 0–10.
@@ -1158,13 +1299,14 @@ async def run_swarm_pipeline(
                     task_id,
                     project_id,
                     "system",
-                    resolved_branch,
+                    resolved_branch if artifact_type != "report" else "",
                     pr_url,
                     quality_score.get("score") if quality_score else None,
                     "COMPLETED",
                     tier,
                     heal_cycles,
                     files_changed,
+                    artifact_type,
                 ],
                 start_to_close_timeout=timedelta(seconds=20),
                 retry_policy=RetryPolicy(maximum_attempts=3),

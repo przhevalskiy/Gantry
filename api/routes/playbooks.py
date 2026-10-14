@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from api.deps import require_any_scope, require_scope
 from api.repositories import playbooks as playbooks_repo
+from schemas.firm_packs import resolve_run_playbook
 from schemas.playbooks import validate_playbook_config
 
 router = APIRouter(prefix="/v1/playbooks", tags=["Playbooks"])
@@ -55,6 +56,20 @@ class UpdatePlaybookRequest(BaseModel):
     config: PlaybookConfig | None = None
 
 
+class RunPlaybookRequest(BaseModel):
+    """Phase E — SDK ``playbooks.run({ pack, playbook, goal, project_id })``."""
+
+    goal: str
+    project_id: str
+    playbook: str | None = None
+    pack: str | None = None
+    branch_prefix: str = "swarm"
+    tier: int = Field(default=-1, ge=-1, le=3)
+    github_token: str | None = None
+    github_token_secret: str | None = None
+    webhook_url: str | None = None
+
+
 @router.get("")
 async def list_playbooks(
     workspace_id: str | None = Query(default=None),
@@ -62,6 +77,71 @@ async def list_playbooks(
 ):
     rows = await playbooks_repo.list_playbooks(org_id=key["org_id"], workspace_id=workspace_id)
     return {"playbooks": rows}
+
+
+@router.post("/run", status_code=201)
+async def run_playbook(
+    body: RunPlaybookRequest,
+    key: dict = Depends(require_scope("tasks:write")),
+):
+    """Submit a factory task bound to a playbook (and optional firm pack)."""
+    try:
+        _pack_id, playbook_slug = resolve_run_playbook(pack=body.pack, playbook=body.playbook)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    from api.repositories import quotas as quotas_repo
+    from api.repositories.quotas import QuotaExceeded
+    from api.repositories import usage as usage_repo
+    from api.routes.tasks import _submit_one
+
+    try:
+        await quotas_repo.check_task_submit(key["org_id"], bulk_count=1)
+    except QuotaExceeded as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+
+    result = await _submit_one(
+        goal=body.goal,
+        project_id=body.project_id,
+        org_id=key["org_id"],
+        branch_prefix=body.branch_prefix,
+        tier=body.tier,
+        github_token=body.github_token or "",
+        github_token_secret=body.github_token_secret,
+        webhook_url=body.webhook_url,
+        key_id=key["id"],
+        playbook=playbook_slug,
+    )
+    if "error" in result:
+        err = result["error"]
+        status = 422 if (
+            err.startswith("unknown playbook")
+            or "firm pack" in err
+            or "playbook or pack" in err
+        ) else 502
+        raise HTTPException(status_code=status, detail=err)
+
+    await usage_repo.record_event(
+        org_id=key["org_id"],
+        event_type="task.submitted",
+        key_id=key["id"],
+        task_id=result["task_id"],
+        metadata={
+            "project_id": body.project_id,
+            "tier": body.tier,
+            "playbook": playbook_slug,
+            "pack": _pack_id,
+            "via": "playbooks.run",
+        },
+    )
+    return {
+        "task_id": result["task_id"],
+        "status": result.get("status", "queued"),
+        "project_id": body.project_id,
+        "playbook": playbook_slug,
+        "pack": _pack_id,
+        "org_id": key["org_id"],
+    }
 
 
 @router.get("/{playbook_id}")

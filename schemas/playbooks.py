@@ -27,6 +27,19 @@ SYSTEM_PLAYBOOKS: dict[str, dict[str, Any]] = {
         "tier_default": 2,
         "branch_prefix": "a11y",
         "goal_prefix": "WCAG 2.1 AA remediation — ",
+        # Phase B: runner should honor artifact (branch-first migration job).
+        "artifact": {"type": "branch"},
+        # Phase C/D: data DAG — classic build_verify + oracle_a11y pack role.
+        "stages": [
+            {"role": "pm", "min_tier": 1},
+            {"role": "architect", "hitl": "architect_plan", "hitl_min_tier": 2},
+            {"role": "builder", "parallel": True},
+            {"role": "inspector", "heal": True},
+            {"role": "reviewer", "heal": True, "skip_lightweight": True},
+            {"role": "oracle_a11y", "skip_lightweight": True},
+            {"role": "security", "skip_lightweight": True},
+            {"role": "devops", "hitl": "devops", "hitl_min_tier": 3},
+        ],
         "pipeline": {
             "max_heal_cycles": 2,
             "max_parallel_tracks": 2,
@@ -79,7 +92,69 @@ def spec_from_row(spec: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+# Classic SWE seats. Phase D packs extend via role_packs.registry.all_known_roles().
+_BASE_CREW_ROLES = frozenset({
+    "pm",
+    "architect",
+    "builder",
+    "inspector",
+    "reviewer",
+    "security",
+    "devops",
+})
+
+
+def _known_crew_roles() -> frozenset[str]:
+    try:
+        from role_packs.registry import all_known_roles
+
+        return all_known_roles()
+    except Exception:
+        return _BASE_CREW_ROLES
+
+
+KNOWN_CREW_ROLES = _known_crew_roles()
+
+ARTIFACT_TYPES = frozenset({"pr", "branch", "patch", "report"})
+
+# Seats that may be muted without inventing a new DAG (Phase B/D). Architect/Builder stay required.
+MUTABLE_CREW_ROLES = frozenset({
+    "pm",
+    "inspector",
+    "reviewer",
+    "security",
+    "devops",
+    "oracle_a11y",
+})
+
+
+def normalize_artifact_type(artifact: Any) -> str:
+    """Return canonical artifact type; default pr for back-compat."""
+    if artifact is None:
+        return "pr"
+    if isinstance(artifact, str):
+        value = artifact.lower().strip()
+    elif isinstance(artifact, dict):
+        value = str(artifact.get("type", "pr")).lower().strip()
+    else:
+        return "pr"
+    return value if value in ARTIFACT_TYPES else "pr"
+
+
+def effective_disable_agents(pipeline: dict[str, Any] | None) -> list[str]:
+    """Merge disable_agents with include_agents (include = allowlist of seats)."""
+    pipeline = pipeline or {}
+    disabled = {str(x).lower() for x in (pipeline.get("disable_agents") or [])}
+    include = pipeline.get("include_agents")
+    if include is not None:
+        include_set = {str(x).lower() for x in include}
+        # Only mute mutable seats not listed; never auto-disable architect/builder.
+        disabled |= MUTABLE_CREW_ROLES - include_set
+    return sorted(disabled)
+
+
 def validate_playbook_config(config: dict[str, Any]) -> None:
+    """Validate playbook config. Additive fields (artifact, stages) are Phase A/B schema."""
     pipeline = config.get("pipeline") or {}
     if not isinstance(pipeline, dict):
         raise ValueError("pipeline must be an object")
@@ -92,6 +167,47 @@ def validate_playbook_config(config: dict[str, Any]) -> None:
     tier = config.get("tier_default", 1)
     if int(tier) < 0 or int(tier) > 3:
         raise ValueError("tier_default must be 0–3")
+
+    for key in ("disable_agents", "include_agents"):
+        agents = pipeline.get(key)
+        if agents is None:
+            continue
+        if not isinstance(agents, list):
+            raise ValueError(f"pipeline.{key} must be an array")
+        for name in agents:
+            if str(name).lower() not in KNOWN_CREW_ROLES:
+                raise ValueError(
+                    f"pipeline.{key}: unknown role {name!r} "
+                    f"(known: {', '.join(sorted(KNOWN_CREW_ROLES))})"
+                )
+
+    artifact = config.get("artifact")
+    if artifact is not None:
+        if isinstance(artifact, str):
+            artifact_type = artifact.lower()
+        elif isinstance(artifact, dict):
+            artifact_type = str(artifact.get("type", "pr")).lower()
+        else:
+            raise ValueError("artifact must be a string type or {type: ...} object")
+        if artifact_type not in ARTIFACT_TYPES:
+            raise ValueError(
+                f"artifact.type must be one of: {', '.join(sorted(ARTIFACT_TYPES))}"
+            )
+
+    stages = config.get("stages")
+    if stages is not None:
+        if not isinstance(stages, list) or not stages:
+            raise ValueError("stages must be a non-empty array")
+        for i, stage in enumerate(stages):
+            if not isinstance(stage, dict):
+                raise ValueError(f"stages[{i}] must be an object")
+            role = str(stage.get("role", "")).lower()
+            known = _known_crew_roles()
+            if role not in known:
+                raise ValueError(
+                    f"stages[{i}].role unknown {role!r} "
+                    f"(known Temporal crew / pack roles: {', '.join(sorted(known))})"
+                )
 
 
 def _resolve_spec(playbook_id: str | None, playbook_spec: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -134,7 +250,25 @@ def resolve_submit_params(
 
     merged_pipeline: dict[str, Any] = dict(spec.get("pipeline") or {})
     if pipeline:
-        merged_pipeline.update(pipeline)
+        # Request body wins on scalar keys; agent lists are unioned carefully below.
+        body_disable = pipeline.get("disable_agents")
+        body_include = pipeline.get("include_agents")
+        merged_pipeline.update({k: v for k, v in pipeline.items() if k not in ("disable_agents", "include_agents")})
+        if body_disable is not None:
+            merged_pipeline["disable_agents"] = list(body_disable)
+        if body_include is not None:
+            merged_pipeline["include_agents"] = list(body_include)
+
+    # Carry artifact policy into pipeline envelope for the worker (Phase B runtime).
+    if "artifact" not in merged_pipeline and "artifact" in spec:
+        merged_pipeline["artifact"] = deepcopy(spec["artifact"])
+
+    # Normalize seat mute list so worker sees a single disable_agents source of truth.
+    merged_pipeline["disable_agents"] = effective_disable_agents(merged_pipeline)
+    if "include_agents" in merged_pipeline:
+        merged_pipeline["include_agents"] = [
+            str(x).lower() for x in (merged_pipeline.get("include_agents") or [])
+        ]
 
     resolved_id = playbook_id or spec.get("slug") or spec.get("label")
     return merged_goal, merged_branch, merged_tier, merged_pipeline or None, resolved_id

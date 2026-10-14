@@ -10,6 +10,8 @@ REST remains the integrator API (`POST /v1/tasks` → structured `result.pr_url`
 - Temporal reachable (default `:7233`)
 - This repo’s worker (`python worker.py` / Helm worker) registered against that cluster
 
+Agentex owns Temporal / Redis / Agentex Postgres / Mongo. Gantry owns only the API control plane (+ optional Gantry Postgres) and the worker process. See [`../architecture.md`](../architecture.md).
+
 ## Register the agent
 
 Point the worker at the existing cluster:
@@ -88,4 +90,4 @@ Existing `POST /v1/tasks/{id}/approve` still works.
 
 Plan: [`agentex-citizen.md`](./agentex-citizen.md)
 
-Factory UI (Vercel): [`apps/web`](../../apps/web/) — consumes `GET /v1/tasks/{id}/events` SSE.
+No in-repo UI. Integrators (and a future optional client) consume `GET /v1/tasks/{id}/events` SSE — see [`../deep-dives/hitl-and-sse.md`](../deep-dives/hitl-and-sse.md).

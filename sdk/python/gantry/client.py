@@ -1,7 +1,7 @@
 from __future__ import annotations
 import os
 from ._http import HttpClient
-from .resources import Tasks, Projects, Agents
+from .resources import Tasks, Projects, Agents, Playbooks, Packs
 
 DEFAULT_BASE_URL = "https://api.gantry.dev"
 
@@ -14,7 +14,11 @@ class GantryClient:
         from gantry import GantryClient
 
         client = GantryClient(api_key="gantry_...")
-        task = client.tasks.submit("Add rate limiting to the API", project_id="proj_abc")
+        task = client.playbooks.run(
+            pack="swe-factory@1",
+            goal="Add rate limiting to the API",
+            project_id="proj_abc",
+        )
         task = client.tasks.wait(task.task_id)
         print(task.pr_url)
     """
@@ -35,3 +39,5 @@ class GantryClient:
         self.tasks = Tasks(http)
         self.projects = Projects(http)
         self.agents = Agents(http)
+        self.playbooks = Playbooks(http)
+        self.packs = Packs(http)

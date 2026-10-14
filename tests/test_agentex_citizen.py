@@ -138,6 +138,9 @@ def test_workflow_defn_names_match_catalog_and_worker():
         "ClarificationWorkflow",
     ):
         assert cls in worker
+    # Phase D packs register via load_pack_workflows() (OracleA11yAgent, …).
+    assert "load_pack_workflows" in worker
+    assert "OracleA11yAgent" in (ROOT / "manifest.yaml").read_text()
 
 
 def test_i7_foreman_composes_temporal_children_not_acp():
@@ -145,7 +148,8 @@ def test_i7_foreman_composes_temporal_children_not_acp():
     pipeline = (ROOT / "workflows" / "swarm" / "pipeline.py").read_text()
     assert "execute_child_workflow" in pipeline
     assert "run_swarm_pipeline" in orchestrator
-    assert "task/create" not in text
+    assert "task/create" not in orchestrator
+    assert "task/create" not in pipeline
     assert 'acp_type="async"' in (ROOT / "project" / "acp.py").read_text()
     assert 'acp_type="async"' in (ROOT / "project" / "schema" / "acp.py").read_text()
 
@@ -167,9 +171,11 @@ def test_sdk_and_docs_surfaces():
     api_md = (ROOT / "docs" / "api.md").read_text()
     assert "/v1/agents" in api_md
     assert "/hitl" in api_md
-    assert not (ROOT / "ui").exists(), "legacy ui/ removed — use apps/web"
-    web_readme = (ROOT / "apps" / "web" / "README.md").read_text()
-    assert "SSE" in web_readme or "/v1/" in web_readme
+    assert not (ROOT / "ui").exists(), "legacy ui/ removed"
+    assert not (ROOT / "apps" / "web").exists(), "apps/web removed — API-first"
+    assert (ROOT / "docs" / "architecture.md").is_file()
+    assert (ROOT / "docs" / "platform.md").is_file()
+    assert "SSE" in api_md or "/events" in api_md
     assert "client.agents" in (ROOT / "sdk" / "python" / "README.md").read_text()
     assert "hitl(" in (ROOT / "sdk" / "python" / "README.md").read_text()
     assert "stream_events" in (ROOT / "sdk" / "python" / "README.md").read_text()

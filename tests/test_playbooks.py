@@ -10,6 +10,7 @@ from project.schema.playbooks import (
     inspector_prompt_overlay,
     playbook_oracle_qa_commands,
     resolve_submit_params,
+    validate_playbook_config,
 )
 
 
@@ -100,3 +101,86 @@ def test_monorepo_architect_overlay():
 def test_platform_backlog_has_no_oracle_overlay():
     assert inspector_prompt_overlay("platform-backlog") is None
     assert architect_prompt_overlay("platform-backlog") is None
+
+
+def test_validate_artifact_and_stages_additive():
+    validate_playbook_config({
+        "tier_default": 2,
+        "artifact": {"type": "branch"},
+        "pipeline": {
+            "max_parallel_tracks": 2,
+            "max_heal_cycles": 1,
+            "disable_agents": ["pm", "security"],
+        },
+        "stages": [
+            {"role": "architect"},
+            {"role": "builder"},
+            {"role": "inspector"},
+        ],
+    })
+
+
+def test_validate_rejects_unknown_role_in_stages():
+    with pytest.raises(ValueError, match="unknown"):
+        validate_playbook_config({
+            "pipeline": {"max_parallel_tracks": 1, "max_heal_cycles": 0},
+            "stages": [{"role": "grok-bot"}],
+        })
+
+
+def test_validate_rejects_unknown_artifact():
+    with pytest.raises(ValueError, match="artifact"):
+        validate_playbook_config({
+            "pipeline": {"max_parallel_tracks": 1, "max_heal_cycles": 0},
+            "artifact": "chat",
+        })
+
+
+def test_a11y_merges_artifact_into_pipeline():
+    _, _, _, pipeline, _ = resolve_submit_params(
+        goal="Fix contrast",
+        branch_prefix="swarm",
+        tier=-1,
+        playbook_id="a11y-remediation",
+        pipeline=None,
+    )
+    assert pipeline is not None
+    assert pipeline.get("artifact") == {"type": "branch"}
+
+
+def test_include_agents_expands_disable_list():
+    from project.schema.playbooks import effective_disable_agents
+
+    disabled = effective_disable_agents({
+        "include_agents": ["builder", "architect", "inspector"],
+    })
+    assert "pm" in disabled
+    assert "devops" in disabled
+    assert "builder" not in disabled
+    assert "architect" not in disabled
+
+
+def test_normalize_artifact_type():
+    from project.schema.playbooks import normalize_artifact_type
+
+    assert normalize_artifact_type(None) == "pr"
+    assert normalize_artifact_type("branch") == "branch"
+    assert normalize_artifact_type({"type": "patch"}) == "patch"
+    assert normalize_artifact_type("chat") == "pr"
+
+
+def test_pipeline_config_passes_artifact():
+    from api.schemas.pipeline import PipelineConfig
+
+    params = PipelineConfig(artifact={"type": "branch"}, disable_agents=["pm"]).to_agentex_params()
+    assert params["artifact"]["type"] == "branch"
+    assert params["disable_agents"] == ["pm"]
+
+
+def test_catalog_states_one_factory_not_bot_firms():
+    from schemas.crew import catalog_payload
+
+    payload = catalog_payload()
+    assert payload["product"]["model"] == "one_factory"
+    assert "bot" in payload["product"]["summary"].lower() or "not separately" in payload["product"]["summary"]
+    assert "pr" in payload["product"]["artifacts"]

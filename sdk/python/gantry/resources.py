@@ -167,6 +167,112 @@ class Agents:
         return self._http.get(f"/v1/agents/{name}")
 
 
+class Playbooks:
+    """Job packets + ``run`` convenience (Phase E)."""
+
+    def __init__(self, http: HttpClient):
+        self._http = http
+
+    def list(self, *, workspace_id: Optional[str] = None) -> list[dict]:
+        path = "/v1/playbooks"
+        if workspace_id:
+            path = f"{path}?workspace_id={workspace_id}"
+        data = self._http.get(path)
+        return data.get("playbooks", [])
+
+    def get(self, playbook_id: str) -> dict:
+        data = self._http.get(f"/v1/playbooks/{playbook_id}")
+        return data.get("playbook", data)
+
+    def run(
+        self,
+        *,
+        goal: str,
+        project_id: str,
+        playbook: Optional[str] = None,
+        pack: Optional[str] = None,
+        branch_prefix: str = "swarm",
+        tier: int = -1,
+        github_token: Optional[str] = None,
+        webhook_url: Optional[str] = None,
+    ) -> Task:
+        """Submit a factory task via playbook (optional firm pack).
+
+        Example::
+
+            client.playbooks.run(
+                pack="migration-runner@1",
+                playbook="a11y-remediation",
+                goal="Fix contrast on login",
+                project_id="...",
+            )
+        """
+        payload: dict = {
+            "goal": goal,
+            "project_id": project_id,
+            "branch_prefix": branch_prefix,
+            "tier": tier,
+        }
+        if playbook:
+            payload["playbook"] = playbook
+        if pack:
+            payload["pack"] = pack
+        if github_token:
+            payload["github_token"] = github_token
+        if webhook_url:
+            payload["webhook_url"] = webhook_url
+        data = self._http.post("/v1/playbooks/run", json=payload)
+        return _task(data)
+
+
+class Packs:
+    """Firm pack catalog — install/enable inside one factory (not bot deploy)."""
+
+    def __init__(self, http: HttpClient):
+        self._http = http
+
+    def list(self) -> list[dict]:
+        data = self._http.get("/v1/packs")
+        return data.get("packs", [])
+
+    def get(self, pack_id: str) -> dict:
+        data = self._http.get(f"/v1/packs/{pack_id}")
+        return data.get("pack", data)
+
+    def install(
+        self,
+        pack_id: str,
+        *,
+        version: Optional[str] = None,
+        max_tasks_per_day: Optional[int] = None,
+    ) -> dict:
+        payload: dict = {}
+        if version is not None:
+            payload["version"] = version
+        if max_tasks_per_day is not None:
+            payload["max_tasks_per_day"] = max_tasks_per_day
+        data = self._http.post(f"/v1/packs/{pack_id}/install", json=payload)
+        return data.get("pack", data)
+
+    def update(
+        self,
+        pack_id: str,
+        *,
+        enabled: Optional[bool] = None,
+        max_tasks_per_day: Optional[int] = None,
+    ) -> dict:
+        payload: dict = {}
+        if enabled is not None:
+            payload["enabled"] = enabled
+        if max_tasks_per_day is not None:
+            payload["max_tasks_per_day"] = max_tasks_per_day
+        data = self._http.patch(f"/v1/packs/{pack_id}", json=payload)
+        return data.get("pack", data)
+
+    def uninstall(self, pack_id: str) -> None:
+        self._http.delete(f"/v1/packs/{pack_id}")
+
+
 class Projects:
     def __init__(self, http: HttpClient):
         self._http = http

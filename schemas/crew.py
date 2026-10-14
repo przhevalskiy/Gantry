@@ -186,6 +186,21 @@ CREW_AGENTS: tuple[dict[str, Any], ...] = (
     },
 )
 
+# Phase D — append role-pack Temporal children (still one ACP citizen).
+def _with_pack_agents(base: tuple[dict[str, Any], ...]) -> tuple[dict[str, Any], ...]:
+    try:
+        from role_packs.registry import pack_catalog_entries
+
+        packs = pack_catalog_entries()
+    except Exception:
+        packs = []
+    if not packs:
+        return base
+    return tuple(list(base) + packs)
+
+
+CREW_AGENTS = _with_pack_agents(CREW_AGENTS)
+
 _CHECKPOINT_BY_ID = {c["id"]: c for c in HITL_CHECKPOINTS}
 _AGENT_BY_NAME = {a["name"]: a for a in CREW_AGENTS}
 _AGENT_BY_WORKFLOW = {a["workflow"]: a for a in CREW_AGENTS}
@@ -244,6 +259,17 @@ def catalog_payload(*, agentex_base_url: str = "http://localhost:5003") -> dict[
     return {
         "acp_agent": FOREMAN_ACP_NAME,
         "orchestration": "temporal_children",
+        "product": {
+            "model": "one_factory",
+            "summary": (
+                "Gantry is one engineering factory (swarm-factory). "
+                "Playbooks are job packets that tune seats, oracles, and artifacts — "
+                "not separately deployable bot firms. "
+                "Crew identities below are Temporal children composed by the Foreman (C1/I7)."
+            ),
+            "playbooks": "GET/POST /v1/playbooks — org-scoped job packets",
+            "artifacts": ["pr", "branch", "patch", "report"],
+        },
         "agents": [dict(a) for a in CREW_AGENTS],
         "autonomy": [dict(v) for v in TIER_AUTONOMY.values()],
         "hitl": [dict(c) for c in HITL_CHECKPOINTS],

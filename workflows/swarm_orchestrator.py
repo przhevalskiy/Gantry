@@ -88,6 +88,16 @@ class SwarmOrchestrator(BaseWorkflow):
                 retry_policy=RetryPolicy(maximum_attempts=2),
             )
 
+        try:
+            await workflow.execute_activity(
+                "db_notify_task_status",
+                args=[task_id, "running"],
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            )
+        except Exception:
+            pass
+
         task_queue = environment_variables.WORKFLOW_TASK_QUEUE or "gantry_queue"
         repo_path = params.params.get("repo_path", ".") if params.params else "."
         branch_prefix = params.params.get("branch_prefix", "swarm") if params.params else "swarm"
@@ -123,6 +133,15 @@ class SwarmOrchestrator(BaseWorkflow):
             post_message=_post_repo_message,
         )
         if repo_error:
+            try:
+                await workflow.execute_activity(
+                    "db_notify_task_status",
+                    args=[task_id, "failed"],
+                    start_to_close_timeout=timedelta(seconds=10),
+                    retry_policy=RetryPolicy(maximum_attempts=2),
+                )
+            except Exception:
+                pass
             return repo_error
 
         explicit_tier = int(params.params.get("tier", -1)) if params.params else -1
@@ -160,7 +179,16 @@ class SwarmOrchestrator(BaseWorkflow):
         lightweight_mode = bool(params.params.get("lightweight_mode", tp["lightweight_mode"])) if params.params else tp["lightweight_mode"]
         max_heal = int(params.params.get("max_heal_cycles", tp["max_heal_cycles"])) if params.params else tp["max_heal_cycles"]
         max_parallel_tracks = int(params.params.get("max_parallel_tracks", tp["max_parallel_tracks"])) if params.params else tp["max_parallel_tracks"]
-        disable_agents = set(params.params.get("disable_agents") or []) if params.params else set()
+        from project.schema.playbooks import effective_disable_agents
+
+        _pipe = {
+            "disable_agents": list(params.params.get("disable_agents") or []) if params.params else [],
+            "include_agents": list(params.params.get("include_agents") or []) if params.params else [],
+        }
+        # include_agents is an allowlist of mutable seats; merge into disable_agents (Phase B).
+        if not _pipe["include_agents"]:
+            _pipe.pop("include_agents")
+        disable_agents = set(effective_disable_agents(_pipe))
 
         tier_label = TIER_LABELS.get(tier, f"Tier {tier}")
         tier_details = []
@@ -288,6 +316,15 @@ class SwarmOrchestrator(BaseWorkflow):
                 content=build_approval_request_content(checkpoint, action, approval_wf_id),
             ),
         )
+        try:
+            await workflow.execute_activity(
+                "db_notify_task_status",
+                args=[task_id, "waiting_approval"],
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            )
+        except Exception:
+            pass
 
         result: str = await workflow.execute_child_workflow(
             ApprovalWorkflow.run,
@@ -300,6 +337,15 @@ class SwarmOrchestrator(BaseWorkflow):
 
         approved = result == "Approved"
         await self._sync_task_meta(task_id, {"pending_hitl_remove": approval_wf_id})
+        try:
+            await workflow.execute_activity(
+                "db_notify_task_status",
+                args=[task_id, "running" if approved else "failed"],
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=RetryPolicy(maximum_attempts=2),
+            )
+        except Exception:
+            pass
         await adk.messages.create(
             task_id=task_id,
             content=TextContent(

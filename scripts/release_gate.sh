@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# release_gate.sh — master check-stop from docs/platform/platform-merge-plan.md §7
+# release_gate.sh — API-first invariant check-stop
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -41,32 +41,29 @@ rg "agentName: swarm-factory" deploy/helm/gantry/values.yaml >/dev/null
 echo "==> invariant: legacy ui/ removed"
 test ! -d ui
 
-echo "==> invariant: DEPLOY points to apps/web"
-rg "Root Directory.*apps/web" DEPLOYMENT.md >/dev/null || rg "root \`apps/web\`" DEPLOYMENT.md >/dev/null
+echo "==> invariant: apps/web not in-tree (API-first)"
+test ! -d apps/web
 
-echo "==> invariant: deploy module + vercel SPA"
-test -f apps/web/src/deploy/invariants.ts
-test -f apps/web/vercel.json
-test -f docs/hosting/PLAN.md
-test -x deploy/smoke.sh
-rg '"destination": "/index.html"' apps/web/vercel.json >/dev/null
+echo "==> invariant: no Vercel UI deploy scripts"
+test ! -f deploy/vercel-deploy.sh
+test ! -f deploy/configure-ui-origin.sh
+
+echo "==> invariant: docs index + core set present"
+test -f docs/README.md
+test -f docs/architecture.md
+test -f docs/platform.md
+test -f docs/use-cases.md
+test -f docs/api.md
+test -f docs/deep-dives/swarm-factory.md
+
+echo "==> invariant: DEPLOYMENT is API-first (no apps/web root)"
+if rg -n "Root Directory.*apps/web|apps/web.*Vercel|Vercel.*apps/web" DEPLOYMENT.md >/dev/null 2>&1; then
+  echo "FAIL: DEPLOYMENT.md still references apps/web / Vercel UI"
+  exit 1
+fi
+rg -n "no in-repo static UI|API \+ worker" DEPLOYMENT.md >/dev/null
 
 echo "==> CORS config tests"
 .venv/bin/python -m pytest tests/test_cors_config.py -q
-
-echo "==> invariant: M1 clean in apps/web/src"
-if rg -i "hive_api|ga4_property|show_checklist|marcomms|web_services|media_outreach|press release request" apps/web/src >/dev/null 2>&1; then
-  echo "FAIL: Qodex domain strings found in apps/web/src"
-  exit 1
-fi
-
-echo "==> invariant: no legacy Qodex backend URLs in apps/web/src"
-if rg "localhost:8000|/api/chat" apps/web/src >/dev/null 2>&1; then
-  echo "FAIL: legacy Qodex backend references in apps/web/src"
-  exit 1
-fi
-
-echo "==> apps/web production build"
-(cd apps/web && npm run build)
 
 echo "==> release gate passed"

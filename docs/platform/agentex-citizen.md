@@ -4,7 +4,7 @@ Make Gantry a first-class Agentex citizen: named crew on the track, L1–L5 lang
 
 ## Invariants (must hold after every phase)
 
-Carried from `PLATFORM_REFACTOR.md`:
+Carried from [`../platform.md`](../platform.md):
 
 | ID | Invariant |
 |----|-----------|

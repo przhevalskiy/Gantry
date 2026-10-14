@@ -18,11 +18,9 @@ if [ ! -d .venv ]; then
 fi
 
 export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-test-key}"
-export TAVILY_API_KEY="${TAVILY_API_KEY:-test-key}"
-export AGENT_NAME="${AGENT_NAME:-web-scout}"
+export AGENT_NAME="${AGENT_NAME:-swarm-factory}"
 export ACP_URL="${ACP_URL:-http://localhost:8000}"
-export WORKFLOW_NAME="${WORKFLOW_NAME:-web-scout}"
-export WORKFLOW_TASK_QUEUE="${WORKFLOW_TASK_QUEUE:-web_scout_queue}"
+export WORKFLOW_TASK_QUEUE="${WORKFLOW_TASK_QUEUE:-gantry_queue}"
 
 SMOKE=0
 PROD=0

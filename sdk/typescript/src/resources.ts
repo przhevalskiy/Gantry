@@ -116,6 +116,88 @@ export class Agents {
   }
 }
 
+export class Playbooks {
+  constructor(private readonly http: HttpClient) {}
+
+  async list(workspaceId?: string): Promise<unknown[]> {
+    const q = workspaceId ? `?workspace_id=${encodeURIComponent(workspaceId)}` : '';
+    const data = await this.http.get<{ playbooks: unknown[] }>(`/v1/playbooks${q}`);
+    return data.playbooks;
+  }
+
+  async get(playbookId: string): Promise<unknown> {
+    const data = await this.http.get<{ playbook: unknown }>(
+      `/v1/playbooks/${encodeURIComponent(playbookId)}`,
+    );
+    return data.playbook;
+  }
+
+  /** Submit a factory task via playbook (optional firm pack). */
+  async run(options: {
+    goal: string;
+    project_id: string;
+    playbook?: string;
+    pack?: string;
+    branch_prefix?: string;
+    tier?: number;
+    github_token?: string;
+    webhook_url?: string;
+  }): Promise<Task> {
+    return this.http.post<Task>('/v1/playbooks/run', {
+      goal: options.goal,
+      project_id: options.project_id,
+      branch_prefix: options.branch_prefix ?? 'swarm',
+      tier: options.tier ?? -1,
+      ...(options.playbook ? { playbook: options.playbook } : {}),
+      ...(options.pack ? { pack: options.pack } : {}),
+      ...(options.github_token ? { github_token: options.github_token } : {}),
+      ...(options.webhook_url ? { webhook_url: options.webhook_url } : {}),
+    });
+  }
+}
+
+export class Packs {
+  constructor(private readonly http: HttpClient) {}
+
+  async list(): Promise<unknown[]> {
+    const data = await this.http.get<{ packs: unknown[] }>('/v1/packs');
+    return data.packs;
+  }
+
+  async get(packId: string): Promise<unknown> {
+    const data = await this.http.get<{ pack: unknown }>(
+      `/v1/packs/${encodeURIComponent(packId)}`,
+    );
+    return data.pack;
+  }
+
+  async install(
+    packId: string,
+    options: { version?: string; max_tasks_per_day?: number } = {},
+  ): Promise<unknown> {
+    const data = await this.http.post<{ pack: unknown }>(
+      `/v1/packs/${encodeURIComponent(packId)}/install`,
+      options,
+    );
+    return data.pack;
+  }
+
+  async update(
+    packId: string,
+    options: { enabled?: boolean; max_tasks_per_day?: number },
+  ): Promise<unknown> {
+    const data = await this.http.patch<{ pack: unknown }>(
+      `/v1/packs/${encodeURIComponent(packId)}`,
+      options,
+    );
+    return data.pack;
+  }
+
+  async uninstall(packId: string): Promise<void> {
+    await this.http.delete(`/v1/packs/${encodeURIComponent(packId)}`);
+  }
+}
+
 export class Projects {
   constructor(private readonly http: HttpClient) {}
 

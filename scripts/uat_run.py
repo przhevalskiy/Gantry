@@ -56,7 +56,6 @@ def phase0_preflight() -> None:
         "P0.2 Temporal": (7233, "Temporal"),
         "P0.3 Agent ACP": (8000, "swarm-factory worker"),
         "P0.4 Gantry API": (8001, "Gantry API"),
-        "P0.5 apps/web": (5173, "Gantry UI"),
     }
     for label, (port, _) in ports.items():
         ok = check_port("localhost", port)
@@ -145,23 +144,29 @@ def phase2_api_inprocess() -> None:
         report.add("A3", "POST /v1/tasks submit", "PASS" if submitted.status_code == 201 else "FAIL", submitted.text)
 
 
-def phase3_ui_static() -> None:
-    try:
-        r = httpx.get("http://localhost:5173", timeout=5)
-        ok = r.status_code == 200 and "html" in r.text.lower()
-        report.add("U1", "UI loads :5173", "PASS" if ok else "FAIL", str(r.status_code))
-    except Exception as exc:
-        report.add("U1", "UI loads :5173", "FAIL", str(exc))
-
-    build = os.path.join(ROOT, "apps", "web", "dist", "index.html")
-    report.add("U-build", "apps/web production build artifact", "PASS" if os.path.isfile(build) else "FAIL")
+def phase3_docs() -> None:
+    required = [
+        "docs/README.md",
+        "docs/architecture.md",
+        "docs/platform.md",
+        "docs/api.md",
+        "docs/use-cases.md",
+    ]
+    for rel in required:
+        path = os.path.join(ROOT, *rel.split("/"))
+        report.add("D-" + rel, "docs present", "PASS" if os.path.isfile(path) else "FAIL")
+    report.add(
+        "D-no-web",
+        "apps/web absent",
+        "PASS" if not os.path.isdir(os.path.join(ROOT, "apps", "web")) else "FAIL",
+    )
 
 
 def main() -> int:
     phase0_preflight()
     phase1_automated()
     phase2_api_inprocess()
-    phase3_ui_static()
+    phase3_docs()
 
     counts = report.summary()
     print(json.dumps({"summary": counts, "results": [r.__dict__ for r in report.results]}, indent=2))

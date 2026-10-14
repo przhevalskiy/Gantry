@@ -1,4 +1,4 @@
-name: Hosting check
+name: Platform check
 
 on:
   push:
@@ -7,35 +7,23 @@ on:
     branches: [main]
 
 jobs:
-  web-build:
-    name: Vercel-ready web build
+  docs-and-invariants:
+    name: Docs + API-first invariants
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-
-      - name: Install
-        run: npm ci
-
-      - name: Production build
-        env:
-          VITE_GANTRY_API_URL: https://api.example.com
-        run: npm run build
-
-      - name: Deploy invariants
+      - name: Core docs present
         run: |
-          test -f vercel.json
-          test -f src/deploy/invariants.ts
-          test -f ../../docs/hosting/PLAN.md
-          grep -F '"destination": "/index.html"' vercel.json
+          test -f docs/README.md
+          test -f docs/architecture.md
+          test -f docs/platform.md
+          test -f docs/use-cases.md
+          test -f docs/api.md
+          test -f docs/deep-dives/swarm-factory.md
+          test ! -d apps/web
+          test ! -f deploy/vercel-deploy.sh
+          test ! -d docs/hosting
 
   api-cors:
     name: API CORS config
