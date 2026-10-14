@@ -1,44 +1,19 @@
-import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { paths } from "../lib/paths";
-import { getTask } from "../services/gantry/client";
-import { GantryApiError, type Task } from "../services/gantry/types";
+import { StreamTimeline, useTaskEventStream } from "../modules/stream";
 
-/** Active matter — status from GET /v1/tasks/{id}. SSE/HITL in later slices. */
+/** Active matter — GET task + SSE timeline. HITL cards in the next slice. */
 export function Engagement() {
   const { taskId } = useParams();
   const location = useLocation();
   const navState = (location.state || {}) as { goal?: string; project_id?: string };
-  const [task, setTask] = useState<Task | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { task, rows, status, result, streamError, loading, live } =
+    useTaskEventStream(taskId);
 
-  useEffect(() => {
-    if (!taskId) return;
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    void getTask(taskId)
-      .then((t) => {
-        if (!cancelled) setTask(t);
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        const msg =
-          e instanceof GantryApiError
-            ? e.detail
-            : e instanceof Error
-              ? e.message
-              : "Failed to load run";
-        setError(msg);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [taskId]);
+  const displayStatus = status ?? task?.status ?? null;
+  const displayResult = result !== undefined ? result : task?.result;
+  const goal = task?.goal || navState.goal;
+  const projectId = task?.project_id || navState.project_id;
 
   return (
     <div style={{ padding: "48px 32px 32px", maxWidth: 720 }}>
@@ -60,70 +35,119 @@ export function Engagement() {
         Engagement
       </h1>
       <p style={{ margin: "0 0 20px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
-        Work order received. Stream and HITL cards land in the next slices — status below is from{" "}
-        <code style={{ fontSize: 12 }}>GET /v1/tasks/{"{id}"}</code>.
+        Live stream from{" "}
+        <code style={{ fontSize: 12 }}>GET /v1/tasks/{"{id}"}/events</code>
+        {live ? (
+          <span style={{ marginLeft: 8, color: "var(--text-muted)", fontSize: 12 }}>
+            · live
+          </span>
+        ) : null}
+        . HITL response cards land next.
       </p>
 
       {loading ? (
         <p style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading…</p>
       ) : null}
-      {error ? <p style={{ color: "#b45309", fontSize: 13 }}>{error}</p> : null}
+      {streamError ? (
+        <p style={{ color: "#b45309", fontSize: 13, marginBottom: 16 }}>{streamError}</p>
+      ) : null}
 
-      {task ? (
+      <section style={{ marginBottom: 28 }}>
         <dl
           style={{
             margin: 0,
-            padding: 16,
-            borderRadius: 14,
-            background: "rgba(255,255,255,0.65)",
-            border: "1px solid var(--border-subtle)",
             display: "grid",
-            gap: 10,
+            gap: 12,
             fontSize: 14,
           }}
         >
-          <div>
-            <dt style={{ color: "var(--text-muted)", fontSize: 11, textTransform: "uppercase" }}>
-              Status
-            </dt>
-            <dd style={{ margin: "2px 0 0", fontWeight: 600 }}>{task.status}</dd>
-          </div>
-          {(task.goal || navState.goal) ? (
+          {displayStatus ? (
             <div>
-              <dt style={{ color: "var(--text-muted)", fontSize: 11, textTransform: "uppercase" }}>
+              <dt
+                style={{
+                  color: "var(--text-muted)",
+                  fontSize: 11,
+                  textTransform: "uppercase",
+                }}
+              >
+                Status
+              </dt>
+              <dd style={{ margin: "2px 0 0", fontWeight: 600 }}>{displayStatus}</dd>
+            </div>
+          ) : null}
+          {goal ? (
+            <div>
+              <dt
+                style={{
+                  color: "var(--text-muted)",
+                  fontSize: 11,
+                  textTransform: "uppercase",
+                }}
+              >
                 Goal
               </dt>
-              <dd style={{ margin: "2px 0 0" }}>{task.goal || navState.goal}</dd>
+              <dd style={{ margin: "2px 0 0" }}>{goal}</dd>
             </div>
           ) : null}
-          {(task.project_id || navState.project_id) ? (
+          {projectId ? (
             <div>
-              <dt style={{ color: "var(--text-muted)", fontSize: 11, textTransform: "uppercase" }}>
+              <dt
+                style={{
+                  color: "var(--text-muted)",
+                  fontSize: 11,
+                  textTransform: "uppercase",
+                }}
+              >
                 Project
               </dt>
-              <dd style={{ margin: "2px 0 0" }}>{task.project_id || navState.project_id}</dd>
-            </div>
-          ) : null}
-          {task.result ? (
-            <div>
-              <dt style={{ color: "var(--text-muted)", fontSize: 11, textTransform: "uppercase" }}>
-                Result
-              </dt>
-              <dd style={{ margin: "2px 0 0" }}>
-                <pre
-                  style={{
-                    margin: 0,
-                    fontSize: 12,
-                    whiteSpace: "pre-wrap",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  {JSON.stringify(task.result, null, 2)}
-                </pre>
-              </dd>
+              <dd style={{ margin: "2px 0 0" }}>{projectId}</dd>
             </div>
           ) : null}
         </dl>
+      </section>
+
+      <section style={{ marginBottom: 28 }}>
+        <h2
+          style={{
+            margin: "0 0 12px",
+            fontSize: 13,
+            fontWeight: 650,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+            color: "var(--text-muted)",
+          }}
+        >
+          Stream
+        </h2>
+        <StreamTimeline rows={rows} live={live} />
+      </section>
+
+      {displayResult ? (
+        <section>
+          <h2
+            style={{
+              margin: "0 0 12px",
+              fontSize: 13,
+              fontWeight: 650,
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+              color: "var(--text-muted)",
+            }}
+          >
+            Result
+          </h2>
+          <pre
+            style={{
+              margin: 0,
+              fontSize: 12,
+              whiteSpace: "pre-wrap",
+              color: "var(--text-secondary)",
+              lineHeight: 1.45,
+            }}
+          >
+            {JSON.stringify(displayResult, null, 2)}
+          </pre>
+        </section>
       ) : null}
     </div>
   );

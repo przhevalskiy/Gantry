@@ -56,6 +56,65 @@ export interface AgentSeat {
   level?: string;
 }
 
+/** SSE payloads from GET /v1/tasks/{id}/events — docs/platform/sse-events.md */
+export type TaskSseEventType =
+  | "status"
+  | "lifecycle"
+  | "message"
+  | "hitl"
+  | "error"
+  | "done";
+
+export interface TaskSseMessage {
+  id?: string;
+  content?: unknown;
+  role?: string;
+  created_at?: string;
+  timestamp?: string;
+  [key: string]: unknown;
+}
+
+export interface TaskSseStatusEvent {
+  type: "status";
+  status: string;
+}
+
+export interface TaskSseLifecycleEvent {
+  type: "lifecycle";
+  event: string;
+}
+
+export interface TaskSseMessageEvent {
+  type: "message";
+  message: TaskSseMessage;
+}
+
+export interface TaskSseHitlEvent {
+  type: "hitl";
+  checkpoint: string;
+  workflow_id: string;
+  description?: string;
+}
+
+export interface TaskSseErrorEvent {
+  type: "error";
+  message: string;
+}
+
+export interface TaskSseDoneEvent {
+  type: "done";
+  status: string;
+  result?: TaskResult | null;
+}
+
+export type TaskSseEvent =
+  | TaskSseStatusEvent
+  | TaskSseLifecycleEvent
+  | TaskSseMessageEvent
+  | TaskSseHitlEvent
+  | TaskSseErrorEvent
+  | TaskSseDoneEvent;
+
 export class GantryApiError extends Error {
   status: number;
   detail: string;

@@ -10,6 +10,7 @@ import {
   type SubmitTaskBody,
   type SubmitTaskResponse,
   type Task,
+  type TaskSseEvent,
 } from "./types";
 
 const baseUrl = () =>
@@ -86,4 +87,69 @@ export async function submitTask(body: SubmitTaskBody): Promise<SubmitTaskRespon
 export async function getTask(taskId: string): Promise<Task> {
   const res = await gantryFetch(`/v1/tasks/${encodeURIComponent(taskId)}`);
   return expectOk<Task>(res);
+}
+
+function parseSseFrame(frame: string): TaskSseEvent | null {
+  const line = frame.split("\n").find((l) => l.startsWith("data: "));
+  if (!line) return null;
+  try {
+    const payload = JSON.parse(line.slice(6)) as TaskSseEvent;
+    if (!payload || typeof payload !== "object" || !("type" in payload)) {
+      return null;
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * GET /v1/tasks/{id}/events — SSE via fetch (Bearer auth; EventSource cannot set Authorization).
+ * Yields until `done`/`error`, abort, or stream end. Observability only — prefer GET task result (I3).
+ */
+export async function* streamTaskEvents(
+  taskId: string,
+  options: { signal?: AbortSignal } = {},
+): AsyncGenerator<TaskSseEvent, void, unknown> {
+  const res = await gantryFetch(`/v1/tasks/${encodeURIComponent(taskId)}/events`, {
+    headers: { Accept: "text/event-stream" },
+    signal: options.signal,
+  });
+  if (!res.ok) {
+    throw new GantryApiError(res.status, await parseDetail(res));
+  }
+  const reader = res.body?.getReader();
+  if (!reader) {
+    throw new Error("No response body for SSE stream");
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      if (options.signal?.aborted) break;
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop() ?? "";
+
+      for (const frame of frames) {
+        const event = parseSseFrame(frame);
+        if (!event) continue;
+        yield event;
+        if (event.type === "done" || event.type === "error") {
+          return;
+        }
+      }
+    }
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      /* already released */
+    }
+  }
 }

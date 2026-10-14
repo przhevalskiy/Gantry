@@ -55,7 +55,7 @@ apps/web/
     │   └── Atmosphere.tsx    # sky / gradient backdrop (wireframe mood)
     ├── routes/
     │   ├── ComposeHome.tsx   # “file a work order” empty state + composer
-    │   ├── Engagement.tsx    # active matter (messaging) — stub
+    │   ├── Engagement.tsx    # active matter — GET task + SSE stream
     │   ├── Runs.tsx          # matter list — stub
     │   ├── Practices.tsx     # pack catalog — stub (not deploy-agent)
     │   ├── Team.tsx          # Operator directory — stub
@@ -67,8 +67,10 @@ apps/web/
     │   │   └── SuggestionChips.tsx
     │   ├── engagement-floor/ # Operator portraits (later)
     │   │   └── index.ts
-    │   ├── stream/           # SSE / bubbles (later)
-    │   │   └── index.ts
+    │   ├── stream/           # SSE timeline (slice 2)
+    │   │   ├── index.ts
+    │   │   ├── StreamTimeline.tsx
+    │   │   └── useTaskEventStream.ts
     │   ├── hitl/             # partner approval cards (later)
     │   │   └── index.ts
     │   └── artifacts/        # deliverable climax (later)
@@ -87,7 +89,7 @@ apps/web/
 |------|--------|--------------|
 | `/` | ComposeHome — firm greeting + composer | **Slice 1 wired** — project pick + `POST /v1/tasks` |
 | `/runs` | Runs list | Stub |
-| `/runs/:taskId` | Engagement (messaging + floor + HITL) | **Slice 1 partial** — `GET /v1/tasks/{id}` status (SSE later) |
+| `/runs/:taskId` | Engagement (messaging + floor + HITL) | **Slice 2 wired** — `GET /v1/tasks/{id}` + SSE timeline (HITL later) |
 | `/practices` | Firm packs | Stub |
 | `/team` | Operators | Stub |
 | `/briefs` | Playbooks | Stub |
@@ -107,7 +109,7 @@ apps/web/
 
 ## What this scaffold explicitly does **not** include
 
-- Live task submit / SSE / HITL wiring (next slices)
+- HITL response cards / floor portraits / artifact climax (later slices)
 - Operator portrait art kit
 - Auth/billing (“Free plan”) beyond placeholder chrome
 - Messenger deploy / Skills marketplace / Plugins nav
@@ -118,7 +120,7 @@ apps/web/
 ## Slice order (after structure lands)
 
 1. ~~ComposeHome + `POST /v1/tasks` submit~~ **done** (auth key field, project picker, navigate to engagement)  
-2. Engagement thread + `GET …/events` SSE  
+2. ~~Engagement thread + `GET …/events` SSE~~ **done** (typed stream client + timeline)  
 3. HITL cards → `POST …/hitl`  
 4. Engagement floor portraits  
 5. Practices / Team / Briefs read-only catalogs  
