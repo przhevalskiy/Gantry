@@ -100,7 +100,7 @@ apps/web/
 - Vite + React + TypeScript app under `apps/web`
 - App shell matching wireframe geometry (sidebar + **grooved** center stage + composer home)
 - Lucide icons only (no emoji in UI chrome)
-- Input bars: `--input-padding-inline: 2rem` (+ vertical padding for chrome)
+- Input bars: compact padding; submit/control size `2rem`
 - Design tokens from brand voice/look
 - Stub routes with firm copy (no Agent deploy landing)
 - Thin `services/gantry` placeholder pointing at `VITE_GANTRY_API_URL`
