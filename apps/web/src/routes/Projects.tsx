@@ -5,6 +5,7 @@ import {
   type FormEvent,
 } from "react";
 import { Link } from "react-router-dom";
+import { PageScroll } from "../shell/PageScroll";
 import { formatWhen } from "../lib/format";
 import { paths } from "../lib/paths";
 import { createProject, listProjects } from "../services/gantry/client";
@@ -69,7 +70,8 @@ export function Projects() {
   }
 
   return (
-    <div style={{ padding: "48px 32px 32px", maxWidth: 720 }}>
+    <PageScroll style={{ padding: "48px 32px 32px" }}>
+    <div style={{ maxWidth: 720 }}>
       <h1
         style={{
           margin: "0 0 8px",
@@ -184,6 +186,7 @@ export function Projects() {
         ))}
       </ul>
     </div>
+    </PageScroll>
   );
 }
 

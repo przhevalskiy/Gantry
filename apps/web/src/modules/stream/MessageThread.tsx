@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import type { PendingHitl, TaskResult } from "../../services/gantry/types";
 import { HitlCard } from "../hitl/HitlCard";
 import { derivePhaseView } from "./engagementPhase";
@@ -24,6 +24,7 @@ export function MessageThread({
   live,
   status,
   result,
+  deliverable = null,
 }: {
   taskId: string;
   goal?: string | null;
@@ -35,6 +36,7 @@ export function MessageThread({
   status?: string | null;
   result?: TaskResult | null;
   terminal?: boolean;
+  deliverable?: ReactNode;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -126,6 +128,12 @@ export function MessageThread({
             </div>
           ))
         : null}
+
+      {deliverable ? (
+        <div style={{ maxWidth: "min(600px, 100%)", alignSelf: "stretch" }}>
+          {deliverable}
+        </div>
+      ) : null}
 
       <div ref={endRef} />
     </div>

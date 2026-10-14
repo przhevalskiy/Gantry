@@ -72,12 +72,13 @@ export function ComposeHome() {
     <div
       style={{
         flex: 1,
+        minHeight: 0,
+        overflow: "auto",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
         padding: "40px 28px 64px",
-        minHeight: 0,
       }}
     >
       <HeadlineCarousel />

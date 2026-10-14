@@ -58,9 +58,11 @@ export function Engagement() {
       style={{
         flex: 1,
         minHeight: 0,
+        height: "100%",
+        maxHeight: "100%",
         display: "flex",
         flexDirection: "column",
-        height: "100%",
+        overflow: "hidden",
       }}
     >
       <header
@@ -108,43 +110,70 @@ export function Engagement() {
         />
       </header>
 
-      {loading ? (
-        <p style={{ margin: "16px 20px", color: "var(--text-muted)", fontSize: 13 }}>
-          Opening engagement…
-        </p>
-      ) : null}
-      {streamError ? (
-        <p style={{ margin: "8px 20px", color: "#b45309", fontSize: 13 }}>{streamError}</p>
-      ) : null}
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        {loading ? (
+          <p
+            style={{
+              margin: "12px 20px 0",
+              color: "var(--text-muted)",
+              fontSize: 13,
+              flexShrink: 0,
+            }}
+          >
+            Opening engagement…
+          </p>
+        ) : null}
+        {streamError ? (
+          <p
+            style={{
+              margin: "8px 20px 0",
+              color: "#b45309",
+              fontSize: 13,
+              flexShrink: 0,
+            }}
+          >
+            {streamError}
+          </p>
+        ) : null}
 
-      <MessageThread
-        taskId={taskId}
-        goal={goal}
-        rows={rows}
-        pendingHitl={pendingHitl}
-        onHitlResolved={dismissHitl}
-        localBubbles={localBubbles}
-        live={live}
-        status={displayStatus}
-        result={displayResult}
-      />
+        <MessageThread
+          taskId={taskId}
+          goal={goal}
+          rows={rows}
+          pendingHitl={pendingHitl}
+          onHitlResolved={dismissHitl}
+          localBubbles={localBubbles}
+          live={live}
+          status={displayStatus}
+          result={displayResult}
+          deliverable={
+            phase.showDeliverable && displayResult ? (
+              <ArtifactClimax result={displayResult} />
+            ) : null
+          }
+        />
+      </div>
 
-      {phase.showDeliverable && displayResult ? (
-        <div style={{ padding: "0 20px 12px", flexShrink: 0 }}>
-          <ArtifactClimax result={displayResult} />
-        </div>
-      ) : null}
-
-      <FollowUpComposer
-        taskId={taskId}
-        disabled={phase.terminal}
-        onSent={(text) =>
-          setLocalBubbles((prev) => [
-            ...prev,
-            { id: `local-${Date.now()}`, role: "user", text },
-          ])
-        }
-      />
+      <div style={{ flexShrink: 0 }}>
+        <FollowUpComposer
+          taskId={taskId}
+          disabled={phase.terminal}
+          onSent={(text) =>
+            setLocalBubbles((prev) => [
+              ...prev,
+              { id: `local-${Date.now()}`, role: "user", text },
+            ])
+          }
+        />
+      </div>
     </div>
   );
 }

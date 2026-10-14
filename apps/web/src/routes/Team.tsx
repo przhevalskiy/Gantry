@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PageScroll } from "../shell/PageScroll";
 import { OperatorPortrait } from "../modules/engagement-floor";
 import { listAgents } from "../services/gantry/client";
 import { GantryApiError, type AgentSeat } from "../services/gantry/types";
@@ -39,7 +40,8 @@ export function Team() {
   }, []);
 
   return (
-    <div style={{ padding: "48px 32px 32px", maxWidth: 800 }}>
+    <PageScroll style={{ padding: "48px 32px 32px" }}>
+    <div style={{ maxWidth: 800 }}>
       <h1
         style={{
           margin: "0 0 8px",
@@ -96,5 +98,6 @@ export function Team() {
         ))}
       </ul>
     </div>
+    </PageScroll>
   );
 }

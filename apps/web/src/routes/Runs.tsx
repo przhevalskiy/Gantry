@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { formatStatus, formatWhen } from "../lib/format";
 import { paths } from "../lib/paths";
+import { PageScroll } from "../shell/PageScroll";
 import { listProjects, listTasks } from "../services/gantry/client";
 import { GantryApiError, type Project, type Task } from "../services/gantry/types";
 
@@ -55,7 +56,8 @@ export function Runs() {
     : null;
 
   return (
-    <div style={{ padding: "48px 32px 32px", maxWidth: 800 }}>
+    <PageScroll style={{ padding: "48px 32px 32px" }}>
+    <div style={{ maxWidth: 800 }}>
       <div
         style={{
           display: "flex",
@@ -172,5 +174,6 @@ export function Runs() {
         ))}
       </ul>
     </div>
+    </PageScroll>
   );
 }

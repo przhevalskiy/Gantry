@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
+import { PageScroll } from "../shell/PageScroll";
 import { installPack, listPacks, updatePack } from "../services/gantry/client";
 import { GantryApiError, type FirmPack } from "../services/gantry/types";
 
@@ -72,7 +73,8 @@ export function Practices() {
   }
 
   return (
-    <div style={{ padding: "48px 32px 32px", maxWidth: 720 }}>
+    <PageScroll style={{ padding: "48px 32px 32px" }}>
+    <div style={{ maxWidth: 720 }}>
       <h1
         style={{
           margin: "0 0 8px",
@@ -147,6 +149,7 @@ export function Practices() {
         })}
       </ul>
     </div>
+    </PageScroll>
   );
 }
 

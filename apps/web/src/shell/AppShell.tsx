@@ -20,8 +20,11 @@ export function AppShell() {
   return (
     <div
       style={{
-        height: "100%",
-        minHeight: "100vh",
+        height: "100dvh",
+        maxHeight: "100dvh",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
         background: "var(--shell-gradient)",
       }}
     >
@@ -29,13 +32,14 @@ export function AppShell() {
         <div
           style={{
             height: "100%",
-            minHeight: "100vh",
+            minHeight: 0,
             padding: "var(--stage-inset)",
             display: "flex",
             gap: 0,
+            boxSizing: "border-box",
+            overflow: "hidden",
           }}
         >
-          {/* Width animates to 0 — sidebar fully clipped / hidden */}
           <div
             aria-hidden={!sidebarOpen}
             style={{
@@ -46,12 +50,15 @@ export function AppShell() {
               overflow: "hidden",
               transition: "width 280ms cubic-bezier(0.22, 1, 0.36, 1)",
               pointerEvents: sidebarOpen ? "auto" : "none",
+              minHeight: 0,
+              height: "100%",
             }}
           >
             <div
               style={{
                 width: "calc(var(--sidebar-width) + var(--stage-inset))",
                 height: "100%",
+                minHeight: 0,
                 paddingRight: "var(--stage-inset)",
                 boxSizing: "border-box",
                 opacity: sidebarOpen ? 1 : 0,
@@ -61,7 +68,7 @@ export function AppShell() {
               }}
             >
               <Sidebar
-                style={{ ...groovePane, height: "100%" }}
+                style={{ ...groovePane, height: "100%", minHeight: 0 }}
                 onCollapse={() => setSidebarOpen(false)}
               />
             </div>
@@ -73,9 +80,12 @@ export function AppShell() {
               ...groovePane,
               flex: 1,
               minWidth: 0,
+              minHeight: 0,
+              height: "100%",
               display: "flex",
               flexDirection: "column",
               position: "relative",
+              overflow: "hidden",
             }}
           >
             {!sidebarOpen ? (
@@ -103,7 +113,17 @@ export function AppShell() {
                 <PanelLeftOpen size={18} strokeWidth={1.75} aria-hidden />
               </button>
             ) : null}
-            <Outlet />
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
+              <Outlet />
+            </div>
           </main>
         </div>
       </Atmosphere>

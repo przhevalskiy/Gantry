@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { PageScroll } from "../shell/PageScroll";
 import { paths } from "../lib/paths";
 import { listPlaybooks } from "../services/gantry/client";
 import { GantryApiError, type PlaybookBrief } from "../services/gantry/types";
@@ -35,7 +36,8 @@ export function Briefs() {
   }, []);
 
   return (
-    <div style={{ padding: "48px 32px 32px", maxWidth: 720 }}>
+    <PageScroll style={{ padding: "48px 32px 32px" }}>
+    <div style={{ maxWidth: 720 }}>
       <h1
         style={{
           margin: "0 0 8px",
@@ -97,5 +99,6 @@ export function Briefs() {
         })}
       </ul>
     </div>
+    </PageScroll>
   );
 }
