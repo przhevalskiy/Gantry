@@ -18,7 +18,7 @@ local_development:
 
 # C1: single ACP task entry. Child workflows are Temporal-composed by Foreman (I7).
 agent:
-  acp_type: agentic
+  acp_type: async
   name: swarm-factory
   description: "L5 Durable Software Engineering Factory — Foreman composes PM, Architect, Builder, Inspector, Reviewer, Security, DevOps"
   temporal:
