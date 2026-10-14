@@ -1,12 +1,8 @@
 import { useEffect, useRef } from "react";
 import type { PendingHitl } from "../../services/gantry/types";
 import { HitlCard } from "../hitl/HitlCard";
-import {
-  extractMessageText,
-  isControlMessage,
-  seatFromText,
-  stripSeatPrefix,
-} from "./messageText";
+import { groupRowsIntoThread } from "./groupWork";
+import { WorkCard } from "./WorkCard";
 import type { StreamRow } from "./useTaskEventStream";
 
 export type LocalBubble = {
@@ -16,7 +12,10 @@ export type LocalBubble = {
   seat?: string | null;
 };
 
-/** Messaging thread — conversation first; HITL cards inline; not an ops log. */
+/**
+ * Messaging thread with work cards: user turns stay as bubbles;
+ * firm activity collapses into multi-step stage cards.
+ */
 export function MessageThread({
   taskId,
   goal,
@@ -36,56 +35,16 @@ export function MessageThread({
 }) {
   const endRef = useRef<HTMLDivElement>(null);
 
-  const bubbles: LocalBubble[] = [];
-  if (goal) {
-    bubbles.push({
-      id: "goal",
-      role: "user",
-      text: goal,
-    });
-  }
-
-  for (const row of rows) {
-    const ev = row.event;
-    if (ev.type === "message") {
-      const text = extractMessageText(ev.message);
-      if (!text || isControlMessage(text)) continue;
-      const seat = seatFromText(text);
-      bubbles.push({
-        id: row.id,
-        role: "firm",
-        text: stripSeatPrefix(text),
-        seat,
-      });
-    } else if (ev.type === "status") {
-      bubbles.push({
-        id: row.id,
-        role: "system",
-        text: `Status · ${ev.status.replace(/_/g, " ").toLowerCase()}`,
-      });
-    } else if (ev.type === "error") {
-      bubbles.push({
-        id: row.id,
-        role: "system",
-        text: ev.message,
-      });
-    } else if (ev.type === "done") {
-      bubbles.push({
-        id: row.id,
-        role: "system",
-        text: `Engagement ${ev.status.replace(/_/g, " ").toLowerCase()}`,
-      });
-    }
-    // lifecycle + hitl: presence/cards handle these — skip log noise
-  }
-
-  for (const b of localBubbles) {
-    if (!bubbles.some((x) => x.id === b.id)) bubbles.push(b);
-  }
+  const items = groupRowsIntoThread(
+    rows,
+    goal,
+    localBubbles.filter((b) => b.role === "user").map((b) => ({ id: b.id, text: b.text })),
+    pendingHitl.length > 0,
+  );
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [bubbles.length, pendingHitl.length]);
+  }, [items.length, pendingHitl.length, rows.length]);
 
   return (
     <div
@@ -96,21 +55,42 @@ export function MessageThread({
         padding: "8px 20px 16px",
         display: "flex",
         flexDirection: "column",
-        gap: 10,
+        gap: 12,
       }}
     >
-      {bubbles.length === 0 && pendingHitl.length === 0 ? (
+      {items.length === 0 && pendingHitl.length === 0 ? (
         <p style={{ margin: "24px auto", color: "var(--text-muted)", fontSize: 13 }}>
           {live ? "Foreman is staffing the floor…" : "No messages yet."}
         </p>
       ) : null}
 
-      {bubbles.map((b) => (
-        <Bubble key={b.id} bubble={b} />
-      ))}
+      {items.map((item) => {
+        if (item.kind === "user") {
+          return <UserBubble key={item.id} text={item.text} />;
+        }
+        if (item.kind === "system") {
+          return (
+            <p
+              key={item.id}
+              style={{
+                margin: "4px auto",
+                fontSize: 12,
+                color: "var(--text-muted)",
+                textAlign: "center",
+              }}
+            >
+              {item.text}
+            </p>
+          );
+        }
+        return <WorkCard key={item.stage.id} stage={item.stage} />;
+      })}
 
       {pendingHitl.map((p) => (
-        <div key={p.workflow_id || p.checkpoint} style={{ maxWidth: 420, alignSelf: "stretch" }}>
+        <div
+          key={p.workflow_id || p.checkpoint}
+          style={{ maxWidth: "min(560px, 100%)", alignSelf: "stretch" }}
+        >
           <HitlCard taskId={taskId} pending={p} onResolved={onHitlResolved} />
         </div>
       ))}
@@ -120,63 +100,23 @@ export function MessageThread({
   );
 }
 
-function Bubble({ bubble }: { bubble: LocalBubble }) {
-  if (bubble.role === "system") {
-    return (
-      <p
-        style={{
-          margin: "4px auto",
-          fontSize: 12,
-          color: "var(--text-muted)",
-          textAlign: "center",
-          maxWidth: 420,
-        }}
-      >
-        {bubble.text}
-      </p>
-    );
-  }
-
-  const mine = bubble.role === "user";
+function UserBubble({ text }: { text: string }) {
   return (
     <div
       style={{
-        alignSelf: mine ? "flex-end" : "flex-start",
+        alignSelf: "flex-end",
         maxWidth: "min(520px, 92%)",
-        display: "grid",
-        gap: 4,
+        padding: "10px 14px",
+        borderRadius: "18px 18px 6px 18px",
+        background: "var(--cta-primary-bg)",
+        color: "var(--cta-primary-fg)",
+        fontSize: 14,
+        lineHeight: 1.45,
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
       }}
     >
-      {!mine && bubble.seat ? (
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 650,
-            color: "var(--text-muted)",
-            paddingLeft: 4,
-          }}
-        >
-          {bubble.seat}
-        </span>
-      ) : null}
-      <div
-        style={{
-          padding: "10px 14px",
-          borderRadius: mine ? "18px 18px 6px 18px" : "18px 18px 18px 6px",
-          background: mine
-            ? "var(--cta-primary-bg)"
-            : "rgba(255,255,255,0.88)",
-          color: mine ? "var(--cta-primary-fg)" : "var(--text-primary)",
-          border: mine ? "none" : "1px solid var(--border-subtle)",
-          fontSize: 14,
-          lineHeight: 1.45,
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-          boxShadow: mine ? "none" : "0 1px 2px rgba(40,30,70,0.04)",
-        }}
-      >
-        {bubble.text}
-      </div>
+      {text}
     </div>
   );
 }
