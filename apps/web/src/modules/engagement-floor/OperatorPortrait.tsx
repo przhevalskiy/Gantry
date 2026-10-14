@@ -8,11 +8,13 @@ export function OperatorPortrait({
   name,
   presence = "idle",
   size = 52,
+  showLabel = true,
 }: {
   role: string;
   name: string;
   presence?: Presence;
   size?: number;
+  showLabel?: boolean;
 }) {
   const motif = motifFor(role);
   const field =
@@ -46,7 +48,14 @@ export function OperatorPortrait({
   };
 
   return (
-    <div style={{ display: "grid", justifyItems: "center", gap: 6, width: size + 12 }}>
+    <div
+      style={{
+        display: "grid",
+        justifyItems: "center",
+        gap: showLabel ? 6 : 0,
+        width: showLabel ? size + 12 : size,
+      }}
+    >
       <div style={shell} title={`${role} · ${name}`} aria-label={`${role}, ${presence}`}>
         <span
           aria-hidden
@@ -88,18 +97,20 @@ export function OperatorPortrait({
           />
         ) : null}
       </div>
-      <span
-        style={{
-          fontSize: 11,
-          fontWeight: 600,
-          color: "var(--text-secondary)",
-          textAlign: "center",
-          lineHeight: 1.2,
-          maxWidth: size + 24,
-        }}
-      >
-        {role}
-      </span>
+      {showLabel ? (
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: "var(--text-secondary)",
+            textAlign: "center",
+            lineHeight: 1.2,
+            maxWidth: size + 24,
+          }}
+        >
+          {role}
+        </span>
+      ) : null}
     </div>
   );
 }

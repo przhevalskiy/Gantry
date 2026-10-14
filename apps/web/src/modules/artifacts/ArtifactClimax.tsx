@@ -7,8 +7,14 @@ export function ArtifactClimax({ result }: { result: TaskResult }) {
   const artifactType =
     typeof result.artifact_type === "string" ? result.artifact_type : null;
   const extras = Object.entries(result).filter(
-    ([k]) => !["pr_url", "branch", "artifact_type"].includes(k),
+    ([k, v]) =>
+      !["pr_url", "branch", "artifact_type", "source"].includes(k) &&
+      v != null &&
+      v !== "",
   );
+  if (!pr && !branch && !artifactType && extras.length === 0) {
+    return null;
+  }
 
   return (
     <section style={{ marginBottom: 8 }}>

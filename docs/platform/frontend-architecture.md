@@ -66,4 +66,5 @@ Detailed IA and module names from the withdrawn greenfield attempt are **non-bin
 - [x] Engagement floor roster (slice 4)  
 - [x] Practices / Team / Briefs catalogs (slice 5)  
 - [x] Artifact climax from `result` (slice 6)  
-- [x] Runs list + Projects page + pack install/enable + brief → compose handoff
+- [x] Runs list + Projects page + pack install/enable + brief → compose handoff  
+- [x] Engagement as messaging UI (not ops console) — bubbles + follow-up + inline HITL

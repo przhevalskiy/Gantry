@@ -68,9 +68,12 @@ function presenceFor(
 export function EngagementFloor({
   status,
   pendingHitl,
+  compact = false,
 }: {
   status: string | null;
   pendingHitl: PendingHitl[];
+  /** Header strip under chat chrome (Muse Goals/Floor as secondary). */
+  compact?: boolean;
 }) {
   const [seats, setSeats] = useState<AgentSeat[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +97,7 @@ export function EngagementFloor({
 
   if (error) {
     return (
-      <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--text-muted)" }}>{error}</p>
+      <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>{error}</p>
     );
   }
   if (seats.length === 0) return null;
@@ -111,6 +114,36 @@ export function EngagementFloor({
       : active
         ? `${active.role} on the floor`
         : null);
+
+  if (compact) {
+    return (
+      <div style={{ display: "grid", gap: 6 }}>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "nowrap",
+            gap: 8,
+            overflowX: "auto",
+            paddingBottom: 2,
+          }}
+        >
+          {seats.map((seat) => (
+            <OperatorPortrait
+              key={seat.name}
+              role={seat.role}
+              name={seat.name}
+              presence={presenceFor(seat, status, pendingHitl)}
+              size={36}
+              showLabel={false}
+            />
+          ))}
+        </div>
+        {line ? (
+          <p style={{ margin: 0, fontSize: 12, color: "var(--text-muted)" }}>{line}</p>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <section style={{ marginBottom: 28 }}>

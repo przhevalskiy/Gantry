@@ -97,7 +97,7 @@ apps/web/
 |------|--------|--------------|
 | `/` | ComposeHome — firm greeting + composer | **Compose bar** — `+` project/brief + `POST /v1/tasks`; API key in sidebar |
 | `/runs` | Runs list | **Wired** — `GET /v1/tasks` → Engagement (`?project=` filter) |
-| `/runs/:taskId` | Engagement (messaging + floor + HITL) | **Wired** — SSE + HITL + floor + artifact |
+| `/runs/:taskId` | Engagement (messaging-first) | **Wired** — Foreman thread + follow-up + inline HITL + compact floor + artifact |
 | `/practices` | Firm packs | **Wired** — list + install/enable |
 | `/team` | Operators | **Wired** — `GET /v1/agents` + portraits |
 | `/briefs` | Playbooks | **Wired** — list + “Use on new run” |

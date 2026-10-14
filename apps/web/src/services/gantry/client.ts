@@ -115,6 +115,15 @@ function parseSseFrame(frame: string): TaskSseEvent | null {
   }
 }
 
+/** POST /v1/tasks/{id}/followup — continue the engagement conversation. */
+export async function sendFollowup(taskId: string, prompt: string): Promise<void> {
+  const res = await gantryFetch(`/v1/tasks/${encodeURIComponent(taskId)}/followup`, {
+    method: "POST",
+    body: JSON.stringify({ prompt }),
+  });
+  await expectOk<{ ok: boolean }>(res);
+}
+
 /** POST /v1/tasks/{id}/hitl — partner decision (C3 audit on server). */
 export async function decideHitl(
   taskId: string,
