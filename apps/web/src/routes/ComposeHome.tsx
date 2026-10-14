@@ -1,24 +1,37 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ApiKeyField } from "../modules/auth/ApiKeyField";
 import { Composer } from "../modules/composer/Composer";
-import { ProjectPicker } from "../modules/composer/ProjectPicker";
 import { SuggestionChips } from "../modules/composer/SuggestionChips";
 import { paths } from "../lib/paths";
-import { submitTask } from "../services/gantry/client";
+import { listProjects, submitTask } from "../services/gantry/client";
 import { GantryApiError } from "../services/gantry/types";
 
-/** Wireframe home — file a work order (POST /v1/tasks). */
+/** Wireframe home — headline + Claude-shaped composer only. */
 export function ComposeHome() {
   const navigate = useNavigate();
   const [goal, setGoal] = useState("");
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [playbookId, setPlaybookId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    let cancelled = false;
+    void listProjects()
+      .then((list) => {
+        if (!cancelled && list[0]?.id) setProjectId((cur) => cur ?? list[0].id);
+      })
+      .catch(() => {
+        /* picker handles empty / errors */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function handleSubmit(nextGoal: string) {
     if (!projectId) {
-      setError("Select or create a project before filing a work order.");
+      setError("Choose a project from + before filing a work order.");
       return;
     }
     setSubmitting(true);
@@ -28,6 +41,7 @@ export function ComposeHome() {
         goal: nextGoal,
         project_id: projectId,
         tier: -1,
+        playbook: playbookId,
       });
       navigate(paths.engagement(res.task_id), {
         state: { goal: nextGoal, project_id: projectId },
@@ -71,31 +85,18 @@ export function ComposeHome() {
         What should the firm take on?
       </p>
 
-      <ApiKeyField />
-      <ProjectPicker value={projectId} onChange={setProjectId} />
       <Composer
         value={goal}
         onChange={setGoal}
         onSubmit={handleSubmit}
-        disabled={!projectId}
+        projectId={projectId}
+        playbookId={playbookId}
+        onProjectChange={setProjectId}
+        onPlaybookChange={setPlaybookId}
         submitting={submitting}
         error={error}
       />
       <SuggestionChips onPick={setGoal} />
-
-      <p
-        style={{
-          marginTop: 28,
-          fontSize: 13,
-          color: "var(--text-muted)",
-          textAlign: "center",
-          maxWidth: 420,
-          lineHeight: 1.45,
-        }}
-      >
-        File a work order. The Foreman staffs Operators and closes with a structured artifact — not a
-        chat farewell.
-      </p>
     </div>
   );
 }

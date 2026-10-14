@@ -62,9 +62,12 @@ apps/web/
     │   ├── Briefs.tsx        # playbooks — stub
     │   └── Projects.tsx      # workspaces — stub
     ├── modules/
-    │   ├── composer/         # work-order input + suggestion chips
+    │   ├── composer/         # Claude-shaped bar + `+` menu (project/brief)
     │   │   ├── Composer.tsx
+    │   │   ├── ComposerMenu.tsx
     │   │   └── SuggestionChips.tsx
+    │   ├── auth/
+    │   │   └── ApiKeyField.tsx   # sidebar UserChip settings (not hero)
     │   ├── engagement-floor/ # Operator roster rail (slice 4)
     │   │   ├── index.ts
     │   │   ├── EngagementFloor.tsx
@@ -92,7 +95,7 @@ apps/web/
 
 | Path | Screen | Slice status |
 |------|--------|--------------|
-| `/` | ComposeHome — firm greeting + composer | **Slice 1 wired** — project pick + `POST /v1/tasks` |
+| `/` | ComposeHome — firm greeting + composer | **Compose bar** — `+` project/brief + `POST /v1/tasks`; API key in sidebar |
 | `/runs` | Runs list | Stub |
 | `/runs/:taskId` | Engagement (messaging + floor + HITL) | **Slices 2–6** — SSE + HITL + floor + artifact climax |
 | `/practices` | Firm packs | **Slice 5** — `GET /v1/packs` |
