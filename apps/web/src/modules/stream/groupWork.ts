@@ -7,199 +7,159 @@ import {
 } from "./messageText";
 import type { StreamRow } from "./useTaskEventStream";
 
-export type WorkStep = {
+export type Exchange = {
   id: string;
-  seat: string | null;
+  /** Speaker seat */
+  from: string;
+  /** If Foreman is dispatching someone */
+  to: string | null;
+  kind: "dispatch" | "speak" | "note";
   text: string;
   tone: "info" | "warn" | "done";
 };
 
-export type WorkStage = {
+export type TrackChain = {
   id: string;
-  title: string;
-  status: "running" | "done" | "blocked";
-  steps: WorkStep[];
+  name: string;
+  status: "planned" | "dropped" | "running" | "done";
+  detail?: string;
 };
 
 export type ThreadItem =
   | { kind: "user"; id: string; text: string }
   | { kind: "system"; id: string; text: string }
-  | { kind: "stage"; stage: WorkStage };
+  | { kind: "crew"; id: string; exchanges: Exchange[]; status: "running" | "blocked" | "done" }
+  | { kind: "tracks"; id: string; tracks: TrackChain[] };
 
-function stageForSeat(seat: string | null, text: string): string {
-  const s = (seat || "").toLowerCase();
-  const t = text.toLowerCase();
-
-  if (t.includes("dispatching builder") || s.includes("builder")) return "build";
-  if (t.includes("dispatching inspector") || s.includes("inspector")) return "verify";
-  if (t.includes("dispatching reviewer") || s.includes("reviewer")) return "verify";
-  if (t.includes("dispatching security") || s.includes("security")) return "secure";
-  if (t.includes("dispatching devops") || s.includes("devops")) return "ship";
-  if (
-    t.includes("dispatching architect") ||
-    s.includes("architect") ||
-    t.includes("track(s) planned") ||
-    t.includes("track(s) dropped")
-  ) {
-    return "plan";
-  }
-  if (
-    t.includes("dispatching pm") ||
-    s === "pm" ||
-    t.includes("scanning repository") ||
-    t.includes("checking for ambiguities")
-  ) {
-    return "clarify";
-  }
-  if (
-    t.includes("complexity tier") ||
-    t.includes("swarm factory activated") ||
-    t.startsWith("goal:") ||
-    t.startsWith("repo:")
-  ) {
-    return "kickoff";
-  }
-  if (s.includes("foreman")) {
-    if (t.includes("dispatching")) return "clarify";
-    return "kickoff";
-  }
-  return "work";
-}
-
-const STAGE_TITLE: Record<string, string> = {
-  kickoff: "Staffing the engagement",
-  clarify: "Clarifying the brief",
-  plan: "Architecting the plan",
-  build: "Building",
-  verify: "Verifying",
-  secure: "Security review",
-  ship: "Shipping",
-  work: "Working",
-};
-
-function stepTone(text: string): WorkStep["tone"] {
+function toneOf(text: string): Exchange["tone"] {
   if (text.includes("⚠") || /dropped|fail|error/i.test(text)) return "warn";
   if (text.includes("✓") || /\bdone\b/i.test(text)) return "done";
   return "info";
 }
 
+function parseDispatch(text: string): { to: string; rest: string } | null {
+  const m = text.match(/^Dispatching\s+([^—\-]+)[—\-]\s*(.*)$/i);
+  if (!m) return null;
+  return { to: m[1].trim(), rest: m[2].trim() };
+}
+
+function ingestTracks(text: string, into: Map<string, TrackChain>): void {
+  const dropped = text.match(/track\(s\)\s+dropped[^:]*:\s*([^.]+)/i);
+  if (dropped) {
+    for (const name of dropped[1].split(/,|\sand\s/).map((s) => s.trim()).filter(Boolean)) {
+      into.set(name, {
+        id: `drop-${name}`,
+        name,
+        status: "dropped",
+        detail: "No valid steps",
+      });
+    }
+  }
+
+  const planned = text.match(/(\d+)\s+track\(s\)\s+planned/i);
+  if (planned) {
+    const n = Number(planned[1]);
+    const stack = text.match(/stack:\s*([^,]+)/i)?.[1]?.trim();
+    const steps = text.match(/(\d+)\s+steps?/i)?.[1];
+    // If we only know a count, synthesize placeholders for unnamed tracks
+    const existingPlanned = [...into.values()].filter((t) => t.status === "planned").length;
+    for (let i = existingPlanned; i < n; i++) {
+      const name = n === 1 ? "Primary track" : `Track ${i + 1}`;
+      if (!into.has(name)) {
+        into.set(name, {
+          id: `plan-${name}`,
+          name,
+          status: "planned",
+          detail: [stack && stack !== "unknown stack" ? stack : null, steps ? `${steps} steps` : null]
+            .filter(Boolean)
+            .join(" · ") || "Awaiting approval",
+        });
+      }
+    }
+  }
+
+  // "3 track(s)" in complexity line — capacity, not concrete chains yet
+}
+
 /**
- * Collapse noisy per-action chat lines into multi-step work stages
- * (agent-turn / work-card pattern).
+ * Build a crew-dialogue + track-chain model from SSE rows.
+ * Shows who speaks to whom, and which parallel chains exist.
  */
 export function groupRowsIntoThread(
   rows: StreamRow[],
   goal: string | null | undefined,
   localUser: { id: string; text: string }[],
   blocked: boolean,
+  terminal: boolean,
 ): ThreadItem[] {
   const items: ThreadItem[] = [];
   if (goal) items.push({ kind: "user", id: "goal", text: goal });
 
-  const stages = new Map<string, WorkStage>();
-  const order: string[] = [];
-
-  function ensure(key: string): WorkStage {
-    let s = stages.get(key);
-    if (!s) {
-      s = {
-        id: key,
-        title: STAGE_TITLE[key] || STAGE_TITLE.work,
-        status: "running",
-        steps: [],
-      };
-      stages.set(key, s);
-      order.push(key);
-    }
-    return s;
-  }
+  const exchanges: Exchange[] = [];
+  const tracks = new Map<string, TrackChain>();
 
   for (const row of rows) {
     const ev = row.event as TaskSseEvent;
     if (ev.type === "message") {
-      const text = extractMessageText(ev.message);
-      if (!text || isControlMessage(text)) continue;
-      const seat = seatFromText(text);
-      const body = stripSeatPrefix(text).trim();
+      const raw = extractMessageText(ev.message);
+      if (!raw || isControlMessage(raw)) continue;
+      const seat = seatFromText(raw) || "Firm";
+      const body = stripSeatPrefix(raw).trim();
       if (!body) continue;
 
-      // Fold multi-line Foreman activation into fewer steps
-      const lines = body.split("\n").map((l) => l.trim()).filter(Boolean);
-      const key = stageForSeat(seat, body);
-      const stage = ensure(key);
+      ingestTracks(body, tracks);
 
-      if (
-        key === "kickoff" &&
-        lines.some((l) => l.startsWith("Goal:") || l.startsWith("Repo:"))
-      ) {
-        // One activation step instead of Goal/Repo spam
-        const summary = lines
-          .filter((l) => !l.startsWith("Goal:"))
-          .slice(0, 2)
-          .join(" · ");
-        stage.steps.push({
-          id: row.id,
-          seat: seat || "Foreman",
-          text: summary || body,
-          tone: stepTone(body),
-        });
-      } else if (lines.length > 1 && seat?.toLowerCase().includes("foreman")) {
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (line.startsWith("Goal:")) continue;
-          stage.steps.push({
-            id: `${row.id}:${i}`,
-            seat: seat || "Foreman",
-            text: line.replace(/^Repo:\s*/, "Repo "),
-            tone: stepTone(line),
+      const lines = body.split("\n").map((l) => l.trim()).filter(Boolean);
+      const isForeman = seat.toLowerCase().includes("foreman");
+
+      if (isForeman && lines.length > 1) {
+        // Activation block → one note, skip Goal: echo
+        const kept = lines.filter((l) => !l.startsWith("Goal:"));
+        const dispatchLine = kept.find((l) => /^Dispatching\s+/i.test(l));
+        if (dispatchLine) {
+          for (const line of kept) {
+            pushExchange(exchanges, row.id + line, seat, line);
+          }
+        } else {
+          exchanges.push({
+            id: row.id,
+            from: seat,
+            to: null,
+            kind: "note",
+            text: kept.map((l) => l.replace(/^Repo:\s*/, "Repo ")).join(" · "),
+            tone: toneOf(body),
           });
         }
-      } else {
-        stage.steps.push({
-          id: row.id,
-          seat,
-          text: body,
-          tone: stepTone(body),
-        });
+        continue;
       }
 
-      if (stepTone(body) === "done") stage.status = "done";
+      pushExchange(exchanges, row.id, seat, body);
     } else if (ev.type === "error") {
       items.push({ kind: "system", id: row.id, text: ev.message });
     } else if (ev.type === "done") {
-      for (const key of order) {
-        const s = stages.get(key);
-        if (s && s.status === "running") s.status = "done";
-      }
       items.push({
         kind: "system",
         id: row.id,
         text: `Engagement ${ev.status.replace(/_/g, " ").toLowerCase()}`,
       });
     }
-    // status/lifecycle/hitl: header + HITL card — not thread spam
   }
 
-  // Mark last non-done stage blocked when HITL pending
-  if (blocked) {
-    for (let i = order.length - 1; i >= 0; i--) {
-      const s = stages.get(order[i]);
-      if (s && s.status !== "done") {
-        s.status = "blocked";
-        break;
-      }
-    }
-  } else {
-    // Only the last stage stays running; earlier ones settle to done
-    for (let i = 0; i < order.length - 1; i++) {
-      const s = stages.get(order[i]);
-      if (s && s.status === "running") s.status = "done";
-    }
+  if (exchanges.length) {
+    items.push({
+      kind: "crew",
+      id: "crew",
+      exchanges,
+      status: terminal ? "done" : blocked ? "blocked" : "running",
+    });
   }
 
-  for (const key of order) {
-    const s = stages.get(key);
-    if (s && s.steps.length) items.push({ kind: "stage", stage: s });
+  if (tracks.size) {
+    items.push({
+      kind: "tracks",
+      id: "tracks",
+      tracks: [...tracks.values()],
+    });
   }
 
   for (const u of localUser) {
@@ -209,4 +169,32 @@ export function groupRowsIntoThread(
   }
 
   return items;
+}
+
+function pushExchange(
+  exchanges: Exchange[],
+  id: string,
+  seat: string,
+  body: string,
+): void {
+  const dispatch = parseDispatch(body);
+  if (seat.toLowerCase().includes("foreman") && dispatch) {
+    exchanges.push({
+      id,
+      from: seat,
+      to: dispatch.to,
+      kind: "dispatch",
+      text: dispatch.rest || body,
+      tone: toneOf(body),
+    });
+    return;
+  }
+  exchanges.push({
+    id,
+    from: seat,
+    to: null,
+    kind: toneOf(body) === "warn" ? "note" : "speak",
+    text: body,
+    tone: toneOf(body),
+  });
 }

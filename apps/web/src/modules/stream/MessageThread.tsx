@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
 import type { PendingHitl } from "../../services/gantry/types";
 import { HitlCard } from "../hitl/HitlCard";
+import { CrewDialogue } from "./CrewDialogue";
 import { groupRowsIntoThread } from "./groupWork";
-import { WorkCard } from "./WorkCard";
+import { TrackBoard } from "./TrackBoard";
 import type { StreamRow } from "./useTaskEventStream";
 
 export type LocalBubble = {
@@ -12,10 +13,7 @@ export type LocalBubble = {
   seat?: string | null;
 };
 
-/**
- * Messaging thread with work cards: user turns stay as bubbles;
- * firm activity collapses into multi-step stage cards.
- */
+/** Messaging thread: user bubbles + crew dialogue + work chains + HITL. */
 export function MessageThread({
   taskId,
   goal,
@@ -24,6 +22,7 @@ export function MessageThread({
   onHitlResolved,
   localBubbles,
   live,
+  terminal = false,
 }: {
   taskId: string;
   goal?: string | null;
@@ -32,6 +31,7 @@ export function MessageThread({
   onHitlResolved: (workflowId: string) => void;
   localBubbles: LocalBubble[];
   live: boolean;
+  terminal?: boolean;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -40,6 +40,7 @@ export function MessageThread({
     goal,
     localBubbles.filter((b) => b.role === "user").map((b) => ({ id: b.id, text: b.text })),
     pendingHitl.length > 0,
+    terminal,
   );
 
   useEffect(() => {
@@ -83,13 +84,22 @@ export function MessageThread({
             </p>
           );
         }
-        return <WorkCard key={item.stage.id} stage={item.stage} />;
+        if (item.kind === "crew") {
+          return (
+            <CrewDialogue
+              key={item.id}
+              exchanges={item.exchanges}
+              status={item.status}
+            />
+          );
+        }
+        return <TrackBoard key={item.id} tracks={item.tracks} />;
       })}
 
       {pendingHitl.map((p) => (
         <div
           key={p.workflow_id || p.checkpoint}
-          style={{ maxWidth: "min(560px, 100%)", alignSelf: "stretch" }}
+          style={{ maxWidth: "min(600px, 100%)", alignSelf: "stretch" }}
         >
           <HitlCard taskId={taskId} pending={p} onResolved={onHitlResolved} />
         </div>

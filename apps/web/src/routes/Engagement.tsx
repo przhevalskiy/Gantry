@@ -125,6 +125,7 @@ export function Engagement() {
         onHitlResolved={dismissHitl}
         localBubbles={localBubbles}
         live={live}
+        terminal={terminal}
       />
 
       {displayResult ? (
