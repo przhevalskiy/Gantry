@@ -34,7 +34,7 @@ export function Composer({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 12,
+          gap: 8,
           borderRadius: 999,
           background: "var(--panel-bg)",
           boxShadow: "var(--panel-shadow)",
