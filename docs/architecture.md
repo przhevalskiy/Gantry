@@ -1,36 +1,38 @@
 # Architecture
 
-Gantry is an **API-first control plane** over a durable Temporal crew that runs as one Agentex citizen (`swarm-factory`). There is no in-repo product UI; clients are SDKs, curl, CI, ticketing webhooks, or a future optional frontend.
+Gantry is a **silicon engineering firm** implemented as an API-first control plane over one Agentex citizen (`swarm-factory`). The Foreman staffs Operator child workflows for each engagement. There is no in-repo product UI; clients are SDKs, curl, CI, ticketing webhooks, or a future optional frontend.
+
+Firm mapping: [`brand/persona-the-firm.md`](./brand/persona-the-firm.md) · Product rules: [`platform.md`](./platform.md)
 
 ```
-Integrator (SDK / curl / CI / future UI)
-        │  Authorization: Bearer gantry_…
+Client (SDK / curl / CI / future UI)
+        │  Authorization: Bearer gantry_…   ← file a work order
         ▼
-   api/  FastAPI control plane  (:8001)
+   api/  control plane  (:8001)
         │  ACP task/create → Agentex
         ▼
    Agentex  (:5003)  +  Temporal
         │
         ▼
-   worker.py  — Foreman workflow (swarm-factory)
+   worker.py  — Foreman (swarm-factory) staffs Operators
         │
         ├── PM → Architect → Builders∥ → Inspector ↺
-        ├── Reviewer → Security → DevOps
-        └── activities: repo tools, LLM, verify, git, PR
+        ├── Reviewer → Security → DevOps → artifact
+        └── activities: repo tools, LLM, verify, git, delivery
 ```
 
 ---
 
 ## Layers
 
-| Layer | Path | Role |
-|-------|------|------|
-| **Control plane** | `api/` | Org-scoped keys, projects/workspaces, tasks, playbooks, packs, quotas, audit, webhooks, HITL, SSE. Submits work via Agentex ACP; does **not** run agent loops. |
-| **Citizen entry** | `manifest.yaml`, Agentex ACP | Single task target: **`swarm-factory`**. |
-| **Engine** | `workflows/`, `activities/`, `worker.py` | Temporal Foreman composes child workflows. LLM + repo tools execute here. |
-| **Schemas** | `schemas/` (`crew.py`, `playbooks.py`, `firm_packs.py`) | Catalog, tiers, playbook overlays, pack contracts. |
+| Layer | Path | Firm role |
+|-------|------|-----------|
+| **Control plane** | `api/` | Matter filing — keys, projects, tasks, playbooks, packs, quotas, audit, webhooks, HITL, SSE. Does **not** run agent loops. |
+| **Citizen entry** | `manifest.yaml`, Agentex ACP | Front desk — only ACP target: **`swarm-factory`**. |
+| **Engine** | `workflows/`, `activities/`, `worker.py` | Foreman composes Operator Temporal children. |
+| **Schemas** | `schemas/` (`crew.py`, `playbooks.py`, `firm_packs.py`) | Practices, briefs, crew catalog. |
 | **SDKs** | `sdk/python`, `sdk/typescript` | Thin clients over `/v1/*`. |
-| **UI** | *(none)* | Deferred. See [`platform/frontend-architecture.md`](./platform/frontend-architecture.md) and [`brand/`](./brand/). |
+| **UI** | *(none)* | Deferred optional client. [`platform/frontend-architecture.md`](./platform/frontend-architecture.md) · [`brand/`](./brand/). |
 
 ---
 
@@ -76,11 +78,11 @@ Removed / non-product: `apps/web` (deleted), legacy `ui/`, root demo SPA, Vercel
 
 ---
 
-## Two doors in, one factory
+## Two doors in, one firm
 
 | Door | Who | Entry |
 |------|-----|--------|
-| **REST** | Integrators, future UI | `POST /v1/tasks` on Gantry API |
+| **REST** | Integrators, future UI | `POST /v1/tasks` — file a work order |
 | **ACP** | Sibling Agentex agents | `task/create` → `swarm-factory` |
 
 Both doors land on the **same** Foreman. Never add a second ACP task agent for a playbook or “bot” (**C1**, **P2**).
@@ -89,6 +91,7 @@ Both doors land on the **same** Foreman. Never add a second ACP task agent for a
 
 ## Related
 
+- Firm persona: [`brand/persona-the-firm.md`](./brand/persona-the-firm.md)
 - Invariants: [`platform.md`](./platform.md)
 - Live routes: [`api.md`](./api.md)
 - Foreman deep dive: [`deep-dives/swarm-factory.md`](./deep-dives/swarm-factory.md)

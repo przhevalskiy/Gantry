@@ -1,9 +1,10 @@
 # Gantry documentation
 
-**Product:** API-first L5 software-engineering factory.  
+**Product:** a silicon engineering firm — one Foreman (`swarm-factory`), staffed Operators, API-first control plane.  
+**Promise:** retain a practice → file a work order → receive a structured change artifact (`pr` \| `branch` \| `patch` \| `report`).  
 **Surface today:** REST `/v1/*` + SDKs + webhooks. **No in-repo web UI.**
 
-Start here before any full-stack / frontend work. Brand and restart notes under [`brand/`](./brand/) are locked; frontend rebuild is deferred until this set is treated as truth.
+Start here before any full-stack / frontend work. Brand under [`brand/`](./brand/) is locked with this set; frontend rebuild is deferred until both are treated as truth.
 
 ---
 

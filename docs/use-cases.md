@@ -1,13 +1,15 @@
 # Use cases
 
-How Gantry is meant to be used **today** (API-first). A future frontend is an optional client of the same flows — not a different product.
+How to retain the firm and file engagements **today** (API-first). A future frontend is an optional client of the same flows — not a different product.
+
+Firm vocabulary: practice = pack, brief = playbook, work order = task, deliverable = structured `result`. See [`platform.md`](./platform.md).
 
 ---
 
-## 1. Headless backlog → PR
+## 1. Headless backlog → deliverable
 
 **Who:** Eng leads, platform teams  
-**Flow:** Create key → link GitHub project → `POST /v1/tasks` with a goal → poll or webhook → review PR.
+**Flow:** Create key → link GitHub project → `POST /v1/tasks` (work order) → poll or webhook → review artifact.
 
 ```bash
 curl -X POST "$API/v1/tasks" \
