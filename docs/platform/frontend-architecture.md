@@ -62,4 +62,5 @@ Detailed IA and module names from the withdrawn greenfield attempt are **non-bin
 - [x] Empty FE scaffold (`apps/web` + [`frontend-structure.md`](./frontend-structure.md))  
 - [x] ComposeHome → `POST /v1/tasks` (slice 1)  
 - [x] Engagement SSE `GET …/events` (slice 2)  
-- [ ] Next: HITL cards → `POST …/hitl`
+- [x] HITL cards → `POST …/hitl` (slice 3)  
+- [ ] Next: engagement floor + catalogs + artifact climax

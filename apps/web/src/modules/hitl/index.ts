@@ -1,2 +1,3 @@
 /** Partner approval cards → POST /v1/tasks/{id}/hitl */
-export {};
+export { HitlCard } from "./HitlCard";
+export { HitlPanel } from "./HitlPanel";

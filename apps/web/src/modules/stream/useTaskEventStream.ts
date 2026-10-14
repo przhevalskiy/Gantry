@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getTask, streamTaskEvents } from "../../services/gantry/client";
 import {
   GantryApiError,
+  type PendingHitl,
   type Task,
   type TaskResult,
   type TaskSseEvent,
@@ -27,18 +28,31 @@ function rowId(event: TaskSseEvent, seq: number): string {
   return `${event.type}:${seq}`;
 }
 
+function upsertPending(list: PendingHitl[], next: PendingHitl): PendingHitl[] {
+  const key = next.workflow_id || `${next.checkpoint}`;
+  const without = list.filter(
+    (p) => (p.workflow_id || `${p.checkpoint}`) !== key,
+  );
+  return [...without, next];
+}
+
 /**
  * Live engagement stream for one task. Re-GETs task on mount (reconnect rule);
- * SSE drives timeline + status until terminal.
+ * SSE drives timeline + status + pending HITL until terminal.
  */
 export function useTaskEventStream(taskId: string | undefined) {
   const [task, setTask] = useState<Task | null>(null);
   const [rows, setRows] = useState<StreamRow[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const [result, setResult] = useState<TaskResult | null | undefined>(undefined);
+  const [pendingHitl, setPendingHitl] = useState<PendingHitl[]>([]);
   const [streamError, setStreamError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [live, setLive] = useState(false);
+
+  const dismissHitl = useCallback((workflowId: string) => {
+    setPendingHitl((prev) => prev.filter((p) => p.workflow_id !== workflowId));
+  }, []);
 
   useEffect(() => {
     if (!taskId) return;
@@ -51,6 +65,7 @@ export function useTaskEventStream(taskId: string | undefined) {
     setRows([]);
     setStatus(null);
     setResult(undefined);
+    setPendingHitl([]);
     setLive(false);
 
     void (async () => {
@@ -60,6 +75,7 @@ export function useTaskEventStream(taskId: string | undefined) {
         setTask(t);
         setStatus(t.status);
         if (t.result) setResult(t.result);
+        setPendingHitl(t.pending_hitl ?? []);
       } catch (e) {
         if (cancelled) return;
         const msg =
@@ -91,15 +107,25 @@ export function useTaskEventStream(taskId: string | undefined) {
           if (event.type === "status") {
             setStatus(event.status);
             setTask((prev) => (prev ? { ...prev, status: event.status } : prev));
+          } else if (event.type === "hitl") {
+            setPendingHitl((prev) =>
+              upsertPending(prev, {
+                checkpoint: event.checkpoint,
+                workflow_id: event.workflow_id,
+                description: event.description,
+              }),
+            );
           } else if (event.type === "done") {
             setStatus(event.status);
             if (event.result !== undefined) setResult(event.result ?? null);
+            setPendingHitl([]);
             setTask((prev) =>
               prev
                 ? {
                     ...prev,
                     status: event.status,
                     result: event.result ?? prev.result,
+                    pending_hitl: [],
                   }
                 : prev,
             );
@@ -127,5 +153,15 @@ export function useTaskEventStream(taskId: string | undefined) {
     };
   }, [taskId]);
 
-  return { task, rows, status, result, streamError, loading, live };
+  return {
+    task,
+    rows,
+    status,
+    result,
+    pendingHitl,
+    dismissHitl,
+    streamError,
+    loading,
+    live,
+  };
 }

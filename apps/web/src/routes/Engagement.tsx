@@ -1,14 +1,24 @@
 import { Link, useLocation, useParams } from "react-router-dom";
 import { paths } from "../lib/paths";
+import { HitlPanel } from "../modules/hitl";
 import { StreamTimeline, useTaskEventStream } from "../modules/stream";
 
-/** Active matter — GET task + SSE timeline. HITL cards in the next slice. */
+/** Active matter — GET task + SSE timeline + HITL cards. */
 export function Engagement() {
   const { taskId } = useParams();
   const location = useLocation();
   const navState = (location.state || {}) as { goal?: string; project_id?: string };
-  const { task, rows, status, result, streamError, loading, live } =
-    useTaskEventStream(taskId);
+  const {
+    task,
+    rows,
+    status,
+    result,
+    pendingHitl,
+    dismissHitl,
+    streamError,
+    loading,
+    live,
+  } = useTaskEventStream(taskId);
 
   const displayStatus = status ?? task?.status ?? null;
   const displayResult = result !== undefined ? result : task?.result;
@@ -35,14 +45,14 @@ export function Engagement() {
         Engagement
       </h1>
       <p style={{ margin: "0 0 20px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
-        Live stream from{" "}
-        <code style={{ fontSize: 12 }}>GET /v1/tasks/{"{id}"}/events</code>
+        Stream + partner approvals via{" "}
+        <code style={{ fontSize: 12 }}>/v1/tasks/{"{id}"}</code>
         {live ? (
           <span style={{ marginLeft: 8, color: "var(--text-muted)", fontSize: 12 }}>
             · live
           </span>
         ) : null}
-        . HITL response cards land next.
+        .
       </p>
 
       {loading ? (
@@ -105,6 +115,14 @@ export function Engagement() {
           ) : null}
         </dl>
       </section>
+
+      {taskId ? (
+        <HitlPanel
+          taskId={taskId}
+          pending={pendingHitl}
+          onResolved={dismissHitl}
+        />
+      ) : null}
 
       <section style={{ marginBottom: 28 }}>
         <h2

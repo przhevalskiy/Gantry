@@ -71,8 +71,10 @@ apps/web/
     │   │   ├── index.ts
     │   │   ├── StreamTimeline.tsx
     │   │   └── useTaskEventStream.ts
-    │   ├── hitl/             # partner approval cards (later)
-    │   │   └── index.ts
+    │   ├── hitl/             # partner approval cards (slice 3)
+    │   │   ├── index.ts
+    │   │   ├── HitlCard.tsx
+    │   │   └── HitlPanel.tsx
     │   └── artifacts/        # deliverable climax (later)
     │       └── index.ts
     └── services/
@@ -89,7 +91,7 @@ apps/web/
 |------|--------|--------------|
 | `/` | ComposeHome — firm greeting + composer | **Slice 1 wired** — project pick + `POST /v1/tasks` |
 | `/runs` | Runs list | Stub |
-| `/runs/:taskId` | Engagement (messaging + floor + HITL) | **Slice 2 wired** — `GET /v1/tasks/{id}` + SSE timeline (HITL later) |
+| `/runs/:taskId` | Engagement (messaging + floor + HITL) | **Slice 3 wired** — SSE timeline + HITL cards → `POST …/hitl` |
 | `/practices` | Firm packs | Stub |
 | `/team` | Operators | Stub |
 | `/briefs` | Playbooks | Stub |
@@ -109,7 +111,7 @@ apps/web/
 
 ## What this scaffold explicitly does **not** include
 
-- HITL response cards / floor portraits / artifact climax (later slices)
+- Floor portraits / artifact climax / catalog wiring (later slices)
 - Operator portrait art kit
 - Auth/billing (“Free plan”) beyond placeholder chrome
 - Messenger deploy / Skills marketplace / Plugins nav
@@ -121,7 +123,7 @@ apps/web/
 
 1. ~~ComposeHome + `POST /v1/tasks` submit~~ **done** (auth key field, project picker, navigate to engagement)  
 2. ~~Engagement thread + `GET …/events` SSE~~ **done** (typed stream client + timeline)  
-3. HITL cards → `POST …/hitl`  
+3. ~~HITL cards → `POST …/hitl`~~ **done** (deterministic approve/reject cards)  
 4. Engagement floor portraits  
 5. Practices / Team / Briefs read-only catalogs  
 6. Artifact climax from `result`

@@ -6,6 +6,8 @@
 import { getApiKey } from "./auth";
 import {
   GantryApiError,
+  type HitlDecideBody,
+  type HitlDecideResponse,
   type Project,
   type SubmitTaskBody,
   type SubmitTaskResponse,
@@ -101,6 +103,18 @@ function parseSseFrame(frame: string): TaskSseEvent | null {
   } catch {
     return null;
   }
+}
+
+/** POST /v1/tasks/{id}/hitl — partner decision (C3 audit on server). */
+export async function decideHitl(
+  taskId: string,
+  body: HitlDecideBody,
+): Promise<HitlDecideResponse> {
+  const res = await gantryFetch(`/v1/tasks/${encodeURIComponent(taskId)}/hitl`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return expectOk<HitlDecideResponse>(res);
 }
 
 /**

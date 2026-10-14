@@ -9,6 +9,14 @@ export interface TaskResult {
   [key: string]: unknown;
 }
 
+export interface PendingHitl {
+  checkpoint: string;
+  workflow_id: string;
+  action?: string;
+  description?: string;
+  questions?: string[];
+}
+
 export interface Task {
   task_id: string;
   status: string;
@@ -19,9 +27,25 @@ export interface Task {
   autonomy_level?: string;
   playbook?: string | null;
   result?: TaskResult | null;
-  pending_hitl?: unknown[];
+  pending_hitl?: PendingHitl[];
   created_at?: string;
   updated_at?: string;
+}
+
+export interface HitlDecideBody {
+  checkpoint: string;
+  workflow_id: string;
+  approved?: boolean;
+  payload?: boolean | Record<string, unknown>;
+  signal?: string;
+}
+
+export interface HitlDecideResponse {
+  ok: boolean;
+  checkpoint: string;
+  acp_event?: string;
+  signal?: string;
+  workflow?: string;
 }
 
 export interface SubmitTaskBody {
